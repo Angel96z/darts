@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "795290115421",
+    "project_id": "dartsroses",
+    "storage_bucket": "dartsroses.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:795290115421:android:93999c7628660c144e1cb4",
+        "android_client_info": {
+          "package_name": "com.az.darts"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyArsQKz2H_-7vN9cIZy8u1rm7qTZkdwwt0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
