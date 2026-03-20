@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../logic/dart_throw_logic.dart';
-import 'training_stats.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 import 'widgets/training_sector_hits.dart';
@@ -146,8 +145,6 @@ class TrainingCharts {
 
   static Widget hitTrend(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
-
-    final target = throws.first.sector;
 
     // capisci se stai filtrando una sola freccetta
     final dartSet = throws.map((t) => t.dartInTurn).toSet();
@@ -337,8 +334,6 @@ class TrainingCharts {
   static Widget streak(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
 
-    final target = throws.first.sector;
-
     // =========================
     // STREAK FRECCETTE CONSECUTIVE
     // =========================
@@ -430,8 +425,6 @@ class TrainingCharts {
 
   static Widget performanceScore(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
-
-    final target = throws.first.sector;
 
     // =========================
     // 1. HIT RATE
@@ -662,27 +655,6 @@ class TrainingCharts {
   // DATA
   // =========================
 
-  static Map<String, double> _dartBreakdown(List<DartThrow> throws) {
-    final map = <int, int>{};
-
-    for (final t in throws) {
-      map[t.dartInTurn] = (map[t.dartInTurn] ?? 0) + 1;
-    }
-
-    return map.map((k, v) => MapEntry('D$k', v.toDouble()));
-  }
-
-  static Map<String, double> _ringDistribution(List<DartThrow> throws) {
-    final map = <String, int>{};
-
-    for (final t in throws) {
-      final ring = t.sector;
-      map[ring] = (map[ring] ?? 0) + 1;
-    }
-
-    return map.map((k, v) => MapEntry(k, v.toDouble()));
-  }
-
   // =========================
   // UI
   // =========================
@@ -743,21 +715,6 @@ class TrainingCharts {
             ),
           );
         }).toList(),
-      ),
-    );
-  }
-
-  static Widget _valueBox({
-    required String title,
-    required String value,
-  }) {
-    return _box(
-      title,
-      Center(
-        child: Text(
-          value,
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-        ),
       ),
     );
   }
