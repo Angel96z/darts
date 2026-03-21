@@ -257,9 +257,10 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
   Future<void> _autoAddAuthenticatedUser() async {
     final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-    final id = user?.uid ?? 'guest_${DateTime.now().millisecondsSinceEpoch}';
-    final name = user?.displayName ?? user?.email ?? 'Guest';
+    final id = user.uid;
+    final name = user.displayName ?? user.email ?? 'Player';
 
     final exists = state.players.any((p) => p.id == id);
     if (exists) return;
@@ -269,7 +270,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       LobbyPlayerVm(
         id: id,
         name: name,
-        isGuest: user == null,
+        isGuest: false,
         connection: ConnectionState.connected,
       ),
     ];
@@ -390,7 +391,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
         LobbyPlayerVm(
           id: id,
           name: name,
-          isGuest: true,
+          isGuest: false,
           connection: ConnectionState.connected,
         ),
       ],
@@ -400,8 +401,12 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
   Future<void> addCurrentUser({String? guestName}) async {
     final user = FirebaseAuth.instance.currentUser;
-    final name = user?.displayName ?? user?.email ?? guestName ?? 'Guest';
-    final id = user?.uid ?? 'guest_${DateTime.now().millisecondsSinceEpoch}';
+    final cleanGuestName = guestName?.trim() ?? '';
+    final isGuest = user == null;
+    if (isGuest && cleanGuestName.isEmpty) return;
+
+    final name = isGuest ? cleanGuestName : (user!.displayName ?? user.email ?? 'Player');
+    final id = isGuest ? 'guest_${DateTime.now().millisecondsSinceEpoch}' : user!.uid;
     final exists = state.players.any((p) => p.id == id);
     if (exists) return;
     state = state.copyWith(
@@ -410,7 +415,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
         LobbyPlayerVm(
           id: id,
           name: name,
-          isGuest: user == null,
+          isGuest: isGuest,
           connection: ConnectionState.connected,
         ),
       ],
