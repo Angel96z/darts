@@ -38,8 +38,6 @@ class MatchController extends StateNotifier<MatchViewModel?> {
   StreamSubscription<Match>? _sub;
   MatchCommandProcessor? _commandProcessor;
 
-  void bind(MatchStateSnapshot snapshot) {}
-
   Future<void> bindMatch({required Match match, required bool isOnline}) async {
     state = MatchViewModel(match: match, isOnline: isOnline, loading: false);
     if (!isOnline) return;
@@ -54,8 +52,8 @@ class MatchController extends StateNotifier<MatchViewModel?> {
       roomRepository: _ref.read(roomRepositoryProvider),
       matchRepository: _ref.read(matchRepositoryProvider),
       commandRepository: _ref.read(commandRepositoryProvider),
-      validator: const CommandValidator(),
-      reducer: const MatchReducer(),
+      validator: CommandValidator(),
+      reducer: MatchReducer(),
       engine: X01Engine(
         inRule: InRule(match.config.inMode),
         outRule: OutRule(match.config.outMode),

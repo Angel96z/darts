@@ -8,6 +8,14 @@ import '../reducers/match_reducer.dart';
 import '../validators/command_validator.dart';
 
 class MatchOrchestrator {
+  InputMode matchInputMode(PlayerId playerId) {
+    final match = _currentMatchCache;
+    if (match == null) return InputMode.totalTurnInput;
+    return match.config.inputSnapshot[playerId]?.mode ?? InputMode.totalTurnInput;
+  }
+
+  Match? _currentMatchCache;
+
   MatchOrchestrator({
     required RoomRepository roomRepository,
     required MatchRepository matchRepository,
@@ -34,6 +42,7 @@ class MatchOrchestrator {
     if (room == null) return;
 
     final match = command.matchId == null ? null : await _matchRepository.getMatch(command.roomId, command.matchId!);
+    _currentMatchCache = match;
     if (!_validator.validate(command: command, room: room, match: match)) return;
 
     if (command is SubmitTurnCommand && match != null) {
@@ -91,7 +100,7 @@ class MatchOrchestrator {
         legNumber: (draftMap['legNumber'] as num?)?.toInt() ?? 1,
         turnNumber: (draftMap['turnNumber'] as num?)?.toInt() ?? 1,
         inputs: inputs,
-        inputMode: InputMode.totalTurnInput,
+        inputMode: matchInputMode(PlayerId((draftMap['playerId'] ?? '') as String)),
       );
     }
 

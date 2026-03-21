@@ -7,17 +7,28 @@ import '../../result/pages/result_shell_page.dart';
 import '../../shared/view_models/connection_badge_vm.dart';
 import '../../shared/widgets/connection_badge.dart';
 import '../controllers/match_controller.dart';
-
+import '../../../domain/entities/match.dart';
 class MatchShellPage extends ConsumerStatefulWidget {
-  const MatchShellPage({super.key});
+  const MatchShellPage({super.key, required this.match, required this.isOnline});
+
+  final Match match;
+  final bool isOnline;
 
   @override
   ConsumerState<MatchShellPage> createState() => _MatchShellPageState();
 }
-
 class _MatchShellPageState extends ConsumerState<MatchShellPage> {
   int _input = 0;
-
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      ref.read(matchControllerProvider.notifier).bindMatch(
+        match: widget.match,
+        isOnline: widget.isOnline,
+      );
+    });
+  }
   @override
   Widget build(BuildContext context) {
     final vm = ref.watch(matchControllerProvider);
