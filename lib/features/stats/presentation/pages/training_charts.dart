@@ -1141,7 +1141,8 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
   double _viewEnd = 0;
   double _lastScale = 1;
   String? _tooltipText;
-  final FocusNode _focusNode = FocusNode();
+  final FocusNode _keyboardFocusNode = FocusNode();
+  final FocusNode _widgetFocusNode = FocusNode();
 
   int get _totalTurns {
     if (widget.series.isEmpty) return 0;
@@ -1170,7 +1171,8 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
 
   @override
   void dispose() {
-    _focusNode.dispose();
+    _keyboardFocusNode.dispose();
+    _widgetFocusNode.dispose();
     super.dispose();
   }
 
@@ -1275,14 +1277,13 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
                   }
                 },
                 child: RawKeyboardListener(
-                  focusNode: _focusNode,
+                  focusNode: _keyboardFocusNode,
                   onKey: (_) {},
                   child: Focus(
-                    focusNode: _focusNode,
+                    focusNode: _widgetFocusNode,
                     autofocus: true,
                     child: GestureDetector(
-                      onTap: () => _focusNode.requestFocus(),
-                      onScaleStart: (_) => _lastScale = 1,
+                      onTap: () => _widgetFocusNode.requestFocus(),                      onScaleStart: (_) => _lastScale = 1,
                       onScaleUpdate: (details) {
                         if (details.pointerCount != 2) return;
                         if ((details.scale - _lastScale).abs() > 0.02) {
