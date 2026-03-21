@@ -237,59 +237,46 @@ class _TrainingScreenState extends State<TrainingScreen> {
                   }
 
                   try {
-                    final feedback = await Navigator.push<TrainingFeedbackData>(
+                    final feedbackResult = await Navigator.push<TrainingFeedbackResult>(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const TrainingFeedbackScreen(),
-                      ),
-                    );
-                    if (feedback == null || !mounted) return;
-
-                    final saveResult = await _syncService.saveSession(
-                      mode: widget.mode.name,
-                      target: scoreController.target,
-                      start: _trainingStartTime,
-                      end: _trainingStartTime.add(_elapsed),
-                      throwsList: throwController.throws,
-                      focus: feedback.focus,
-                      stress: feedback.stress,
-                      energia: feedback.energia,
-                      fiducia: feedback.fiducia,
-                      distrazioni: feedback.distrazioni,
-                      commento: feedback.commento,
-                    );
-
-                    if (!mounted) return;
-
-                    String message;
-                    switch (saveResult.status) {
-                      case LocalTrainingSyncStatus.synced:
-                        message = 'Sessione salvata';
-                        break;
-                      case LocalTrainingSyncStatus.pending:
-                        message = 'Salvato offline. Verrà sincronizzato automaticamente';
-                        break;
-                      case LocalTrainingSyncStatus.failed:
-                      case LocalTrainingSyncStatus.syncing:
-                        message = 'Salvata. Sync non riuscita';
-                        break;
-                    }
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(message)),
-                    );
-
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => TrainingStatsScreen(
-                          title: 'Statistiche allenamento',
-                          mode: widget.mode,
-                          initialSessionId: saveResult.localId,
-                          initialTarget: scoreController.target,
+                        builder: (_) => TrainingFeedbackScreen(
+                          onSave: (feedback) {
+                            return _syncService.saveSession(
+                              mode: widget.mode.name,
+                              target: scoreController.target,
+                              start: _trainingStartTime,
+                              end: _trainingStartTime.add(_elapsed),
+                              throwsList: throwController.throws,
+                              focus: feedback.focus,
+                              stress: feedback.stress,
+                              energia: feedback.energia,
+                              fiducia: feedback.fiducia,
+                              distrazioni: feedback.distrazioni,
+                              commento: feedback.commento,
+                            );
+                          },
                         ),
                       ),
                     );
+                    if (feedbackResult == null || !mounted) return;
+
+                    if (feedbackResult.action == TrainingFeedbackAction.goToStats) {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => TrainingStatsScreen(
+                            title: 'Statistiche allenamento',
+                            mode: widget.mode,
+                            initialSessionId: feedbackResult.savedSessionId,
+                            initialTarget: scoreController.target,
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+
+                    Navigator.of(context).popUntil((route) => route.isFirst);
                   } catch (e) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Errore salvataggio: $e')),
