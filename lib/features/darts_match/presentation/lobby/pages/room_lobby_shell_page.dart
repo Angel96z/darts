@@ -19,7 +19,37 @@ class RoomLobbyShellPage extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Aggiungi giocatore locale'),
-        content: TextField(controller: ctrl, decoration: const InputDecoration(labelText: 'Nome')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: ctrl, decoration: const InputDecoration(labelText: 'Nome')),
+            const SizedBox(height: 12),
+            const Row(
+              children: [
+                Expanded(child: Divider()),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Text('oppure'),
+                ),
+                Expanded(child: Divider()),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () async {
+                final logged = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                );
+                if (logged == true) {
+                  await ref.read(lobbyControllerProvider.notifier).addAuthenticatedLocalGuest();
+                  if (context.mounted) Navigator.pop(context);
+                }
+              },
+              child: const Text('Accedi'),
+            ),
+          ],
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annulla')),
           FilledButton(

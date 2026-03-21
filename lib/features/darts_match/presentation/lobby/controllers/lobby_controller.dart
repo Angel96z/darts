@@ -372,6 +372,32 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     await _syncPlayers();
   }
 
+  Future<void> addAuthenticatedLocalGuest() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final id = user.uid;
+    final name = (user.displayName != null && user.displayName!.trim().isNotEmpty)
+        ? user.displayName!.trim()
+        : (user.email ?? 'Guest');
+
+    final exists = state.players.any((p) => p.id == id);
+    if (exists) return;
+
+    state = state.copyWith(
+      players: [
+        ...state.players,
+        LobbyPlayerVm(
+          id: id,
+          name: name,
+          isGuest: true,
+          connection: ConnectionState.connected,
+        ),
+      ],
+    );
+    await _syncPlayers();
+  }
+
   Future<void> addCurrentUser({String? guestName}) async {
     final user = FirebaseAuth.instance.currentUser;
     final name = user?.displayName ?? user?.email ?? guestName ?? 'Guest';
