@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' hide OverlayState;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../../core/widgets/blocking_overlay.dart';
 import '../../../domain/entities/match.dart';
@@ -37,6 +38,11 @@ class RoomLobbyShellPage extends ConsumerWidget {
             const SizedBox(height: 8),
             TextButton(
               onPressed: () async {
+                if (FirebaseAuth.instance.currentUser != null) {
+                  await ref.read(lobbyControllerProvider.notifier).addAuthenticatedUser();
+                  if (context.mounted) Navigator.pop(context);
+                  return;
+                }
                 await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -82,8 +88,14 @@ class RoomLobbyShellPage extends ConsumerWidget {
               child: const Text('Entra come guest'),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+              onPressed: () async {
+                if (FirebaseAuth.instance.currentUser != null) {
+                  await ref.read(lobbyControllerProvider.notifier).addAuthenticatedUser();
+                  if (context.mounted) Navigator.pop(context);
+                  return;
+                }
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+                await ref.read(lobbyControllerProvider.notifier).addAuthenticatedUser();
               },
               child: const Text('Login / Registrazione'),
             )
