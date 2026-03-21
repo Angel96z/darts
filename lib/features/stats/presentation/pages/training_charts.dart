@@ -1722,15 +1722,7 @@ LineTouchData _touch(void Function(int? index) onHoverIndex) {
       onHoverIndex(spot.x.toInt());
     },
     touchTooltipData: LineTouchTooltipData(
-      getTooltipColor: (_) => Colors.black87,
-      getTooltipItems: (spots) {
-        return spots.map((spot) {
-          return LineTooltipItem(
-            'Turno ${(spot.x + 1).toInt()}\n${spot.y.toStringAsFixed(1)}',
-            const TextStyle(color: Colors.white),
-          );
-        }).toList();
-      },
+      getTooltipItems: (_) => [],
     ),
   );
 }
