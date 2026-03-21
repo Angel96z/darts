@@ -1,19 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ResultVm {
-  const ResultVm({required this.winnerId, required this.highestScore, required this.average});
+import '../../../domain/entities/match.dart';
 
-  final String winnerId;
-  final int highestScore;
-  final int average;
-}
-
-class ResultController extends StateNotifier<ResultVm?> {
+class ResultController extends StateNotifier<MatchResult?> {
   ResultController() : super(null);
 
-  void setResult({required String winnerId, required int highestScore, required int average}) {
-    state = ResultVm(winnerId: winnerId, highestScore: highestScore, average: average);
-  }
+  void setResult(MatchResult result) => state = result;
 }
 
-final resultControllerProvider = StateNotifierProvider<ResultController, ResultVm?>((ref) => ResultController());
+final resultControllerProvider = StateNotifierProvider<ResultController, MatchResult?>((ref) => ResultController());
