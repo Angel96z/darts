@@ -161,13 +161,17 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       state = state.copyWith(clearLoading: true);
       return;
     }
+    final data = snap.data() ?? const <String, dynamic>{};
+    final players = _mapPlayers(data['players'] as List?);
     state = state.copyWith(
       roomId: roomId,
       isOnline: true,
       inviteLink: _buildInviteLink(roomId),
+      players: players,
       clearLoading: true,
     );
     _watchRoom(roomId);
+    await addCurrentUser();
   }
 
   void _watchRoom(String roomId) {
@@ -175,19 +179,22 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     _roomSub = FirebaseFirestore.instance.collection('rooms').doc(roomId).snapshots().listen((doc) {
       final data = doc.data();
       if (data == null) return;
-      final rawPlayers = List<Map<String, dynamic>>.from(data['players'] as List? ?? const []);
-      final players = rawPlayers
-          .map(
-            (p) => LobbyPlayerVm(
-              id: (p['id'] ?? '') as String,
-              name: (p['name'] ?? 'Guest') as String,
-              isGuest: (p['isGuest'] ?? true) as bool,
-              connection: (p['connected'] ?? true) ? ConnectionState.connected : ConnectionState.disconnected,
-            ),
-          )
-          .toList();
+      final players = _mapPlayers(data['players'] as List?);
       state = state.copyWith(players: players, connection: ConnectionState.connected);
     });
+  }
+
+  List<LobbyPlayerVm> _mapPlayers(List? rawPlayers) {
+    return List<Map<String, dynamic>>.from(rawPlayers ?? const [])
+        .map(
+          (p) => LobbyPlayerVm(
+            id: (p['id'] ?? '') as String,
+            name: (p['name'] ?? 'Guest') as String,
+            isGuest: (p['isGuest'] ?? true) as bool,
+            connection: (p['connected'] ?? true) ? ConnectionState.connected : ConnectionState.disconnected,
+          ),
+        )
+        .toList();
   }
 
   Future<void> addLocalGuest(String name) async {
