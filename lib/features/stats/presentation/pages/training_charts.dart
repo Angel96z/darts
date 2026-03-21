@@ -1185,21 +1185,28 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
 
   void _zoomAround(double factor, double centerX) {
     if (_totalTurns <= 1) return;
+
     final minIndex = 0.0;
     final maxIndex = (_totalTurns - 1).toDouble();
-    final oldSpan = max(1.0, _viewEnd - _viewStart);
-    final newSpan = (oldSpan / factor).clamp(_minWindowTurns, maxIndex + 1);
-    final ratio = oldSpan == 0 ? 0.5 : ((centerX - _viewStart) / oldSpan).clamp(0.0, 1.0);
-    double newStart = centerX - (newSpan * ratio);
+
+    final currentSpan = (_viewEnd - _viewStart).clamp(1.0, maxIndex);
+    final newSpan = (currentSpan / factor).clamp(_minWindowTurns, maxIndex);
+
+    final centerRatio = (centerX - _viewStart) / currentSpan;
+
+    double newStart = centerX - newSpan * centerRatio;
     double newEnd = newStart + newSpan;
+
     if (newStart < minIndex) {
       newStart = minIndex;
       newEnd = newStart + newSpan;
     }
+
     if (newEnd > maxIndex) {
       newEnd = maxIndex;
       newStart = newEnd - newSpan;
     }
+
     setState(() {
       _viewStart = newStart.clamp(minIndex, maxIndex);
       _viewEnd = newEnd.clamp(minIndex, maxIndex);
@@ -1210,7 +1217,7 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
     if (_totalTurns <= 1) return;
     final minIndex = 0.0;
     final maxIndex = (_totalTurns - 1).toDouble();
-    final span = max(1.0, _viewEnd - _viewStart);
+    final span = (_viewEnd - _viewStart).clamp(1.0, _totalTurns.toDouble());
     double newStart = _viewStart - deltaTurns;
     double newEnd = _viewEnd - deltaTurns;
     if (newStart < minIndex) {
@@ -1243,7 +1250,7 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
           final start = _viewStart.floor().clamp(0, s.points.length - 1);
           final end = _viewEnd.ceil().clamp(0, s.points.length - 1);
           final slice = s.points.sublist(start, end + 1);
-          final maxPoints = max(60, (width / 3).round());
+          final maxPoints = max(40, (width / 4).round());
           if (slice.length <= maxPoints) return ChartSeries(name: s.name, points: slice, color: s.color);
           final step = (slice.length / maxPoints).ceil();
           final sampled = <ChartDataPoint>[];
@@ -1271,9 +1278,13 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
               Listener(
                 onPointerSignal: (event) {
                   if (event is PointerScrollEvent && _isCtrlPressed()) {
-                    final centerX = _viewStart + ((event.localPosition.dx / width) * span);
-                    final factor = event.scrollDelta.dy > 0 ? 0.9 : 1.1;
+                    final centerX =
+                        _viewStart + ((event.localPosition.dx / width) * span);
+
+                    final factor = event.scrollDelta.dy > 0 ? 1.2 : 0.8;
+
                     _zoomAround(factor, centerX);
+
                   }
                 },
                 child: RawKeyboardListener(
@@ -1416,14 +1427,22 @@ class MultiLineChartRenderer extends StatelessWidget {
 
 FlTitlesData _titles(ChartConfig config) {
   return FlTitlesData(
+    topTitles: const AxisTitles(
+      sideTitles: SideTitles(showTitles: false),
+    ),
+    rightTitles: const AxisTitles(
+      sideTitles: SideTitles(showTitles: false),
+    ),
     leftTitles: AxisTitles(
       sideTitles: SideTitles(
         showTitles: true,
         interval: config.yInterval,
+        reservedSize: 36,
         getTitlesWidget: (v, _) {
-          final text = config.yLabelBuilder?.call(v) ?? v.toStringAsFixed(0);
+          final text =
+              config.yLabelBuilder?.call(v) ?? v.toStringAsFixed(0);
           if (text.isEmpty) return const SizedBox.shrink();
-          return Text(text);
+          return Text(text, style: const TextStyle(fontSize: 10));
         },
       ),
     ),
@@ -1431,10 +1450,15 @@ FlTitlesData _titles(ChartConfig config) {
       sideTitles: SideTitles(
         showTitles: true,
         interval: config.xInterval,
+        reservedSize: 28,
         getTitlesWidget: (v, _) {
-          final isInt = (v - v.roundToDouble()).abs() < 0.001;
+          final isInt =
+              (v - v.roundToDouble()).abs() < 0.001;
           if (!isInt) return const SizedBox.shrink();
-          return Text('${v.toInt() + 1}');
+          return Text(
+            '${v.toInt() + 1}',
+            style: const TextStyle(fontSize: 10),
+          );
         },
       ),
     ),
