@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../../../dto/match_dto.dart';
+import '../../dto/match_dto.dart';
 
 class FirestoreMatchDataSource {
   FirestoreMatchDataSource(this._firestore);
