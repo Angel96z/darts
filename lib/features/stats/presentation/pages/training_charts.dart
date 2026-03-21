@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../game/domain/entities/dart_models.dart';
@@ -445,10 +446,10 @@ class TrainingCharts {
   }
 
   static Widget relationalPerformance(
-    List<DartThrow> throws,
-    String target, {
-    bool showSessionTime = false,
-  }) {
+      List<DartThrow> throws,
+      String target, {
+        bool showSessionTime = false,
+      }) {
     if (throws.length < 3) return _empty();
 
     final turns = _buildTurns(throws);
@@ -470,7 +471,12 @@ class TrainingCharts {
     return BaseChartWidget(
       title: 'Relational performance',
       series: series,
-      config: const ChartConfig(minY: 0, maxY: 100, yInterval: 20, xInterval: 1),
+      config: const ChartConfig(
+        minY: 0,
+        maxY: 100,
+        yInterval: 20,
+        xInterval: 1,
+      ),
       highlightedRanges: [
         ChartRange(
           start: metrics.indexOf(best).toDouble(),
@@ -485,18 +491,23 @@ class TrainingCharts {
       ],
       tooltipBuilder: (index) {
         if (index < 0 || index >= metrics.length) return '';
+
         final m = metrics[index];
-        final session = showSessionTime && m.sessionDuration != null
+
+        final session =
+        showSessionTime && m.sessionDuration != null
             ? '\nSessione: ${_formatDurationHHmm(m.sessionDuration!)}'
             : '';
+
         return 'Turno ${m.turnNumber}\n'
             'Hit: ${m.hits}/3\n'
             'Precisione: ${m.avgMm.toStringAsFixed(1)} mm\n'
             'Consistenza: ${m.variance.toStringAsFixed(1)}$session';
-      ),
+      },
       legendText:
-          'Confronti hit, precisione e consistenza. Se una linea cala spesso, concentra il lavoro su quella metrica nella prossima sessione.',
+      'Confronti hit, precisione e consistenza. Se una linea cala spesso, concentra il lavoro su quella metrica nella prossima sessione.',
       rendererBuilder: (ctx) => MultiLineChartRenderer(ctx: ctx),
+
     );
   }
 
@@ -1023,15 +1034,19 @@ class BaseChartWidget extends StatefulWidget {
   final _ChartRendererBuilder rendererBuilder;
 
   const BaseChartWidget({
-    required this.title,
-    required this.series,
-    required this.config,
-    required this.legendText,
-    required this.rendererBuilder,
-    this.tooltipBuilder,
-    this.highlightedRanges = const [],
-    super.key,
+  required this.title,
+  required this.series,
+  required this.config,
+  this.legendText = '',
+  this.rendererBuilder = _defaultRenderer,
+  this.tooltipBuilder,
+  this.highlightedRanges = const [],
+  super.key,
   });
+
+  static Widget _defaultRenderer(_BaseChartContext ctx) {
+  return LineChartRenderer(ctx: ctx);
+  }
 
   @override
   State<BaseChartWidget> createState() => _BaseChartWidgetState();
@@ -1338,7 +1353,7 @@ LineTouchData _touch(void Function(int? index) onHoverIndex) {
       }
       onHoverIndex(response.lineBarSpots!.first.x.toInt());
     },
-    touchTooltipData: LineTouchTooltipData(tooltipBgColor: Colors.transparent),
+  touchTooltipData: LineTouchTooltipData(),
   );
 }
 
