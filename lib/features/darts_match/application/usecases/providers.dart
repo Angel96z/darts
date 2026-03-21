@@ -3,6 +3,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/datasources/firestore/firestore_command_datasource.dart';
+import '../../data/datasources/firestore/firestore_connection_datasource.dart';
 import '../../data/datasources/firestore/firestore_match_datasource.dart';
 import '../../data/datasources/firestore/firestore_room_datasource.dart';
 import '../../data/datasources/rtdb_presence/rtdb_presence_datasource.dart';
@@ -27,6 +28,10 @@ final matchRepositoryProvider = Provider<MatchRepository>((ref) {
 
 final commandRepositoryProvider = Provider<CommandRepository>((ref) {
   return FirebaseCommandRepository(FirestoreCommandDataSource(FirebaseFirestore.instance));
+});
+
+final backendConnectionServiceProvider = Provider<FirestoreConnectionDataSource>((ref) {
+  return FirestoreConnectionDataSource(FirebaseFirestore.instance);
 });
 
 final presenceRepositoryProvider = Provider<PresenceRepository>((ref) {

@@ -38,6 +38,15 @@ class MatchController extends StateNotifier<MatchViewModel?> {
   StreamSubscription<Match>? _sub;
   MatchCommandProcessor? _commandProcessor;
 
+  Future<bool> _checkBackendConnection() async {
+    final ok = await _ref.read(backendConnectionServiceProvider).checkBackendConnection();
+    final current = state;
+    if (current != null) {
+      state = current.copyWith(isOnline: ok);
+    }
+    return ok;
+  }
+
   Future<void> bindMatch({required Match match, required bool isOnline}) async {
     state = MatchViewModel(match: match, isOnline: isOnline, loading: false);
     if (!isOnline) return;
@@ -70,7 +79,8 @@ class MatchController extends StateNotifier<MatchViewModel?> {
 
   Future<void> submitTurn(int points) async {
     final current = state;
-    if (current == null || !current.isOnline) return;
+    if (current == null) return;
+    if (!await _checkBackendConnection()) return;
 
     final now = DateTime.now();
     final commandId = FirebaseFirestore.instance.collection('_').doc().id;
@@ -96,12 +106,20 @@ class MatchController extends StateNotifier<MatchViewModel?> {
       status: CommandStatus.pending,
     );
 
-    await _ref.read(commandRepositoryProvider).enqueue(command);
+    try {
+      await _ref.read(commandRepositoryProvider).enqueue(command);
+    } catch (_) {
+      final latest = state;
+      if (latest != null) {
+        state = latest.copyWith(isOnline: false);
+      }
+    }
   }
 
   Future<void> undoLastTurn() async {
     final current = state;
-    if (current == null || !current.isOnline) return;
+    if (current == null) return;
+    if (!await _checkBackendConnection()) return;
 
     final now = DateTime.now();
     final commandId = FirebaseFirestore.instance.collection('_').doc().id;
@@ -116,7 +134,14 @@ class MatchController extends StateNotifier<MatchViewModel?> {
       status: CommandStatus.pending,
     );
 
-    await _ref.read(commandRepositoryProvider).enqueue(command);
+    try {
+      await _ref.read(commandRepositoryProvider).enqueue(command);
+    } catch (_) {
+      final latest = state;
+      if (latest != null) {
+        state = latest.copyWith(isOnline: false);
+      }
+    }
   }
 
   @override
