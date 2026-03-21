@@ -12,17 +12,15 @@ import '../../../game/domain/entities/training_mode.dart';
 
 import '../../../game/presentation/widgets/dartboard_widget.dart';
 import '../../data/datasources/local_training_sync_service.dart';
-import '../../data/repositories_impl/training_repository.dart';
 import '../../domain/usecases/training_save_logic.dart';
 import '../../domain/entities/training_stats.dart';
-import 'training_summary_screen.dart';
+import 'training_feedback_screen.dart';
+import 'training_stats_screen.dart';
 import '../widgets/target_sector_selector.dart';
 import '../widgets/training_quadrant_distance.dart';
 import '../widgets/training_throws_turns.dart';
 import '../widgets/training_hit_stats.dart';
 import '../widgets/training_sector_hits.dart';
-
-enum SaveOverlayState { loading, success, error }
 
 class TrainingScreen extends StatefulWidget {
   final String title;
@@ -41,10 +39,7 @@ class TrainingScreen extends StatefulWidget {
 class _TrainingScreenState extends State<TrainingScreen> {
   Timer? _elapsedTimer;
 
-  final TrainingRepository _trainingRepo = TrainingRepository();
   late final LocalTrainingSyncService _syncService = LocalTrainingSyncService.instance;
-  SaveOverlayState? _overlayState;
-  String? _overlayMessage;
 
   late final DateTime _trainingStartTime = DateTime.now();
 
@@ -98,75 +93,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
     scoreController.dispose();
     throwController.dispose();
     super.dispose();
-  }
-
-  Widget _buildOverlay() {
-    if (_overlayState == null) return const SizedBox();
-
-    IconData icon;
-    Color color;
-    bool showSpinner = false;
-
-    switch (_overlayState) {
-      case SaveOverlayState.loading:
-        showSpinner = true;
-        icon = Icons.hourglass_empty;
-        color = Colors.white;
-        break;
-      case SaveOverlayState.success:
-        icon = Icons.check_circle;
-        color = Colors.green;
-        break;
-      case SaveOverlayState.error:
-        icon = Icons.close;
-        color = Colors.red;
-        break;
-      case null:
-        icon = Icons.info;
-        color = Colors.white;
-        break;
-    }
-    return Positioned.fill(
-      child: AbsorbPointer(
-        absorbing: true,
-        child: Container(
-          color: Colors.black.withOpacity(0.55),
-          child: Center(
-            child: Container(
-              width: 320,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (showSpinner) const CircularProgressIndicator(),
-                  if (!showSpinner)
-                    Icon(icon, size: 48, color: color),
-                  const SizedBox(height: 16),
-                  Text(_overlayMessage ?? "",
-                      textAlign: TextAlign.center),
-                  if (_overlayState == SaveOverlayState.error)
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () {
-                          setState(() {
-                            _overlayState = null;
-                          });
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 
   Widget _buildBoard() {
@@ -304,73 +230,70 @@ class _TrainingScreenState extends State<TrainingScreen> {
                   final result = TrainingSaveLogic.validateSave(throwController);
 
                   if (!result.canSave) {
-                    setState(() {
-                      _overlayState = SaveOverlayState.error;
-                      _overlayMessage = result.message;
-                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(result.message)),
+                    );
                     return;
                   }
 
-                  setState(() {
-                    _overlayState = SaveOverlayState.loading;
-                    _overlayMessage = "Salvataggio in corso...";
-                  });
-
                   try {
-// 1. Salva locale con transaction
-                    final localId = await _syncService.saveLocalTransactional(
+                    final feedback = await Navigator.push<TrainingFeedbackData>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const TrainingFeedbackScreen(),
+                      ),
+                    );
+                    if (feedback == null || !mounted) return;
+
+                    final saveResult = await _syncService.saveSession(
                       mode: widget.mode.name,
                       target: scoreController.target,
                       start: _trainingStartTime,
                       end: _trainingStartTime.add(_elapsed),
                       throwsList: throwController.throws,
+                      focus: feedback.focus,
+                      stress: feedback.stress,
+                      energia: feedback.energia,
+                      fiducia: feedback.fiducia,
+                      distrazioni: feedback.distrazioni,
+                      commento: feedback.commento,
                     );
-
-// 2. Tenta sincronizzazione con retry (con timeout breve)
-                    try {
-// Esegui sync con timeout di 3 secondi
-                      await _syncService.syncAllWithRetry(maxRetries: 1)
-                          .timeout(const Duration(seconds: 5));
-                    } catch (e) {
-// Se fallisce, marca come pending per sync successivo
-                      await _syncService.markPendingSync(localId);
-
-                      String message = "Salvato in locale";
-                      if (e.toString().contains("Timeout")) {
-                        message = "Salvato in locale (sync troppo lento)";
-                      } else {
-                        message = "Salvato in locale (offline)";
-                      }
-
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(message),
-                            backgroundColor: Colors.orange,
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      }
-
-                      debugPrint('Sync non riuscito: $e');
-                    }
 
                     if (!mounted) return;
 
-// 3. Naviga al summary
+                    String message;
+                    switch (saveResult.status) {
+                      case LocalTrainingSyncStatus.synced:
+                        message = 'Sessione salvata';
+                        break;
+                      case LocalTrainingSyncStatus.pending:
+                        message = 'Salvato offline. Verrà sincronizzato automaticamente';
+                        break;
+                      case LocalTrainingSyncStatus.failed:
+                      case LocalTrainingSyncStatus.syncing:
+                        message = 'Salvata. Sync non riuscita';
+                        break;
+                    }
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(message)),
+                    );
+
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => TrainingSummaryScreen(
-                          trainingId: localId,
+                        builder: (_) => TrainingStatsScreen(
+                          title: 'Statistiche allenamento',
+                          mode: widget.mode,
+                          initialSessionId: saveResult.localId,
+                          initialTarget: scoreController.target,
                         ),
                       ),
                     );
                   } catch (e) {
-                    setState(() {
-                      _overlayState = SaveOverlayState.error;
-                      _overlayMessage = "Errore salvataggio: $e";
-                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Errore salvataggio: $e')),
+                    );
                   }
                 }
             ),
@@ -504,7 +427,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
                 );
               },
             ),
-            _buildOverlay(),
           ],
         ),
       ),

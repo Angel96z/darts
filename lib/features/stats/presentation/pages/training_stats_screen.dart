@@ -58,11 +58,15 @@ enum SessionSort {
 class TrainingStatsScreen extends StatefulWidget {
   final String title;
   final TrainingMode mode;
+  final String? initialSessionId;
+  final String? initialTarget;
 
   const TrainingStatsScreen({
     super.key,
     required this.title,
     required this.mode,
+    this.initialSessionId,
+    this.initialTarget,
   });
 
   @override
@@ -84,6 +88,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
   @override
   void initState() {
     super.initState();
+    _target = widget.initialTarget ?? _target;
 
     final now = DateTime.now();
     _range = DateTimeRange(
@@ -108,9 +113,24 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
 
     if (!mounted) return;
 
+    TrainingSessionStats? highlighted;
+    if (widget.initialSessionId != null) {
+      final sessions = await _loadTrainingsForTarget();
+      for (final session in sessions) {
+        if (session.id == widget.initialSessionId) {
+          highlighted = session;
+          break;
+        }
+      }
+    }
+
     setState(() {
       _cachedRecords = allRecords;
       _loaded = true;
+      if (highlighted != null) {
+        _mode = StatsMode.session;
+        _session = highlighted;
+      }
     });
   }
 
@@ -223,6 +243,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       MaterialPageRoute(
         builder: (_) => _SessionPickerScreen(
           target: _target,
+          highlightedSessionId: widget.initialSessionId,
           onSelect: (session) {
             setState(() {
               _mode = StatsMode.session;
@@ -348,8 +369,44 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
   }
 
   Future<List<TrainingSessionStats>> _loadTrainingsForTarget() async {
+    final sessions = <TrainingSessionStats>[];
+    final added = <String>{};
+
+    final localRecords = await LocalTrainingSyncService.instance.getAllRecords();
+    for (final local in localRecords.where((e) => e.target == _target)) {
+      final localStats = TrainingStats(local.throwsList);
+      final id = local.remoteId ?? local.localId;
+      added.add(id);
+
+      sessions.add(
+        TrainingSessionStats(
+          id: id,
+          target: local.target,
+          startTime: local.startTime,
+          endTime: local.endTime,
+          durationSeconds: local.endTime.difference(local.startTime).inSeconds,
+          totalThrows: localStats.totalThrows,
+          totalTurns: localStats.totalTurns,
+          hits: localStats.targetHits(local.target),
+          miss: localStats.targetMiss(local.target),
+          hitPercent: localStats.totalThrows == 0
+              ? 0
+              : ((localStats.targetHits(local.target) / localStats.totalThrows) * 100).round(),
+          avgDistanceMm: localStats.averageDistanceMm,
+          bestStreak: localStats.bestStreak(local.target),
+          focus: local.focus,
+          stress: local.stress,
+          energia: local.energia,
+          fiducia: local.fiducia,
+          distrazioni: local.distrazioni,
+          commento: local.commento,
+          syncStatus: local.syncStatus,
+        ),
+      );
+    }
+
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return [];
+    if (user == null) return sessions;
 
     final snapshot = await FirebaseFirestore.instance
         .collection('users')
@@ -359,9 +416,8 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
         .where('status', isEqualTo: 'complete')
         .get();
 
-    final sessions = <TrainingSessionStats>[];
-
     for (final doc in snapshot.docs) {
+      if (added.contains(doc.id)) continue;
       final data = doc.data();
 
       final startTs = data['startTime'];
@@ -395,6 +451,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
           fiducia: _asNullableInt(data['fiducia']),
           distrazioni: _asNullableInt(data['distrazioni']),
           commento: data['commento']?.toString(),
+          syncStatus: LocalTrainingSyncStatus.synced,
         ),
       );
     }
@@ -941,10 +998,12 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
 
 class _SessionPickerScreen extends StatefulWidget {
   final String target;
+  final String? highlightedSessionId;
   final ValueChanged<TrainingSessionStats> onSelect;
 
   const _SessionPickerScreen({
     required this.target,
+    required this.highlightedSessionId,
     required this.onSelect,
   });
 
@@ -963,8 +1022,47 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
   }
 
   Future<List<TrainingSessionStats>> _loadSessions() async {
+    final sessions = <TrainingSessionStats>[];
+    final added = <String>{};
+
+    final localRecords = await LocalTrainingSyncService.instance.getAllRecords();
+    for (final local in localRecords.where((e) => e.target == widget.target)) {
+      final localStats = TrainingStats(local.throwsList);
+      final id = local.remoteId ?? local.localId;
+      added.add(id);
+
+      sessions.add(
+        TrainingSessionStats(
+          id: id,
+          target: local.target,
+          startTime: local.startTime,
+          endTime: local.endTime,
+          durationSeconds: local.endTime.difference(local.startTime).inSeconds,
+          totalThrows: localStats.totalThrows,
+          totalTurns: localStats.totalTurns,
+          hits: localStats.targetHits(local.target),
+          miss: localStats.targetMiss(local.target),
+          hitPercent: localStats.totalThrows == 0
+              ? 0
+              : ((localStats.targetHits(local.target) / localStats.totalThrows) * 100).round(),
+          avgDistanceMm: localStats.averageDistanceMm,
+          bestStreak: localStats.bestStreak(local.target),
+          focus: local.focus,
+          stress: local.stress,
+          energia: local.energia,
+          fiducia: local.fiducia,
+          distrazioni: local.distrazioni,
+          commento: local.commento,
+          syncStatus: local.syncStatus,
+        ),
+      );
+    }
+
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return [];
+    if (user == null) {
+      _sortSessions(sessions);
+      return sessions;
+    }
 
     final snapshot = await FirebaseFirestore.instance
         .collection('users')
@@ -974,9 +1072,8 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
         .where('status', isEqualTo: 'complete')
         .get();
 
-    final sessions = <TrainingSessionStats>[];
-
     for (final doc in snapshot.docs) {
+      if (added.contains(doc.id)) continue;
       final data = doc.data();
 
       final startTs = data['startTime'];
@@ -1010,6 +1107,7 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
           fiducia: _asNullableInt(data['fiducia']),
           distrazioni: _asNullableInt(data['distrazioni']),
           commento: data['commento']?.toString(),
+          syncStatus: LocalTrainingSyncStatus.synced,
         ),
       );
     }
@@ -1115,62 +1213,58 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
             itemCount: sessions.length,
             itemBuilder: (context, index) {
               final s = sessions[index];
+              final isHighlighted = widget.highlightedSessionId == s.id;
+              final status = s.syncStatus;
+              IconData? icon;
+              Color? iconColor;
 
-              return FutureBuilder<LocalTrainingRecord?>(
-                future: LocalTrainingSyncService.instance.getById(s.id),
-                builder: (context, snapshot) {
-                  Color? iconColor;
-                  IconData? icon;
+              switch (status) {
+                case LocalTrainingSyncStatus.synced:
+                  icon = Icons.cloud_done;
+                  iconColor = Colors.green;
+                  break;
+                case LocalTrainingSyncStatus.pending:
+                  icon = Icons.cloud_upload;
+                  iconColor = Colors.orange;
+                  break;
+                case LocalTrainingSyncStatus.syncing:
+                  icon = Icons.cloud_sync;
+                  iconColor = Colors.blue;
+                  break;
+                case LocalTrainingSyncStatus.failed:
+                  icon = Icons.cloud_off;
+                  iconColor = Colors.red;
+                  break;
+                case null:
+                  break;
+              }
 
-                  if (snapshot.hasData) {
-                    final record = snapshot.data;
-                    if (record != null) {
-                      switch (record.syncStatus) {
-                        case LocalTrainingSyncStatus.synced:
-                          iconColor = Colors.green;
-                          icon = Icons.cloud_done;
-                          break;
-                        case LocalTrainingSyncStatus.pending:
-                          iconColor = Colors.orange;
-                          icon = Icons.cloud_upload;
-                          break;
-                        case LocalTrainingSyncStatus.syncing:
-                          iconColor = Colors.blue;
-                          icon = Icons.cloud_sync;
-                          break;
-                        case LocalTrainingSyncStatus.failed:
-                          iconColor = Colors.red;
-                          icon = Icons.cloud_off;
-                          break;
-                      }
-                    }
-                  }
-
-                  return ListTile(
-                    leading: icon != null
-                        ? Icon(icon, color: iconColor)
-                        : null,
-                    title: Text(
-                      '${DateFormat('dd/MM/yyyy').format(s.startTime)} • ${s.id}',
-                    ),
-                    subtitle: Text(
-                      '${s.hitPercent}% • ${s.totalThrows} tiri • ${_formatDuration(s.durationSeconds)}',
-                    ),
-                    trailing: snapshot.hasData && snapshot.data?.syncStatus == LocalTrainingSyncStatus.failed
-                        ? IconButton(
-                      icon: const Icon(Icons.refresh),
-                      onPressed: () async {
-                        await LocalTrainingSyncService.instance.syncAll();
-                        setState(() {});
-                      },
-                    )
-                        : null,
-                    onTap: () {
-                      widget.onSelect(s);
-                      Navigator.pop(context);
-                    },
-                  );
-                },
+              return Container(
+                color: isHighlighted ? Colors.amber.withOpacity(0.15) : null,
+                child: ListTile(
+                  leading: icon != null ? Icon(icon, color: iconColor) : null,
+                  title: Text(
+                    '${DateFormat('dd/MM/yyyy').format(s.startTime)} • ${s.id}',
+                  ),
+                  subtitle: Text(
+                    '${s.hitPercent}% • ${s.totalThrows} tiri • ${_formatDuration(s.durationSeconds)}',
+                  ),
+                  trailing: status == LocalTrainingSyncStatus.failed
+                      ? IconButton(
+                          icon: const Icon(Icons.refresh),
+                          onPressed: () async {
+                            await LocalTrainingSyncService.instance.syncAll();
+                            _reload();
+                          },
+                        )
+                      : isHighlighted
+                          ? const Icon(Icons.check_circle, color: Colors.amber)
+                          : null,
+                  onTap: () {
+                    widget.onSelect(s);
+                    Navigator.pop(context);
+                  },
+                ),
               );
             },
           );
@@ -1211,6 +1305,7 @@ class TrainingSessionStats {
   final int? fiducia;
   final int? distrazioni;
   final String? commento;
+  final LocalTrainingSyncStatus? syncStatus;
 
   const TrainingSessionStats({
     required this.id,
@@ -1231,6 +1326,7 @@ class TrainingSessionStats {
     this.fiducia,
     this.distrazioni,
     this.commento,
+    this.syncStatus,
   });
 }
 
