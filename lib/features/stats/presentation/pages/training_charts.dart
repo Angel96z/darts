@@ -291,7 +291,58 @@ class TrainingCharts {
       points.add(ChartDataPoint(x: i.toDouble(), y: sessions[i].performance));
     }
 
-    return BaseChartWidget(
+    final sums = <String, double>{
+      'Focus': 0,
+      'Stress': 0,
+      'Energia': 0,
+      'Fiducia': 0,
+      'Distrazioni': 0,
+    };
+    final counts = <String, int>{
+      'Focus': 0,
+      'Stress': 0,
+      'Energia': 0,
+      'Fiducia': 0,
+      'Distrazioni': 0,
+    };
+
+    void collect(String key, num? value) {
+      if (value == null) return;
+      sums[key] = (sums[key] ?? 0) + value.toDouble();
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+
+    for (final s in sessions) {
+      collect('Focus', s.focus);
+      collect('Stress', s.stress);
+      collect('Energia', s.energia);
+      collect('Fiducia', s.fiducia);
+      collect('Distrazioni', s.distrazioni);
+    }
+
+    final averages = <String, double>{};
+    for (final entry in sums.entries) {
+      final count = counts[entry.key] ?? 0;
+      if (count > 0) averages[entry.key] = entry.value / count;
+    }
+
+    Widget mediaRow(String label, double value) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label),
+            Text(
+              value.toStringAsFixed(1),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final chart = BaseChartWidget(
       title: title,
       series: [ChartSeries(name: 'Performance', points: points, color: color)],
       config: const ChartConfig(
@@ -312,6 +363,32 @@ class TrainingCharts {
       },
       legendText: 'Confronta i contesti mentali/fisici delle sessioni migliori e peggiori.',
       rendererBuilder: (ctx) => LineChartRenderer(ctx: ctx, showDots: true),
+    );
+
+    if (averages.isEmpty) return chart;
+
+    return Column(
+      children: [
+        chart,
+        _box(
+          'Media sessioni',
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (averages.containsKey('Focus'))
+                mediaRow('Focus', averages['Focus']!),
+              if (averages.containsKey('Stress'))
+                mediaRow('Stress', averages['Stress']!),
+              if (averages.containsKey('Energia'))
+                mediaRow('Energia', averages['Energia']!),
+              if (averages.containsKey('Fiducia'))
+                mediaRow('Fiducia', averages['Fiducia']!),
+              if (averages.containsKey('Distrazioni'))
+                mediaRow('Distrazioni', averages['Distrazioni']!),
+            ],
+          ),
+        ),
+      ],
     );
   }
   static Widget directionalBias(List<DartThrow> throws) {
