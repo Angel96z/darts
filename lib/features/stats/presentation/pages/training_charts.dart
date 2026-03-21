@@ -493,42 +493,24 @@ class TrainingCharts {
     );
   }
 
-  static Widget relationalPerformance(List<DartThrow> throws) {
+  static Widget relationalPerformance(
+    List<DartThrow> throws,
+    String target, {
+    bool showSessionTime = false,
+  }) {
     if (throws.length < 3) return _empty();
 
     final turns = _buildTurns(throws);
     if (turns.isEmpty) return _empty();
 
-    final segments = _buildDynamicSegments(turns);
-    if (segments.isEmpty) return _empty();
+    final metrics = _buildTurnMetrics(
+      turns: turns,
+      target: target,
+      showSessionTime: showSessionTime,
+    );
+    if (metrics.isEmpty) return _empty();
 
-    final variances = segments.map((s) => s.variance).toList();
-    final maxVariance = variances.isEmpty
-        ? 0.0
-        : variances.reduce((a, b) => a > b ? a : b);
-
-    final enriched = segments.map((s) {
-      final hitRate = (s.hitRate * 100).clamp(0.0, 100.0);
-      final precision = (1 - (s.avgMm / 100)).clamp(0.0, 1.0) * 100;
-      final consistency = maxVariance == 0
-          ? 100.0
-          : (1 - (s.variance / maxVariance)).clamp(0.0, 1.0) * 100;
-      final score = hitRate * 0.5 + precision * 0.3 + consistency * 0.2;
-      return _RelationalSegment(
-        startTurn: s.startTurn,
-        endTurn: s.endTurn,
-        hitRate: hitRate,
-        precision: precision,
-        consistency: consistency,
-        avgMm: s.avgMm,
-        variance: s.variance,
-        meanXmm: s.meanXmm,
-        meanYmm: s.meanYmm,
-        score: score,
-      );
-    }).toList();
-
-    final sorted = [...enriched]..sort((a, b) => b.score.compareTo(a.score));
+    final sorted = [...metrics]..sort((a, b) => b.score.compareTo(a.score));
     final best = sorted.first;
     final worst = sorted.last;
 
@@ -536,11 +518,11 @@ class TrainingCharts {
     final precisionSpots = <FlSpot>[];
     final consistencySpots = <FlSpot>[];
 
-    for (int i = 0; i < enriched.length; i++) {
+    for (int i = 0; i < metrics.length; i++) {
       final x = i.toDouble();
-      hitSpots.add(FlSpot(x, enriched[i].hitRate));
-      precisionSpots.add(FlSpot(x, enriched[i].precision));
-      consistencySpots.add(FlSpot(x, enriched[i].consistency));
+      hitSpots.add(FlSpot(x, metrics[i].hitRate));
+      precisionSpots.add(FlSpot(x, metrics[i].precisionForChart));
+      consistencySpots.add(FlSpot(x, metrics[i].consistencyNorm));
     }
 
     return _ZoomableMultiTrendBox(
@@ -551,54 +533,39 @@ class TrainingCharts {
         _SeriesData(name: 'Consistenza', color: Colors.purple, spots: consistencySpots),
       ],
       bestRange: _RangeMarker(
-        start: enriched.indexOf(best).toDouble(),
-        end: enriched.indexOf(best).toDouble(),
+        start: metrics.indexOf(best).toDouble(),
+        end: metrics.indexOf(best).toDouble(),
         color: Colors.green.withOpacity(0.18),
       ),
       worstRange: _RangeMarker(
-        start: enriched.indexOf(worst).toDouble(),
-        end: enriched.indexOf(worst).toDouble(),
+        start: metrics.indexOf(worst).toDouble(),
+        end: metrics.indexOf(worst).toDouble(),
         color: Colors.red.withOpacity(0.18),
       ),
+      tooltipBuilder: (index) {
+        if (index < 0 || index >= metrics.length) return '';
+        final m = metrics[index];
+        final session = showSessionTime && m.sessionDuration != null
+            ? '\nSessione: ${_formatDurationHHmm(m.sessionDuration!)}'
+            : '';
+        return 'Turno ${m.turnNumber}\n'
+            'Hit: ${m.hits}/3\n'
+            'Precisione: ${m.avgMm.toStringAsFixed(1)} mm\n'
+            'Consistenza: ${m.variance.toStringAsFixed(1)}$session';
+      },
     );
   }
 
-  static Widget bestWorstAnalysis(List<DartThrow> throws) {
+  static Widget bestWorstAnalysis(List<DartThrow> throws, String target) {
     if (throws.length < 3) return _empty();
 
     final turns = _buildTurns(throws);
     if (turns.isEmpty) return _empty();
 
-    final segments = _buildDynamicSegments(turns);
-    if (segments.isEmpty) return _empty();
+    final metrics = _buildTurnMetrics(turns: turns, target: target, showSessionTime: false);
+    if (metrics.isEmpty) return _empty();
 
-    final variances = segments.map((s) => s.variance).toList();
-    final maxVariance = variances.isEmpty
-        ? 0.0
-        : variances.reduce((a, b) => a > b ? a : b);
-
-    final enriched = segments.map((s) {
-      final hitRate = (s.hitRate * 100).clamp(0.0, 100.0);
-      final precision = (1 - (s.avgMm / 100)).clamp(0.0, 1.0) * 100;
-      final consistency = maxVariance == 0
-          ? 100.0
-          : (1 - (s.variance / maxVariance)).clamp(0.0, 1.0) * 100;
-      final score = hitRate * 0.5 + precision * 0.3 + consistency * 0.2;
-      return _RelationalSegment(
-        startTurn: s.startTurn,
-        endTurn: s.endTurn,
-        hitRate: hitRate,
-        precision: precision,
-        consistency: consistency,
-        avgMm: s.avgMm,
-        variance: s.variance,
-        meanXmm: s.meanXmm,
-        meanYmm: s.meanYmm,
-        score: score,
-      );
-    }).toList();
-
-    final sorted = [...enriched]..sort((a, b) => b.score.compareTo(a.score));
+    final sorted = [...metrics]..sort((a, b) => b.score.compareTo(a.score));
     final best = sorted.first;
     final worst = sorted.last;
 
@@ -622,9 +589,7 @@ class TrainingCharts {
 
     final deltaHit = best.hitRate - worst.hitRate;
     final deltaMm = best.avgMm - worst.avgMm;
-    final deltaX = best.meanXmm - worst.meanXmm;
-    final deltaY = best.meanYmm - worst.meanYmm;
-    final deltaConsistency = best.consistency - worst.consistency;
+    final deltaConsistency = best.consistencyNorm - worst.consistencyNorm;
 
     return _box(
       'Best vs Worst',
@@ -633,24 +598,20 @@ class TrainingCharts {
         children: [
           const Text('BEST', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
+          row('Turno', '#${best.turnNumber}'),
           row('Hit rate', '${best.hitRate.toStringAsFixed(1)}%'),
           row('Avg mm', '${best.avgMm.toStringAsFixed(1)} mm'),
-          row('Bias X', '${signed(best.meanXmm, unit: ' mm')}'),
-          row('Bias Y', '${signed(best.meanYmm, unit: ' mm')}'),
-          row('Consistency', '${best.consistency.toStringAsFixed(1)}%'),
+          row('Consistenza', '${best.variance.toStringAsFixed(1)}'),
           const Divider(),
           const Text('WORST', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
+          row('Turno', '#${worst.turnNumber}'),
           row('Hit rate', '${worst.hitRate.toStringAsFixed(1)}%'),
           row('Avg mm', '${worst.avgMm.toStringAsFixed(1)} mm'),
-          row('Bias X', '${signed(worst.meanXmm, unit: ' mm')}'),
-          row('Bias Y', '${signed(worst.meanYmm, unit: ' mm')}'),
-          row('Consistency', '${worst.consistency.toStringAsFixed(1)}%'),
+          row('Consistenza', '${worst.variance.toStringAsFixed(1)}'),
           const Divider(),
           Text('${signed(deltaHit, unit: '%')} hit'),
           Text('${signed(deltaMm, unit: 'mm')} distanza'),
-          Text('bias X ${signed(deltaX, unit: 'mm')}'),
-          Text('bias Y ${signed(deltaY, unit: 'mm')}'),
           Text('${signed(deltaConsistency, unit: '%')} consistency'),
         ],
       ),
@@ -666,71 +627,88 @@ class TrainingCharts {
     return turns;
   }
 
-  static List<_RawSegment> _buildDynamicSegments(List<List<DartThrow>> turns) {
-    final total = turns.length;
-    if (total == 0) return [];
+  static List<_TurnMetric> _buildTurnMetrics({
+    required List<List<DartThrow>> turns,
+    required String target,
+    required bool showSessionTime,
+  }) {
+    if (turns.isEmpty) return [];
 
-    final segmentCount = sqrt(total).ceil().clamp(1, total);
-    final out = <_RawSegment>[];
+    final maxMm = turns
+        .expand((t) => t)
+        .map((t) => t.distanceMm)
+        .fold(0.0, (p, v) => v > p ? v : p);
 
-    int start = 0;
-    for (int i = 0; i < segmentCount; i++) {
-      final remainingSegments = segmentCount - i;
-      final remainingTurns = total - start;
-      final size = (remainingTurns / remainingSegments).ceil();
-      final end = (start + size).clamp(start + 1, total);
-
-      final flat = turns.sublist(start, end).expand((t) => t).toList();
-      if (flat.isNotEmpty) {
-        out.add(_buildRawSegment(flat, start, end - 1));
-      }
-      start = end;
-      if (start >= total) break;
+    final raw = <_TurnMetricRaw>[];
+    for (int i = 0; i < turns.length; i++) {
+      final turn = turns[i];
+      final hits = turn.where((t) => t.sector == target).length;
+      final avgMm = turn.map((t) => t.distanceMm).reduce((a, b) => a + b) / turn.length;
+      final variance = turn
+          .map((t) => pow(t.distanceMm - avgMm, 2).toDouble())
+          .reduce((a, b) => a + b) /
+          turn.length;
+      raw.add(_TurnMetricRaw(turnNumber: i + 1, hits: hits, hitRate: (hits / 3) * 100, avgMm: avgMm, variance: variance));
     }
 
+    final maxVariance = raw.fold(0.0, (p, e) => e.variance > p ? e.variance : p);
+    final minMm = raw.fold<double>(raw.first.avgMm, (p, e) => e.avgMm < p ? e.avgMm : p);
+    final maxAvgMm = raw.fold<double>(raw.first.avgMm, (p, e) => e.avgMm > p ? e.avgMm : p);
+
+    final sessionDurations = showSessionTime ? _buildSessionDurations(turns) : <int, Duration>{};
+
+    return raw.map((r) {
+      final consistencyNorm = maxVariance == 0 ? 100.0 : (1 - (r.variance / maxVariance)).clamp(0.0, 1.0) * 100;
+      final precisionForChart = maxAvgMm == minMm ? 100.0 : (1 - ((r.avgMm - minMm) / (maxAvgMm - minMm))).clamp(0.0, 1.0) * 100;
+      final score = r.hitRate * 0.6 +
+          ((maxMm == 0 ? 0 : (1 - r.avgMm / maxMm)) * 100) * 0.3 +
+          consistencyNorm * 0.1;
+      return _TurnMetric(
+        turnNumber: r.turnNumber,
+        hits: r.hits,
+        hitRate: r.hitRate,
+        avgMm: r.avgMm,
+        variance: r.variance,
+        consistencyNorm: consistencyNorm,
+        precisionForChart: precisionForChart,
+        score: score,
+        sessionDuration: sessionDurations[r.turnNumber],
+      );
+    }).toList();
+  }
+
+  static Map<int, Duration> _buildSessionDurations(List<List<DartThrow>> turns) {
+    final out = <int, Duration>{};
+    int sessionStart = 0;
+
+    void flush(int endExclusive) {
+      if (sessionStart >= endExclusive) return;
+      final block = turns.sublist(sessionStart, endExclusive).expand((e) => e).toList();
+      if (block.isEmpty) return;
+      final start = block.map((e) => e.timestamp).reduce((a, b) => a.isBefore(b) ? a : b);
+      final end = block.map((e) => e.timestamp).reduce((a, b) => a.isAfter(b) ? a : b);
+      final duration = end.isAfter(start) ? end.difference(start) : Duration.zero;
+      for (int i = sessionStart; i < endExclusive; i++) {
+        out[i + 1] = duration;
+      }
+    }
+
+    for (int i = 1; i < turns.length; i++) {
+      final prevTurnNumber = turns[i - 1].first.turnNumber;
+      final currTurnNumber = turns[i].first.turnNumber;
+      if (currTurnNumber <= prevTurnNumber) {
+        flush(i);
+        sessionStart = i;
+      }
+    }
+    flush(turns.length);
     return out;
   }
 
-  static _RawSegment _buildRawSegment(
-    List<DartThrow> list,
-    int startTurn,
-    int endTurn,
-  ) {
-    final valid = list.where((t) => !t.isPass).toList();
-    if (valid.isEmpty) {
-      return _RawSegment(
-        startTurn: startTurn,
-        endTurn: endTurn,
-        hitRate: 0,
-        avgMm: 0,
-        variance: 0,
-        meanXmm: 0,
-        meanYmm: 0,
-      );
-    }
-
-    final hits = valid.where((t) => t.sector.toUpperCase() != 'MISS').length;
-    final hitRate = hits / valid.length;
-    final avgMm = valid.map((e) => e.distanceMm).reduce((a, b) => a + b) / valid.length;
-    final meanX = valid.map((e) => e.position.dx).reduce((a, b) => a + b) / valid.length;
-    final meanY = valid.map((e) => e.position.dy).reduce((a, b) => a + b) / valid.length;
-
-    double variance = 0;
-    for (final t in valid) {
-      variance += pow(t.distanceMm - avgMm, 2).toDouble();
-    }
-    variance = variance / valid.length;
-
-    const boardMm = 451.0;
-    return _RawSegment(
-      startTurn: startTurn,
-      endTurn: endTurn,
-      hitRate: hitRate,
-      avgMm: avgMm,
-      variance: variance,
-      meanXmm: (meanX - 0.5) * boardMm,
-      meanYmm: (meanY - 0.5) * boardMm,
-    );
+  static String _formatDurationHHmm(Duration d) {
+    final hours = d.inHours.toString().padLeft(2, '0');
+    final minutes = (d.inMinutes % 60).toString().padLeft(2, '0');
+    return '$hours:$minutes';
   }
 
   static Widget _perfRow(String label, double value) {
@@ -1001,12 +979,14 @@ class _ZoomableMultiTrendBox extends StatefulWidget {
   final List<_SeriesData> allSeries;
   final _RangeMarker bestRange;
   final _RangeMarker worstRange;
+  final String Function(int index)? tooltipBuilder;
 
   const _ZoomableMultiTrendBox({
     required this.title,
     required this.allSeries,
     required this.bestRange,
     required this.worstRange,
+    this.tooltipBuilder,
   });
 
   @override
@@ -1141,6 +1121,25 @@ class _ZoomableMultiTrendBoxState extends State<_ZoomableMultiTrendBox> {
                         dotData: const FlDotData(show: false),
                       );
                     }).toList(),
+                    lineTouchData: LineTouchData(
+                      enabled: widget.tooltipBuilder != null,
+                      touchTooltipData: LineTouchTooltipData(
+                        fitInsideHorizontally: true,
+                        fitInsideVertically: true,
+                        getTooltipItems: (touched) {
+                          if (widget.tooltipBuilder == null || touched.isEmpty) return [];
+                          final index = touched.first.x.toInt();
+                          return touched
+                              .map(
+                                (_) => LineTooltipItem(
+                                  widget.tooltipBuilder!(index),
+                                  const TextStyle(color: Colors.white),
+                                ),
+                              )
+                              .toList();
+                        },
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -1152,49 +1151,43 @@ class _ZoomableMultiTrendBoxState extends State<_ZoomableMultiTrendBox> {
   }
 }
 
-class _RawSegment {
-  final int startTurn;
-  final int endTurn;
+class _TurnMetricRaw {
+  final int turnNumber;
+  final int hits;
   final double hitRate;
   final double avgMm;
   final double variance;
-  final double meanXmm;
-  final double meanYmm;
 
-  const _RawSegment({
-    required this.startTurn,
-    required this.endTurn,
+  const _TurnMetricRaw({
+    required this.turnNumber,
+    required this.hits,
     required this.hitRate,
     required this.avgMm,
     required this.variance,
-    required this.meanXmm,
-    required this.meanYmm,
   });
 }
 
-class _RelationalSegment {
-  final int startTurn;
-  final int endTurn;
+class _TurnMetric {
+  final int turnNumber;
+  final int hits;
   final double hitRate;
-  final double precision;
-  final double consistency;
   final double avgMm;
   final double variance;
-  final double meanXmm;
-  final double meanYmm;
+  final double consistencyNorm;
+  final double precisionForChart;
   final double score;
+  final Duration? sessionDuration;
 
-  const _RelationalSegment({
-    required this.startTurn,
-    required this.endTurn,
+  const _TurnMetric({
+    required this.turnNumber,
+    required this.hits,
     required this.hitRate,
-    required this.precision,
-    required this.consistency,
     required this.avgMm,
     required this.variance,
-    required this.meanXmm,
-    required this.meanYmm,
+    required this.consistencyNorm,
+    required this.precisionForChart,
     required this.score,
+    this.sessionDuration,
   });
 }
 
