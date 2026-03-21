@@ -1,27 +1,245 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../../core/widgets/blocking_overlay.dart';
+import '../../../domain/entities/match.dart';
+import '../../match/pages/match_shell_page.dart';
+import '../../../../players/presentation/pages/login_screen.dart';
+import '../../shared/view_models/connection_badge_vm.dart';
+import '../../shared/widgets/connection_badge.dart';
 import '../controllers/lobby_controller.dart';
 
 class RoomLobbyShellPage extends ConsumerWidget {
   const RoomLobbyShellPage({super.key});
 
+  Future<void> _showAddGuest(BuildContext context, WidgetRef ref) async {
+    final ctrl = TextEditingController();
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Aggiungi giocatore locale'),
+        content: TextField(controller: ctrl, decoration: const InputDecoration(labelText: 'Nome')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annulla')),
+          FilledButton(
+            onPressed: () async {
+              await ref.read(lobbyControllerProvider.notifier).addLocalGuest(ctrl.text);
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('Aggiungi'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showJoinOverlay(BuildContext context, WidgetRef ref) async {
+    final ctrl = TextEditingController();
+    await showDialog<void>(
+      barrierDismissible: false,
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Entra nella room'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: ctrl, decoration: const InputDecoration(labelText: 'Nome guest')),
+            const SizedBox(height: 10),
+            FilledButton(
+              onPressed: () async {
+                await ref.read(lobbyControllerProvider.notifier).addCurrentUser(guestName: ctrl.text);
+                if (context.mounted) Navigator.pop(context);
+              },
+              child: const Text('Entra come guest'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+              },
+              child: const Text('Login / Registrazione'),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final vm = ref.watch(lobbyControllerProvider);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Room Lobby')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Room state: ${vm.roomState.name}'),
-            Text('Connection: ${vm.connection.name}'),
-            const SizedBox(height: 16),
-            const Text('Flow: join → login/resume → guest → order → teams → config → lock → start'),
-          ],
-        ),
+      appBar: AppBar(
+        title: const Text('Room Lobby'),
+        actions: [
+          ConnectionBadge(vm: ConnectionBadgeVm(state: vm.connection)),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                const Text('Config match', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: 'X01', label: Text('X01')),
+                    ButtonSegment(value: 'Cricket', label: Text('Cricket')),
+                    ButtonSegment(value: 'High Score', label: Text('High Score')),
+                  ],
+                  selected: {vm.config.gameType},
+                  onSelectionChanged: (v) {
+                    ref.read(lobbyControllerProvider.notifier).updateConfig(gameType: v.first);
+                  },
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<X01Variant>(
+                  initialValue: vm.config.variant,
+                  decoration: const InputDecoration(labelText: 'Variante X01'),
+                  items: const [
+                    DropdownMenuItem(value: X01Variant.x101, child: Text('101')),
+                    DropdownMenuItem(value: X01Variant.x301, child: Text('301')),
+                    DropdownMenuItem(value: X01Variant.x501, child: Text('501')),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) ref.read(lobbyControllerProvider.notifier).updateConfig(variant: v);
+                  },
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<InMode>(
+                        initialValue: vm.config.inMode,
+                        decoration: const InputDecoration(labelText: 'In'),
+                        items: const [
+                          DropdownMenuItem(value: InMode.straightIn, child: Text('Straight In')),
+                          DropdownMenuItem(value: InMode.doubleIn, child: Text('Double In')),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) ref.read(lobbyControllerProvider.notifier).updateConfig(inMode: v);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonFormField<OutMode>(
+                        initialValue: vm.config.outMode,
+                        decoration: const InputDecoration(labelText: 'Out'),
+                        items: const [
+                          DropdownMenuItem(value: OutMode.singleOut, child: Text('Single Out')),
+                          DropdownMenuItem(value: OutMode.doubleOut, child: Text('Double Out')),
+                          DropdownMenuItem(value: OutMode.masterOut, child: Text('Master Out')),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) ref.read(lobbyControllerProvider.notifier).updateConfig(outMode: v);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        initialValue: vm.config.legs,
+                        decoration: const InputDecoration(labelText: 'Legs'),
+                        items: List.generate(5, (i) => i + 1)
+                            .map((v) => DropdownMenuItem(value: v, child: Text('$v')))
+                            .toList(),
+                        onChanged: (v) {
+                          if (v != null) ref.read(lobbyControllerProvider.notifier).updateConfig(legs: v);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        initialValue: vm.config.sets,
+                        decoration: const InputDecoration(labelText: 'Sets'),
+                        items: List.generate(5, (i) => i + 1)
+                            .map((v) => DropdownMenuItem(value: v, child: Text('$v')))
+                            .toList(),
+                        onChanged: (v) {
+                          if (v != null) ref.read(lobbyControllerProvider.notifier).updateConfig(sets: v);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text('Giocatori', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                ...vm.players.map(
+                  (p) => Card(
+                    child: ListTile(
+                      title: Text(p.name),
+                      subtitle: Text('${p.isGuest ? 'guest' : 'registered'} • ${p.connection.name}'),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () => _showAddGuest(context, ref),
+                      icon: const Icon(Icons.person_add),
+                      label: const Text('Aggiungi giocatore locale'),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () async {
+                        await ref.read(lobbyControllerProvider.notifier).invite();
+                        if (context.mounted && vm.inviteLink != null) {
+                          await Clipboard.setData(ClipboardData(text: vm.inviteLink!));
+                        }
+                      },
+                      icon: const Icon(Icons.share),
+                      label: const Text('Invita'),
+                    ),
+                    FilledButton.icon(
+                      onPressed: vm.canStart
+                          ? () async {
+                              final match = await ref.read(lobbyControllerProvider.notifier).startMatch();
+                              if (context.mounted && match != null) {
+                                Navigator.push(context, MaterialPageRoute(builder: (_) => const MatchShellPage()));
+                              }
+                            }
+                          : null,
+                      icon: const Icon(Icons.play_arrow),
+                      label: const Text('Start match'),
+                    )
+                  ],
+                ),
+                if (vm.inviteLink != null) ...[
+                  const SizedBox(height: 10),
+                  SelectableText('Link: ${vm.inviteLink!}'),
+                ],
+                if (vm.roomId != null && FirebaseAuth.instance.currentUser == null) ...[
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: () => _showJoinOverlay(context, ref),
+                    child: const Text('Completa ingresso'),
+                  ),
+                ]
+              ],
+            ),
+          ),
+          if (vm.loading != null)
+            const Positioned.fill(
+              child: BlockingOverlay(
+                state: OverlayState.loading,
+                message: 'Caricamento...',
+              ),
+            ),
+        ],
       ),
     );
   }
