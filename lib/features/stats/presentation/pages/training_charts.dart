@@ -1159,8 +1159,8 @@ class TrainingCharts {
         border: Border.all(color: Colors.grey.shade300),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
@@ -1547,7 +1547,13 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
                           _pan(deltaTurns);
                         }
                       },
-                      child: SizedBox(height: 220, width: double.infinity, child: widget.rendererBuilder(ctx)),
+                        child: RepaintBoundary(
+                          child: SizedBox(
+                            height: 220,
+                            width: double.infinity,
+                            child: widget.rendererBuilder(ctx),
+                          ),
+                        )
                     ),
                   ),
                 ),
@@ -1560,7 +1566,22 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
                   color: Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(_tooltipText ?? 'Tocca un punto del grafico per vedere Turno, Hit e Distanza'),
+                child: AnimatedSize(
+                  duration: const Duration(milliseconds: 150),
+                  alignment: Alignment.topCenter,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _tooltipText ?? 'Tocca un punto del grafico per vedere i dettagli',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                )
               ),
               const SizedBox(height: 8),
               _SimpleLegend(series: widget.series, text: widget.legendText),

@@ -318,14 +318,25 @@ class TrainingSectorHits extends StatelessWidget {
       ..._orderedSectors().where((s) => stats.containsKey(s)),
     ];
 
-    return ListView.builder(
-      padding: EdgeInsets.zero,
-      itemCount: ordered.length,
-      itemBuilder: (context, i) {
-        final number = ordered[i];
-        final data = stats[number] ?? {};
-        return _sectorCard(number, data);
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification is OverscrollNotification) {
+// quando sei già al limite → lascia propagare al parent
+          return false;
+        }
+        return false;
       },
+      child: ListView.builder(
+        padding: EdgeInsets.zero,
+        itemCount: ordered.length,
+        shrinkWrap: true,
+        physics: const ClampingScrollPhysics(),
+        itemBuilder: (context, i) {
+          final number = ordered[i];
+          final data = stats[number] ?? {};
+          return _sectorCard(number, data);
+        },
+      ),
     );
   }
 }

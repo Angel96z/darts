@@ -944,6 +944,9 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     return Stack(
       children: [
         SingleChildScrollView(
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
           padding: const EdgeInsets.only(bottom: 80),
           child: Column(
             children: [
@@ -990,7 +993,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
               _statsSection(),
             ],
           ),
-        ),
+        )
       ],
     );
   }
