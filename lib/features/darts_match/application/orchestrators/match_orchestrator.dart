@@ -37,7 +37,7 @@ class MatchOrchestrator {
     if (!_validator.validate(command: command, room: room, match: match)) return;
 
     if (command is SubmitTurnCommand && match != null) {
-      final draft = command.payload['draft'] as TurnDraft;
+      final draft = _extractDraft(command.payload['draft']);
       final playerScore = match.snapshot.scoreboard.playerScores[draft.playerId] ?? match.config.startScore;
       final resolution = _engine.resolveTurn(
         match: match,
@@ -74,4 +74,28 @@ class MatchOrchestrator {
 
     await _commandRepository.enqueue(command);
   }
+
+  TurnDraft _extractDraft(Object? rawDraft) {
+    if (rawDraft is TurnDraft) return rawDraft;
+    if (rawDraft is Map) {
+      final draftMap = Map<String, dynamic>.from(rawDraft);
+      final inputs = List<Map<String, dynamic>>.from((draftMap['inputs'] as List?) ?? const [])
+          .map((it) => DartInput(
+                rawValue: (it['rawValue'] as num?)?.toInt() ?? 0,
+                multiplier: (it['multiplier'] as num?)?.toInt() ?? 1,
+              ))
+          .toList();
+
+      return TurnDraft(
+        playerId: PlayerId((draftMap['playerId'] ?? '') as String),
+        legNumber: (draftMap['legNumber'] as num?)?.toInt() ?? 1,
+        turnNumber: (draftMap['turnNumber'] as num?)?.toInt() ?? 1,
+        inputs: inputs,
+        inputMode: InputMode.pointsOnly,
+      );
+    }
+
+    throw StateError('Invalid turn draft payload');
+  }
+
 }
