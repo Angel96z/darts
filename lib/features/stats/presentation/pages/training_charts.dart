@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../game/domain/entities/dart_models.dart';
 import 'package:fl_chart/fl_chart.dart';
 
@@ -148,120 +149,70 @@ class TrainingCharts {
   static Widget hitTrend(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
 
-    // capisci se stai filtrando una sola freccetta
     final dartSet = throws.map((t) => t.dartInTurn).toSet();
     final bool singleDart = dartSet.length == 1;
     final int? selectedDart = singleDart ? dartSet.first : null;
-
-    // =========================
-    // COSTRUZIONE TURNI
-    // =========================
-    final turns = <List<DartThrow>>[];
-
-    for (int i = 0; i < throws.length; i += 3) {
-      final turn = throws.skip(i).take(3).toList();
-      if (turn.length == 3) turns.add(turn);
-    }
+    final turns = _buildTurns(throws);
 
     if (turns.isEmpty) return _empty();
 
-    final visibleTurns = turns;
+    final series = ChartDataSource.hitTrendSeries(
+      turns: turns,
+      target: target,
+      singleDart: singleDart,
+      selectedDart: selectedDart,
+    );
 
-    final spots = <FlSpot>[];
-
-    for (int i = 0; i < visibleTurns.length; i++) {
-      final turn = visibleTurns[i];
-
-      int hits = 0;
-
-      if (singleDart) {
-        // usa solo quella freccetta
-        final dart = turn.firstWhere(
-              (t) => t.dartInTurn == selectedDart,
-          orElse: () => turn.first,
-        );
-
-        hits = dart.sector == target ? 1 : 0;
-      } else {
-        // usa tutte e 3
-        hits = turn.where((t) => t.sector == target).length;
-      }
-
-      final percent = singleDart
-          ? (hits * 100.0) // 0 o 100
-          : (hits / 3) * 100.0;
-
-      spots.add(FlSpot(i.toDouble(), percent));
-    }
-
-    return _ZoomableTrendBox(
+    return BaseChartWidget(
       title: singleDart ? 'Trend D$selectedDart' : 'Trend turni (3 freccette)',
-      spots: spots,
-      minY: 0,
-      maxY: 100,
-      showDots: true,
-      leftTitleBuilder: (v) {
-        if (singleDart) {
-          if (v == 0) return const Text('0');
-          if (v == 100) return const Text('1');
-          return const SizedBox.shrink();
-        } else {
-          if (v == 0) return const Text('0');
-          if (v == 33) return const Text('1');
-          if (v == 66) return const Text('2');
-          if (v == 100) return const Text('3');
-          return const SizedBox.shrink();
-        }
+      series: [series],
+      config: ChartConfig(
+        minY: 0,
+        maxY: singleDart ? 1 : 3,
+        yInterval: 1,
+        xInterval: 1,
+        yLabelBuilder: (v) => v % 1 == 0 ? '${v.toInt()}' : '',
+      ),
+      tooltipBuilder: (index) {
+        if (index < 0 || index >= series.points.length) return '';
+        final v = series.points[index].y.toInt();
+        final label = singleDart ? 'Hit' : 'Hit nel turno';
+        return 'Turno ${index + 1} • $label: $v';
       },
-      leftInterval: singleDart ? 100 : 33,
+      legendText:
+          'Vedi quanti hit fai a turno. Se la linea scende, stai perdendo controllo: rallenta il ritmo e cura la routine.',
+      rendererBuilder: (ctx) => LineChartRenderer(ctx: ctx, showDots: true),
     );
   }
 
 
   static Widget mmTrend(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
-
-    // =========================
-    // COSTRUZIONE TURNI (3 FRECCETTE)
-    // =========================
-    final turns = <List<DartThrow>>[];
-
-    for (int i = 0; i < throws.length; i += 3) {
-      final turn = throws.skip(i).take(3).toList();
-      if (turn.length == 3) turns.add(turn);
-    }
+    final turns = _buildTurns(throws);
 
     if (turns.isEmpty) return _empty();
 
-    final visibleTurns = turns;
+    final series = ChartDataSource.mmTrendSeries(turns: turns);
+    if (series.points.isEmpty) return _empty();
+    final maxY = series.points.map((e) => e.y).fold<double>(0, max);
 
-    final spots = <FlSpot>[];
-
-    double maxY = 0;
-
-    for (int i = 0; i < visibleTurns.length; i++) {
-      final turn = visibleTurns[i];
-
-      final avgMm = turn
-          .map((e) => e.distanceMm)
-          .reduce((a, b) => a + b) /
-          3;
-
-      if (avgMm > maxY) maxY = avgMm;
-
-      spots.add(FlSpot(i.toDouble(), avgMm));
-    }
-
-    if (spots.isEmpty) return _empty();
-
-    return _ZoomableTrendBox(
+    return BaseChartWidget(
       title: 'Trend distanza (mm)',
-      spots: spots,
-      minY: 0,
-      maxY: maxY == 0 ? 100 : maxY * 1.2,
-      showDots: false,
-      leftTitleBuilder: (v) => Text('${v.toInt()}'),
-      leftInterval: (maxY / 4).clamp(5, 50),
+      series: [series],
+      config: ChartConfig(
+        minY: 0,
+        maxY: maxY == 0 ? 100 : maxY * 1.2,
+        yInterval: (maxY / 4).clamp(5, 50).toDouble(),
+        xInterval: 1,
+        yLabelBuilder: (v) => v.toStringAsFixed(0),
+      ),
+      tooltipBuilder: (index) {
+        if (index < 0 || index >= series.points.length) return '';
+        return 'Turno ${index + 1} • ${series.points[index].y.toStringAsFixed(1)} mm';
+      },
+      legendText:
+          'Vedi la distanza media dal target per turno. Se i mm salgono, riduci forza e cerca un rilascio più morbido.',
+      rendererBuilder: (ctx) => LineChartRenderer(ctx: ctx, showDots: false),
     );
   }
   static Widget directionalBias(List<DartThrow> throws) {
@@ -503,7 +454,7 @@ class TrainingCharts {
     final turns = _buildTurns(throws);
     if (turns.isEmpty) return _empty();
 
-    final metrics = _buildTurnMetrics(
+    final metrics = TurnMetricsBuilder.build(
       turns: turns,
       target: target,
       showSessionTime: showSessionTime,
@@ -514,34 +465,24 @@ class TrainingCharts {
     final best = sorted.first;
     final worst = sorted.last;
 
-    final hitSpots = <FlSpot>[];
-    final precisionSpots = <FlSpot>[];
-    final consistencySpots = <FlSpot>[];
+    final series = ChartDataSource.relationalSeries(metrics);
 
-    for (int i = 0; i < metrics.length; i++) {
-      final x = i.toDouble();
-      hitSpots.add(FlSpot(x, metrics[i].hitRate));
-      precisionSpots.add(FlSpot(x, metrics[i].precisionForChart));
-      consistencySpots.add(FlSpot(x, metrics[i].consistencyNorm));
-    }
-
-    return _ZoomableMultiTrendBox(
+    return BaseChartWidget(
       title: 'Relational performance',
-      allSeries: [
-        _SeriesData(name: 'Hit', color: Colors.blue, spots: hitSpots),
-        _SeriesData(name: 'Precisione', color: Colors.orange, spots: precisionSpots),
-        _SeriesData(name: 'Consistenza', color: Colors.purple, spots: consistencySpots),
+      series: series,
+      config: const ChartConfig(minY: 0, maxY: 100, yInterval: 20, xInterval: 1),
+      highlightedRanges: [
+        ChartRange(
+          start: metrics.indexOf(best).toDouble(),
+          end: metrics.indexOf(best).toDouble(),
+          color: Colors.green.withOpacity(0.18),
+        ),
+        ChartRange(
+          start: metrics.indexOf(worst).toDouble(),
+          end: metrics.indexOf(worst).toDouble(),
+          color: Colors.red.withOpacity(0.18),
+        ),
       ],
-      bestRange: _RangeMarker(
-        start: metrics.indexOf(best).toDouble(),
-        end: metrics.indexOf(best).toDouble(),
-        color: Colors.green.withOpacity(0.18),
-      ),
-      worstRange: _RangeMarker(
-        start: metrics.indexOf(worst).toDouble(),
-        end: metrics.indexOf(worst).toDouble(),
-        color: Colors.red.withOpacity(0.18),
-      ),
       tooltipBuilder: (index) {
         if (index < 0 || index >= metrics.length) return '';
         final m = metrics[index];
@@ -552,7 +493,10 @@ class TrainingCharts {
             'Hit: ${m.hits}/3\n'
             'Precisione: ${m.avgMm.toStringAsFixed(1)} mm\n'
             'Consistenza: ${m.variance.toStringAsFixed(1)}$session';
-      },
+      ),
+      legendText:
+          'Confronti hit, precisione e consistenza. Se una linea cala spesso, concentra il lavoro su quella metrica nella prossima sessione.',
+      rendererBuilder: (ctx) => MultiLineChartRenderer(ctx: ctx),
     );
   }
 
@@ -562,7 +506,7 @@ class TrainingCharts {
     final turns = _buildTurns(throws);
     if (turns.isEmpty) return _empty();
 
-    final metrics = _buildTurnMetrics(turns: turns, target: target, showSessionTime: false);
+    final metrics = TurnMetricsBuilder.build(turns: turns, target: target, showSessionTime: false);
     if (metrics.isEmpty) return _empty();
 
     final sorted = [...metrics]..sort((a, b) => b.score.compareTo(a.score));
@@ -951,109 +895,470 @@ class TrainingCharts {
   }
 }
 
-class _ZoomableTrendBox extends StatefulWidget {
-  final String title;
-  final List<FlSpot> spots;
+class ChartDataPoint {
+  final double x;
+  final double y;
+
+  const ChartDataPoint({required this.x, required this.y});
+}
+
+class ChartSeries {
+  final String name;
+  final List<ChartDataPoint> points;
+  final Color color;
+
+  const ChartSeries({
+    required this.name,
+    required this.points,
+    required this.color,
+  });
+}
+
+class ChartRange {
+  final double start;
+  final double end;
+  final Color color;
+
+  const ChartRange({
+    required this.start,
+    required this.end,
+    required this.color,
+  });
+}
+
+class ChartConfig {
   final double minY;
   final double maxY;
-  final bool showDots;
-  final Widget Function(double) leftTitleBuilder;
-  final double leftInterval;
+  final double yInterval;
+  final double xInterval;
+  final String Function(double)? yLabelBuilder;
 
-  const _ZoomableTrendBox({
-    required this.title,
-    required this.spots,
+  const ChartConfig({
     required this.minY,
     required this.maxY,
-    required this.showDots,
-    required this.leftTitleBuilder,
-    required this.leftInterval,
+    required this.yInterval,
+    required this.xInterval,
+    this.yLabelBuilder,
   });
-
-  @override
-  State<_ZoomableTrendBox> createState() => _ZoomableTrendBoxState();
 }
 
-class _ZoomableMultiTrendBox extends StatefulWidget {
+class ChartDataSource {
+  static ChartSeries hitTrendSeries({
+    required List<List<DartThrow>> turns,
+    required String target,
+    required bool singleDart,
+    required int? selectedDart,
+  }) {
+    final points = <ChartDataPoint>[];
+    for (int i = 0; i < turns.length; i++) {
+      final turn = turns[i];
+      final hits = singleDart
+          ? ((turn.firstWhere(
+                (t) => t.dartInTurn == selectedDart,
+                orElse: () => turn.first,
+              ).sector ==
+              target)
+              ? 1
+              : 0)
+          : turn.where((t) => t.sector == target).length;
+      points.add(ChartDataPoint(x: i.toDouble(), y: hits.toDouble()));
+    }
+    return ChartSeries(
+      name: singleDart ? 'D${selectedDart ?? 1}' : 'Hit',
+      points: points,
+      color: Colors.blue,
+    );
+  }
+
+  static ChartSeries mmTrendSeries({required List<List<DartThrow>> turns}) {
+    final points = <ChartDataPoint>[];
+    for (int i = 0; i < turns.length; i++) {
+      final avgMm = turns[i].map((e) => e.distanceMm).reduce((a, b) => a + b) / 3;
+      points.add(ChartDataPoint(x: i.toDouble(), y: avgMm));
+    }
+    return ChartSeries(name: 'Distanza', points: points, color: Colors.orange);
+  }
+
+  static List<ChartSeries> relationalSeries(List<_TurnMetric> metrics) {
+    final hit = <ChartDataPoint>[];
+    final precision = <ChartDataPoint>[];
+    final consistency = <ChartDataPoint>[];
+    for (int i = 0; i < metrics.length; i++) {
+      final x = i.toDouble();
+      hit.add(ChartDataPoint(x: x, y: metrics[i].hitRate));
+      precision.add(ChartDataPoint(x: x, y: metrics[i].precisionForChart));
+      consistency.add(ChartDataPoint(x: x, y: metrics[i].consistencyNorm));
+    }
+    return [
+      ChartSeries(name: 'Hit', color: Colors.blue, points: hit),
+      ChartSeries(name: 'Precisione', color: Colors.orange, points: precision),
+      ChartSeries(name: 'Consistenza', color: Colors.purple, points: consistency),
+    ];
+  }
+}
+
+class TurnMetricsBuilder {
+  static List<_TurnMetric> build({
+    required List<List<DartThrow>> turns,
+    required String target,
+    required bool showSessionTime,
+  }) {
+    return TrainingCharts._buildTurnMetrics(
+      turns: turns,
+      target: target,
+      showSessionTime: showSessionTime,
+    );
+  }
+}
+
+typedef _ChartRendererBuilder = Widget Function(_BaseChartContext ctx);
+
+class BaseChartWidget extends StatefulWidget {
   final String title;
-  final List<_SeriesData> allSeries;
-  final _RangeMarker bestRange;
-  final _RangeMarker worstRange;
+  final List<ChartSeries> series;
+  final ChartConfig config;
   final String Function(int index)? tooltipBuilder;
+  final List<ChartRange> highlightedRanges;
+  final String legendText;
+  final _ChartRendererBuilder rendererBuilder;
 
-  const _ZoomableMultiTrendBox({
+  const BaseChartWidget({
     required this.title,
-    required this.allSeries,
-    required this.bestRange,
-    required this.worstRange,
+    required this.series,
+    required this.config,
+    required this.legendText,
+    required this.rendererBuilder,
     this.tooltipBuilder,
+    this.highlightedRanges = const [],
+    super.key,
   });
 
   @override
-  State<_ZoomableMultiTrendBox> createState() => _ZoomableMultiTrendBoxState();
+  State<BaseChartWidget> createState() => _BaseChartWidgetState();
 }
 
-class _ZoomableMultiTrendBoxState extends State<_ZoomableMultiTrendBox> {
-  late final TransformationController _controller;
+class _BaseChartWidgetState extends State<BaseChartWidget> {
+  static const double _minWindowTurns = 6;
+  double _viewStart = 0;
+  double _viewEnd = 0;
+  double _lastScale = 1;
+  String? _tooltipText;
+
+  int get _totalTurns {
+    if (widget.series.isEmpty) return 0;
+    return widget.series.first.points.length;
+  }
 
   @override
   void initState() {
     super.initState();
-    _controller = TransformationController();
-    _controller.addListener(() => setState(() {}));
+    _resetView();
   }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  void didUpdateWidget(covariant BaseChartWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.series != widget.series) {
+      _resetView();
+    }
   }
 
-  List<FlSpot> _visibleSpots(List<FlSpot> input, double zoomX) {
-    if (input.length <= 2) return input;
+  void _resetView() {
+    final maxIndex = max(0, _totalTurns - 1).toDouble();
+    _viewStart = 0;
+    _viewEnd = maxIndex;
+  }
 
-    const baseWidth = 360.0;
-    const minPxPerPoint = 3.0;
-    final visibleCapacity = max(40, ((baseWidth * zoomX) / minPxPerPoint).round());
-    if (input.length <= visibleCapacity) return input;
+  void _onHoverIndex(int? index) {
+    if (widget.tooltipBuilder == null) return;
+    setState(() {
+      _tooltipText = index == null ? null : widget.tooltipBuilder!(index);
+    });
+  }
 
-    final step = (input.length / visibleCapacity).ceil();
-    final out = <FlSpot>[];
-    for (int i = 0; i < input.length; i += step) {
-      out.add(input[i]);
+  void _zoomAround(double factor, double centerX) {
+    if (_totalTurns <= 1) return;
+    final minIndex = 0.0;
+    final maxIndex = (_totalTurns - 1).toDouble();
+    final oldSpan = max(1.0, _viewEnd - _viewStart);
+    final newSpan = (oldSpan / factor).clamp(_minWindowTurns, maxIndex + 1);
+    final ratio = oldSpan == 0 ? 0.5 : ((centerX - _viewStart) / oldSpan).clamp(0.0, 1.0);
+    double newStart = centerX - (newSpan * ratio);
+    double newEnd = newStart + newSpan;
+    if (newStart < minIndex) {
+      newStart = minIndex;
+      newEnd = newStart + newSpan;
     }
-    if (out.isEmpty || out.last.x != input.last.x) {
-      out.add(input.last);
+    if (newEnd > maxIndex) {
+      newEnd = maxIndex;
+      newStart = newEnd - newSpan;
     }
-    return out;
+    setState(() {
+      _viewStart = newStart.clamp(minIndex, maxIndex);
+      _viewEnd = newEnd.clamp(minIndex, maxIndex);
+    });
+  }
+
+  void _pan(double deltaTurns) {
+    if (_totalTurns <= 1) return;
+    final minIndex = 0.0;
+    final maxIndex = (_totalTurns - 1).toDouble();
+    final span = max(1.0, _viewEnd - _viewStart);
+    double newStart = _viewStart - deltaTurns;
+    double newEnd = _viewEnd - deltaTurns;
+    if (newStart < minIndex) {
+      newStart = minIndex;
+      newEnd = newStart + span;
+    }
+    if (newEnd > maxIndex) {
+      newEnd = maxIndex;
+      newStart = newEnd - span;
+    }
+    setState(() {
+      _viewStart = newStart.clamp(minIndex, maxIndex);
+      _viewEnd = newEnd.clamp(minIndex, maxIndex);
+    });
+  }
+
+  bool _isCtrlPressed() {
+    return RawKeyboard.instance.keysPressed.contains(LogicalKeyboardKey.controlLeft) ||
+        RawKeyboard.instance.keysPressed.contains(LogicalKeyboardKey.controlRight);
   }
 
   @override
   Widget build(BuildContext context) {
-    final zoomX = _controller.value.getMaxScaleOnAxis().clamp(1.0, 6.0);
+    if (_totalTurns == 0) return TrainingCharts._empty();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth <= 0 ? 320.0 : constraints.maxWidth;
+        final span = max(1.0, _viewEnd - _viewStart);
+        final sampledSeries = widget.series.map((s) {
+          final start = _viewStart.floor().clamp(0, s.points.length - 1);
+          final end = _viewEnd.ceil().clamp(0, s.points.length - 1);
+          final slice = s.points.sublist(start, end + 1);
+          final maxPoints = max(60, (width / 3).round());
+          if (slice.length <= maxPoints) return ChartSeries(name: s.name, points: slice, color: s.color);
+          final step = (slice.length / maxPoints).ceil();
+          final sampled = <ChartDataPoint>[];
+          for (int i = 0; i < slice.length; i += step) {
+            sampled.add(slice[i]);
+          }
+          if (sampled.last.x != slice.last.x) sampled.add(slice.last);
+          return ChartSeries(name: s.name, points: sampled, color: s.color);
+        }).toList();
 
-    final series = widget.allSeries.map((s) {
-      return _SeriesData(
-        name: s.name,
-        color: s.color,
-        spots: _visibleSpots(s.spots, zoomX),
-      );
-    }).toList();
+        final ctx = _BaseChartContext(
+          series: sampledSeries,
+          config: widget.config,
+          minX: _viewStart,
+          maxX: _viewEnd,
+          onHoverIndex: _onHoverIndex,
+          highlightedRanges: widget.highlightedRanges,
+        );
 
-    final totalPoints = widget.allSeries.isEmpty ? 0 : widget.allSeries.first.spots.length;
-    final chartWidth = max(360.0, totalPoints * 18.0);
-    final bottomInterval = max(1, (max(1, totalPoints) / 8).round()).toDouble();
+        return TrainingCharts._box(
+          widget.title,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Listener(
+                onPointerSignal: (event) {
+                  if (event is PointerScrollEvent && _isCtrlPressed()) {
+                    final centerX = _viewStart + ((event.localPosition.dx / width) * span);
+                    final factor = event.scrollDelta.dy > 0 ? 0.9 : 1.1;
+                    _zoomAround(factor, centerX);
+                  }
+                },
+                child: GestureDetector(
+                  onScaleStart: (_) => _lastScale = 1,
+                  onScaleUpdate: (details) {
+                    if (details.pointerCount != 2) return;
+                    if ((details.scale - _lastScale).abs() > 0.02) {
+                      final centerX = _viewStart + ((details.localFocalPoint.dx / width) * span);
+                      final factor = details.scale / _lastScale;
+                      _zoomAround(factor, centerX);
+                      _lastScale = details.scale;
+                    } else {
+                      final deltaTurns = (details.focalPointDelta.dx / width) * span;
+                      _pan(deltaTurns);
+                    }
+                  },
+                  child: SizedBox(height: 220, width: double.infinity, child: widget.rendererBuilder(ctx)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(_tooltipText ?? 'Passa il mouse sul grafico per dettagli'),
+              ),
+              const SizedBox(height: 8),
+              _SimpleLegend(series: widget.series, text: widget.legendText),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
 
-    return TrainingCharts._box(
-      widget.title,
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: widget.allSeries.map((s) {
-              return Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Row(
+class _BaseChartContext {
+  final List<ChartSeries> series;
+  final ChartConfig config;
+  final double minX;
+  final double maxX;
+  final void Function(int? index) onHoverIndex;
+  final List<ChartRange> highlightedRanges;
+
+  const _BaseChartContext({
+    required this.series,
+    required this.config,
+    required this.minX,
+    required this.maxX,
+    required this.onHoverIndex,
+    required this.highlightedRanges,
+  });
+}
+
+class LineChartRenderer extends StatelessWidget {
+  final _BaseChartContext ctx;
+  final bool showDots;
+
+  const LineChartRenderer({required this.ctx, this.showDots = false, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = ctx.series.first;
+    return LineChart(
+      LineChartData(
+        minX: ctx.minX,
+        maxX: ctx.maxX,
+        minY: ctx.config.minY,
+        maxY: ctx.config.maxY,
+        gridData: FlGridData(show: true),
+        borderData: FlBorderData(show: true),
+        titlesData: _titles(ctx.config),
+        lineTouchData: _touch(ctx.onHoverIndex),
+        lineBarsData: [
+          LineChartBarData(
+            spots: s.points.map((p) => FlSpot(p.x, p.y)).toList(),
+            color: s.color,
+            isCurved: false,
+            barWidth: 2,
+            dotData: FlDotData(show: showDots),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class MultiLineChartRenderer extends StatelessWidget {
+  final _BaseChartContext ctx;
+
+  const MultiLineChartRenderer({required this.ctx, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return LineChart(
+      LineChartData(
+        minX: ctx.minX,
+        maxX: ctx.maxX,
+        minY: ctx.config.minY,
+        maxY: ctx.config.maxY,
+        gridData: FlGridData(show: true),
+        borderData: FlBorderData(show: true),
+        titlesData: _titles(ctx.config),
+        lineTouchData: _touch(ctx.onHoverIndex),
+        rangeAnnotations: RangeAnnotations(
+          verticalRangeAnnotations: ctx.highlightedRanges
+              .map((r) => VerticalRangeAnnotation(
+                    x1: r.start - 0.5,
+                    x2: r.end + 0.5,
+                    color: r.color,
+                  ))
+              .toList(),
+        ),
+        lineBarsData: ctx.series
+            .map((s) => LineChartBarData(
+                  spots: s.points.map((p) => FlSpot(p.x, p.y)).toList(),
+                  isCurved: false,
+                  barWidth: 2,
+                  color: s.color,
+                  dotData: const FlDotData(show: false),
+                ))
+            .toList(),
+      ),
+    );
+  }
+}
+
+FlTitlesData _titles(ChartConfig config) {
+  return FlTitlesData(
+    leftTitles: AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        interval: config.yInterval,
+        getTitlesWidget: (v, _) {
+          final text = config.yLabelBuilder?.call(v) ?? v.toStringAsFixed(0);
+          if (text.isEmpty) return const SizedBox.shrink();
+          return Text(text);
+        },
+      ),
+    ),
+    bottomTitles: AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        interval: config.xInterval,
+        getTitlesWidget: (v, _) {
+          final isInt = (v - v.roundToDouble()).abs() < 0.001;
+          if (!isInt) return const SizedBox.shrink();
+          return Text('${v.toInt() + 1}');
+        },
+      ),
+    ),
+  );
+}
+
+LineTouchData _touch(void Function(int? index) onHoverIndex) {
+  return LineTouchData(
+    enabled: true,
+    handleBuiltInTouches: false,
+    touchCallback: (event, response) {
+      if (!event.isInterestedForInteractions ||
+          response == null ||
+          response.lineBarSpots == null ||
+          response.lineBarSpots!.isEmpty) {
+        onHoverIndex(null);
+        return;
+      }
+      onHoverIndex(response.lineBarSpots!.first.x.toInt());
+    },
+    touchTooltipData: LineTouchTooltipData(tooltipBgColor: Colors.transparent),
+  );
+}
+
+class _SimpleLegend extends StatelessWidget {
+  final List<ChartSeries> series;
+  final String text;
+
+  const _SimpleLegend({required this.series, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 12,
+          runSpacing: 4,
+          children: series
+              .map(
+                (s) => Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(width: 10, height: 10, color: s.color),
@@ -1061,92 +1366,12 @@ class _ZoomableMultiTrendBoxState extends State<_ZoomableMultiTrendBox> {
                     Text(s.name, style: const TextStyle(fontSize: 12)),
                   ],
                 ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 220,
-            child: InteractiveViewer(
-              transformationController: _controller,
-              constrained: false,
-              minScale: 1,
-              maxScale: 6,
-              boundaryMargin: const EdgeInsets.symmetric(horizontal: 80),
-              child: SizedBox(
-                width: chartWidth,
-                height: 220,
-                child: LineChart(
-                  LineChartData(
-                    minY: 0,
-                    maxY: 100,
-                    gridData: FlGridData(show: true),
-                    rangeAnnotations: RangeAnnotations(
-                      verticalRangeAnnotations: [
-                        VerticalRangeAnnotation(
-                          x1: widget.bestRange.start - 0.5,
-                          x2: widget.bestRange.end + 0.5,
-                          color: widget.bestRange.color,
-                        ),
-                        VerticalRangeAnnotation(
-                          x1: widget.worstRange.start - 0.5,
-                          x2: widget.worstRange.end + 0.5,
-                          color: widget.worstRange.color,
-                        ),
-                      ],
-                    ),
-                    titlesData: FlTitlesData(
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          interval: 20,
-                          getTitlesWidget: (v, _) => Text('${v.toInt()}'),
-                        ),
-                      ),
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          interval: bottomInterval,
-                          getTitlesWidget: (v, _) => Text('${v.toInt() + 1}'),
-                        ),
-                      ),
-                    ),
-                    borderData: FlBorderData(show: true),
-                    lineBarsData: series.map((s) {
-                      return LineChartBarData(
-                        spots: s.spots,
-                        isCurved: false,
-                        barWidth: 2,
-                        color: s.color,
-                        dotData: const FlDotData(show: false),
-                      );
-                    }).toList(),
-                    lineTouchData: LineTouchData(
-                      enabled: widget.tooltipBuilder != null,
-                      touchTooltipData: LineTouchTooltipData(
-                        fitInsideHorizontally: true,
-                        fitInsideVertically: true,
-                        getTooltipItems: (touched) {
-                          if (widget.tooltipBuilder == null || touched.isEmpty) return [];
-                          final index = touched.first.x.toInt();
-                          return touched
-                              .map(
-                                (_) => LineTooltipItem(
-                                  widget.tooltipBuilder!(index),
-                                  const TextStyle(color: Colors.white),
-                                ),
-                              )
-                              .toList();
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 6),
+        Text(text, style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
+      ],
     );
   }
 }
@@ -1189,123 +1414,4 @@ class _TurnMetric {
     required this.score,
     this.sessionDuration,
   });
-}
-
-class _SeriesData {
-  final String name;
-  final Color color;
-  final List<FlSpot> spots;
-
-  const _SeriesData({
-    required this.name,
-    required this.color,
-    required this.spots,
-  });
-}
-
-class _RangeMarker {
-  final double start;
-  final double end;
-  final Color color;
-
-  const _RangeMarker({
-    required this.start,
-    required this.end,
-    required this.color,
-  });
-}
-
-class _ZoomableTrendBoxState extends State<_ZoomableTrendBox> {
-  late final TransformationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TransformationController();
-    _controller.addListener(() => setState(() {}));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  List<FlSpot> _visibleSpots(double zoomX) {
-    if (widget.spots.length <= 2) return widget.spots;
-
-    const baseWidth = 360.0;
-    const minPxPerPoint = 3.0;
-
-    final visibleCapacity = max(40, ((baseWidth * zoomX) / minPxPerPoint).round());
-    if (widget.spots.length <= visibleCapacity) return widget.spots;
-
-    final step = (widget.spots.length / visibleCapacity).ceil();
-    final out = <FlSpot>[];
-    for (int i = 0; i < widget.spots.length; i += step) {
-      out.add(widget.spots[i]);
-    }
-    if (out.isEmpty || out.last.x != widget.spots.last.x) {
-      out.add(widget.spots.last);
-    }
-    return out;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final zoomX = _controller.value.getMaxScaleOnAxis().clamp(1.0, 6.0);
-    final spots = _visibleSpots(zoomX);
-    final bottomInterval = max(1, (spots.length / 8).round()).toDouble();
-    final chartWidth = max(360.0, widget.spots.length * 12.0);
-
-    return TrainingCharts._box(
-      widget.title,
-      SizedBox(
-        height: 180,
-        child: InteractiveViewer(
-          transformationController: _controller,
-          constrained: false,
-          minScale: 1,
-          maxScale: 6,
-          boundaryMargin: const EdgeInsets.symmetric(horizontal: 80),
-          child: SizedBox(
-            width: chartWidth,
-            height: 180,
-            child: LineChart(
-              LineChartData(
-                minY: widget.minY,
-                maxY: widget.maxY,
-                gridData: FlGridData(show: true),
-                titlesData: FlTitlesData(
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: widget.leftInterval,
-                      getTitlesWidget: (v, _) => widget.leftTitleBuilder(v),
-                    ),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: bottomInterval,
-                      getTitlesWidget: (v, _) => Text('${v.toInt() + 1}'),
-                    ),
-                  ),
-                ),
-                borderData: FlBorderData(show: true),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots,
-                    isCurved: false,
-                    barWidth: 2,
-                    dotData: FlDotData(show: widget.showDots),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
