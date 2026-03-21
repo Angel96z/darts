@@ -15,6 +15,7 @@ enum DartboardOverlayType {
   dispersion,
   targetZone,
   radialError,
+  directionalBias,
 }
 
 class DartboardWidget extends StatefulWidget {
@@ -208,6 +209,9 @@ class _DartboardPainter extends CustomPainter {
     if (overlays.contains(DartboardOverlayType.bias)) {
       _drawBias(canvas, size, r);
     }
+    if (overlays.contains(DartboardOverlayType.directionalBias)) {
+      _drawDirectionalBias(canvas, size, r);
+    }
     if (overlays.contains(DartboardOverlayType.targetZone)) {
       _drawTargetZone(canvas, center, r);
     }
@@ -392,6 +396,74 @@ class _DartboardPainter extends CustomPainter {
 
     canvas.drawCircle(mean, r * 0.02, paint);
 
+  }
+  void _drawDirectionalBias(Canvas canvas, Size size, double r) {
+    if (throws.length < 2) return;
+
+    double meanX = 0;
+    double meanY = 0;
+    int n = 0;
+
+    for (final t in throws) {
+      if (t.isPass) continue;
+      meanX += t.position.dx;
+      meanY += t.position.dy;
+      n++;
+    }
+
+    if (n < 2) return;
+
+    meanX /= n;
+    meanY /= n;
+
+    double varX = 0;
+    double varY = 0;
+
+    for (final t in throws) {
+      if (t.isPass) continue;
+      varX += pow(t.position.dx - meanX, 2);
+      varY += pow(t.position.dy - meanY, 2);
+    }
+
+    final stdX = sqrt(varX / n);
+    final stdY = sqrt(varY / n);
+
+    final centerX = meanX * size.width;
+    final centerY = meanY * size.height;
+
+    final halfBandX = max(r * 0.03, stdX * size.width * 2);
+    final halfBandY = max(r * 0.03, stdY * size.height * 2);
+
+    final verticalBand = Rect.fromLTWH(
+      centerX - halfBandX,
+      0,
+      halfBandX * 2,
+      size.height,
+    );
+    final horizontalBand = Rect.fromLTWH(
+      0,
+      centerY - halfBandY,
+      size.width,
+      halfBandY * 2,
+    );
+
+    final fillX = Paint()
+      ..color = Colors.red.withOpacity(0.18)
+      ..style = PaintingStyle.fill;
+    final fillY = Paint()
+      ..color = Colors.orange.withOpacity(0.18)
+      ..style = PaintingStyle.fill;
+
+    canvas.drawRect(verticalBand, fillX);
+    canvas.drawRect(horizontalBand, fillY);
+
+    final line = Paint()
+      ..color = const Color(0xFFE53935)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = max(1.5, r * 0.006);
+
+    canvas.drawLine(Offset(centerX, 0), Offset(centerX, size.height), line);
+    canvas.drawLine(Offset(0, centerY), Offset(size.width, centerY), line);
   }
   void _drawErrorVector(Canvas canvas, Size size, double r) {
     if (throws.isEmpty) return;

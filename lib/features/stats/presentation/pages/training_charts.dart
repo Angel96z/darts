@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import '../../../game/domain/entities/dart_models.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -163,10 +165,7 @@ class TrainingCharts {
 
     if (turns.isEmpty) return _empty();
 
-    const maxTurns = 30;
-    final visibleTurns = turns.length > maxTurns
-        ? turns.sublist(turns.length - maxTurns)
-        : turns;
+    final visibleTurns = turns;
 
     final spots = <FlSpot>[];
 
@@ -195,57 +194,26 @@ class TrainingCharts {
       spots.add(FlSpot(i.toDouble(), percent));
     }
 
-    return _box(
-      singleDart
-          ? 'Trend D$selectedDart'
-          : 'Trend turni (3 freccette)',
-      SizedBox(
-        height: 180,
-        child: LineChart(
-          LineChartData(
-            minY: 0,
-            maxY: 100,
-            gridData: FlGridData(show: true),
-            titlesData: FlTitlesData(
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  interval: singleDart ? 100 : 33,
-                  getTitlesWidget: (v, _) {
-                    if (singleDart) {
-                      if (v == 0) return const Text('0');
-                      if (v == 100) return const Text('1');
-                      return const SizedBox.shrink();
-                    } else {
-                      if (v == 0) return const Text('0');
-                      if (v == 33) return const Text('1');
-                      if (v == 66) return const Text('2');
-                      if (v == 100) return const Text('3');
-                      return const SizedBox.shrink();
-                    }
-                  },
-                ),
-              ),
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  interval: 5,
-                  getTitlesWidget: (v, _) => Text('${v.toInt() + 1}'),
-                ),
-              ),
-            ),
-            borderData: FlBorderData(show: true),
-            lineBarsData: [
-              LineChartBarData(
-                spots: spots,
-                isCurved: false,
-                barWidth: 2,
-                dotData: FlDotData(show: true),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return _ZoomableTrendBox(
+      title: singleDart ? 'Trend D$selectedDart' : 'Trend turni (3 freccette)',
+      spots: spots,
+      minY: 0,
+      maxY: 100,
+      showDots: true,
+      leftTitleBuilder: (v) {
+        if (singleDart) {
+          if (v == 0) return const Text('0');
+          if (v == 100) return const Text('1');
+          return const SizedBox.shrink();
+        } else {
+          if (v == 0) return const Text('0');
+          if (v == 33) return const Text('1');
+          if (v == 66) return const Text('2');
+          if (v == 100) return const Text('3');
+          return const SizedBox.shrink();
+        }
+      },
+      leftInterval: singleDart ? 100 : 33,
     );
   }
 
@@ -265,11 +233,7 @@ class TrainingCharts {
 
     if (turns.isEmpty) return _empty();
 
-    // ultimi 30 turni
-    const maxTurns = 30;
-    final visibleTurns = turns.length > maxTurns
-        ? turns.sublist(turns.length - maxTurns)
-        : turns;
+    final visibleTurns = turns;
 
     final spots = <FlSpot>[];
 
@@ -290,44 +254,68 @@ class TrainingCharts {
 
     if (spots.isEmpty) return _empty();
 
-    return _box(
-      'Trend distanza (mm)',
-      SizedBox(
-        height: 180,
-        child: LineChart(
-          LineChartData(
-            minY: 0,
-            maxY: maxY == 0 ? 100 : maxY * 1.2,
-            gridData: FlGridData(show: true),
-            titlesData: FlTitlesData(
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  interval: (maxY / 4).clamp(5, 50),
-                  getTitlesWidget: (v, _) =>
-                      Text('${v.toInt()}'),
-                ),
-              ),
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  interval: 5,
-                  getTitlesWidget: (v, _) =>
-                      Text('${v.toInt() + 1}'),
-                ),
-              ),
-            ),
-            borderData: FlBorderData(show: true),
-            lineBarsData: [
-              LineChartBarData(
-                spots: spots,
-                isCurved: false,
-                barWidth: 2,
-                dotData: FlDotData(show: false),
-              ),
-            ],
-          ),
+    return _ZoomableTrendBox(
+      title: 'Trend distanza (mm)',
+      spots: spots,
+      minY: 0,
+      maxY: maxY == 0 ? 100 : maxY * 1.2,
+      showDots: false,
+      leftTitleBuilder: (v) => Text('${v.toInt()}'),
+      leftInterval: (maxY / 4).clamp(5, 50),
+    );
+  }
+  static Widget directionalBias(List<DartThrow> throws) {
+    if (throws.isEmpty) return _empty();
+
+    final valid = throws.where((t) => !t.isPass).toList();
+    if (valid.isEmpty) return _empty();
+
+    final meanX = valid.map((t) => t.position.dx).reduce((a, b) => a + b) / valid.length;
+    final meanY = valid.map((t) => t.position.dy).reduce((a, b) => a + b) / valid.length;
+
+    double varX = 0;
+    double varY = 0;
+    for (final t in valid) {
+      varX += pow(t.position.dx - meanX, 2);
+      varY += pow(t.position.dy - meanY, 2);
+    }
+
+    final stdX = sqrt(varX / valid.length);
+    final stdY = sqrt(varY / valid.length);
+
+    const boardMm = 451.0;
+    final meanXmm = (meanX - 0.5) * boardMm;
+    final meanYmm = (meanY - 0.5) * boardMm;
+    final stdXmm = stdX * boardMm;
+    final stdYmm = stdY * boardMm;
+
+    final xDir = meanXmm >= 0 ? 'destra' : 'sinistra';
+    final yDir = meanYmm >= 0 ? 'basso' : 'alto';
+
+    Widget row(String label, String value) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label),
+            Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          ],
         ),
+      );
+    }
+
+    return _box(
+      'Bias direzionale',
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          row('Orizzontale', '${meanXmm >= 0 ? '+' : ''}${meanXmm.toStringAsFixed(0)} mm ($xDir)'),
+          row('Verticale', '${meanYmm >= 0 ? '+' : ''}${meanYmm.toStringAsFixed(0)} mm ($yDir)'),
+          const Divider(),
+          row('Dispersione X', '${stdXmm.toStringAsFixed(0)} mm'),
+          row('Dispersione Y', '${stdYmm.toStringAsFixed(0)} mm'),
+        ],
       ),
     );
   }
@@ -742,5 +730,123 @@ class TrainingCharts {
 
   static Widget _empty() {
     return const Center(child: Text('Nessun dato'));
+  }
+}
+
+class _ZoomableTrendBox extends StatefulWidget {
+  final String title;
+  final List<FlSpot> spots;
+  final double minY;
+  final double maxY;
+  final bool showDots;
+  final Widget Function(double) leftTitleBuilder;
+  final double leftInterval;
+
+  const _ZoomableTrendBox({
+    required this.title,
+    required this.spots,
+    required this.minY,
+    required this.maxY,
+    required this.showDots,
+    required this.leftTitleBuilder,
+    required this.leftInterval,
+  });
+
+  @override
+  State<_ZoomableTrendBox> createState() => _ZoomableTrendBoxState();
+}
+
+class _ZoomableTrendBoxState extends State<_ZoomableTrendBox> {
+  late final TransformationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TransformationController();
+    _controller.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  List<FlSpot> _visibleSpots(double zoomX) {
+    if (widget.spots.length <= 2) return widget.spots;
+
+    const baseWidth = 360.0;
+    const minPxPerPoint = 3.0;
+
+    final visibleCapacity = max(40, ((baseWidth * zoomX) / minPxPerPoint).round());
+    if (widget.spots.length <= visibleCapacity) return widget.spots;
+
+    final step = (widget.spots.length / visibleCapacity).ceil();
+    final out = <FlSpot>[];
+    for (int i = 0; i < widget.spots.length; i += step) {
+      out.add(widget.spots[i]);
+    }
+    if (out.isEmpty || out.last.x != widget.spots.last.x) {
+      out.add(widget.spots.last);
+    }
+    return out;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final zoomX = _controller.value.getMaxScaleOnAxis().clamp(1.0, 6.0);
+    final spots = _visibleSpots(zoomX);
+    final bottomInterval = max(1, (spots.length / 8).round()).toDouble();
+    final chartWidth = max(360.0, widget.spots.length * 12.0);
+
+    return TrainingCharts._box(
+      widget.title,
+      SizedBox(
+        height: 180,
+        child: InteractiveViewer(
+          transformationController: _controller,
+          constrained: false,
+          minScale: 1,
+          maxScale: 6,
+          boundaryMargin: const EdgeInsets.symmetric(horizontal: 80),
+          child: SizedBox(
+            width: chartWidth,
+            height: 180,
+            child: LineChart(
+              LineChartData(
+                minY: widget.minY,
+                maxY: widget.maxY,
+                gridData: FlGridData(show: true),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: widget.leftInterval,
+                      getTitlesWidget: (v, _) => widget.leftTitleBuilder(v),
+                    ),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: bottomInterval,
+                      getTitlesWidget: (v, _) => Text('${v.toInt() + 1}'),
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: true),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: false,
+                    barWidth: 2,
+                    dotData: FlDotData(show: widget.showDots),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
