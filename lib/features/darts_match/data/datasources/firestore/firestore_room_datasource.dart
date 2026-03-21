@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../../../dto/room_dto.dart';
+import '../../dto/room_dto.dart';
 
 class FirestoreRoomDataSource {
   FirestoreRoomDataSource(this._firestore);

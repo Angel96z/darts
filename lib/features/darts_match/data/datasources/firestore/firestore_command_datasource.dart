@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../../../dto/command_dto.dart';
+import '../../dto/command_dto.dart';
 
 class FirestoreCommandDataSource {
   FirestoreCommandDataSource(this._firestore);
