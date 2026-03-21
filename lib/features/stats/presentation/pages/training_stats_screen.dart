@@ -389,6 +389,12 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
           hitPercent: _asInt(stats['hitPercent']),
           avgDistanceMm: _asDouble(stats['avgDistanceMm']),
           bestStreak: _asInt(stats['bestStreak']),
+          focus: _asNullableInt(data['focus']),
+          stress: _asNullableInt(data['stress']),
+          energia: _asNullableInt(data['energia']),
+          fiducia: _asNullableInt(data['fiducia']),
+          distrazioni: _asNullableInt(data['distrazioni']),
+          commento: data['commento']?.toString(),
         ),
       );
     }
@@ -536,8 +542,36 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
           TrainingCharts.performanceScore(throws, _target),
           TrainingCharts.bestWorstAnalysis(throws, _target),
           TrainingCharts.ringDistribution(throws, _target),
+          const SizedBox(height: 4),
+          _clusterTitle('SESSIONI'),
+          FutureBuilder<List<TrainingSessionStats>>(
+            future: _loadSessionsForActivePeriod(),
+            builder: (context, snapshot) {
+              final sessions = snapshot.data ?? const <TrainingSessionStats>[];
+              final points = sessions.map(_toSessionPoint).toList();
+              return Column(
+                children: [
+                  TrainingCharts.topSessions(points),
+                  TrainingCharts.worstSessions(points),
+                ],
+              );
+            },
+          ),
         ],
       ),
+    );
+  }
+
+  SessionPerformancePoint _toSessionPoint(TrainingSessionStats s) {
+    return SessionPerformancePoint(
+      id: s.id,
+      performance: s.hitPercent.toDouble(),
+      focus: s.focus,
+      stress: s.stress,
+      energia: s.energia,
+      fiducia: s.fiducia,
+      distrazioni: s.distrazioni,
+      commento: s.commento,
     );
   }
 
@@ -969,6 +1003,12 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
           hitPercent: _asInt(stats['hitPercent']),
           avgDistanceMm: _asDouble(stats['avgDistanceMm']),
           bestStreak: _asInt(stats['bestStreak']),
+          focus: _asNullableInt(data['focus']),
+          stress: _asNullableInt(data['stress']),
+          energia: _asNullableInt(data['energia']),
+          fiducia: _asNullableInt(data['fiducia']),
+          distrazioni: _asNullableInt(data['distrazioni']),
+          commento: data['commento']?.toString(),
         ),
       );
     }
@@ -1164,6 +1204,12 @@ class TrainingSessionStats {
   final int hitPercent;
   final double avgDistanceMm;
   final int bestStreak;
+  final int? focus;
+  final int? stress;
+  final int? energia;
+  final int? fiducia;
+  final int? distrazioni;
+  final String? commento;
 
   const TrainingSessionStats({
     required this.id,
@@ -1178,6 +1224,12 @@ class TrainingSessionStats {
     required this.hitPercent,
     required this.avgDistanceMm,
     required this.bestStreak,
+    this.focus,
+    this.stress,
+    this.energia,
+    this.fiducia,
+    this.distrazioni,
+    this.commento,
   });
 }
 
@@ -1268,6 +1320,13 @@ int _asInt(dynamic value) {
   if (value is double) return value.round();
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
+}
+
+int? _asNullableInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value.toString());
 }
 
 double _asDouble(dynamic value) {
