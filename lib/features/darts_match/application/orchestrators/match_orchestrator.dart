@@ -91,7 +91,7 @@ class MatchOrchestrator {
         legNumber: (draftMap['legNumber'] as num?)?.toInt() ?? 1,
         turnNumber: (draftMap['turnNumber'] as num?)?.toInt() ?? 1,
         inputs: inputs,
-        inputMode: InputMode.pointsOnly,
+        inputMode: InputMode.totalTurnInput,
       );
     }
 

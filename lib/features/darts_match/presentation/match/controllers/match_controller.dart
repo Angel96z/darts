@@ -11,6 +11,8 @@ import '../../../application/validators/command_validator.dart';
 import '../../../domain/commands/match_command.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/engines/x01_engine.dart';
+import '../../../domain/policies/team_finish_constraint.dart';
+import '../../../domain/rules/x01_rules.dart';
 import '../../../domain/value_objects/identifiers.dart';
 
 class MatchViewModel {
@@ -54,7 +56,12 @@ class MatchController extends StateNotifier<MatchViewModel?> {
       commandRepository: _ref.read(commandRepositoryProvider),
       validator: const CommandValidator(),
       reducer: const MatchReducer(),
-      engine: const X01Engine(),
+      engine: X01Engine(
+        inRule: InRule(match.config.inMode),
+        outRule: OutRule(match.config.outMode),
+        bustRule: const BustRule(),
+        finishConstraint: _resolveFinishConstraint(match.config),
+      ),
     );
     _commandProcessor ??= MatchCommandProcessor(
       firestore: FirebaseFirestore.instance,
@@ -119,6 +126,13 @@ class MatchController extends StateNotifier<MatchViewModel?> {
     _sub?.cancel();
     _commandProcessor?.dispose();
     super.dispose();
+  }
+
+  TeamFinishConstraint _resolveFinishConstraint(MatchConfig config) {
+    if (!config.finishConstraintEnabled || config.teamMode != TeamMode.teams) {
+      return const NoTeamFinishConstraint();
+    }
+    return const LowestTeamTotalConstraint();
   }
 }
 
