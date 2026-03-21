@@ -17,6 +17,12 @@ class TrainingRepository {
     required DateTime startTime,
     required DateTime endTime,
     required List<DartThrow> throwsList,
+    int? focus,
+    int? stress,
+    int? energia,
+    int? fiducia,
+    int? distrazioni,
+    String? commento,
     String? trainingIdOverride,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
@@ -66,6 +72,12 @@ class TrainingRepository {
         'avgDistanceMm': stats.averageDistanceMm,
         'bestStreak': stats.bestStreak(target),
       },
+      'focus': focus,
+      'stress': stress,
+      'energia': energia,
+      'fiducia': fiducia,
+      'distrazioni': distrazioni,
+      'commento': commento,
     };
 
     await trainingRef.set(trainingData, SetOptions(merge: true)).timeout(_timeout);

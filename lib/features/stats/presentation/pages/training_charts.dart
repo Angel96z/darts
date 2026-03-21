@@ -235,6 +235,62 @@ class TrainingCharts {
       rendererBuilder: (ctx) => LineChartRenderer(ctx: ctx, showDots: false),
     );
   }
+
+  static Widget topSessions(List<SessionPerformancePoint> sessions) {
+    if (sessions.isEmpty) return _empty();
+    final sorted = [...sessions]..sort((a, b) => b.performance.compareTo(a.performance));
+    final top = sorted.take(5).toList();
+    return _sessionScatterChart(
+      title: 'Top 5 sessioni',
+      sessions: top,
+      color: Colors.green,
+    );
+  }
+
+  static Widget worstSessions(List<SessionPerformancePoint> sessions) {
+    if (sessions.isEmpty) return _empty();
+    final sorted = [...sessions]..sort((a, b) => a.performance.compareTo(b.performance));
+    final worst = sorted.take(5).toList();
+    return _sessionScatterChart(
+      title: 'Worst 5 sessioni',
+      sessions: worst,
+      color: Colors.red,
+    );
+  }
+
+  static Widget _sessionScatterChart({
+    required String title,
+    required List<SessionPerformancePoint> sessions,
+    required Color color,
+  }) {
+    final points = <ChartDataPoint>[];
+    for (int i = 0; i < sessions.length; i++) {
+      points.add(ChartDataPoint(x: i.toDouble(), y: sessions[i].performance));
+    }
+
+    return BaseChartWidget(
+      title: title,
+      series: [ChartSeries(name: 'Performance', points: points, color: color)],
+      config: const ChartConfig(
+        minY: 0,
+        maxY: 100,
+        yInterval: 10,
+        xInterval: 1,
+      ),
+      description: 'Ogni punto è una sessione.',
+      tooltipBuilder: (index) {
+        if (index < 0 || index >= sessions.length) return '';
+        final s = sessions[index];
+        return 'Performance: ${s.performance.toStringAsFixed(1)}%\n'
+            'Focus: ${s.focus ?? '-'}  Stress: ${s.stress ?? '-'}\n'
+            'Energia: ${s.energia ?? '-'}  Fiducia: ${s.fiducia ?? '-'}\n'
+            'Distrazioni: ${s.distrazioni ?? '-'}\n'
+            'Commento: ${s.commento?.isNotEmpty == true ? s.commento : 'Nessun commento'}';
+      },
+      legendText: 'Confronta i contesti mentali/fisici delle sessioni migliori e peggiori.',
+      rendererBuilder: (ctx) => LineChartRenderer(ctx: ctx, showDots: true),
+    );
+  }
   static Widget directionalBias(List<DartThrow> throws) {
     if (throws.isEmpty) return _empty();
 
@@ -1021,6 +1077,28 @@ class ChartDataPoint {
   final double y;
 
   const ChartDataPoint({required this.x, required this.y});
+}
+
+class SessionPerformancePoint {
+  final String id;
+  final double performance;
+  final int? focus;
+  final int? stress;
+  final int? energia;
+  final int? fiducia;
+  final int? distrazioni;
+  final String? commento;
+
+  const SessionPerformancePoint({
+    required this.id,
+    required this.performance,
+    this.focus,
+    this.stress,
+    this.energia,
+    this.fiducia,
+    this.distrazioni,
+    this.commento,
+  });
 }
 
 class ChartSeries {

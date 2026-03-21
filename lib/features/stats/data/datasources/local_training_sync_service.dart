@@ -30,6 +30,12 @@ class LocalTrainingRecord {
   final LocalTrainingSyncStatus syncStatus;
   final int retryCount;
   final DateTime? lastSyncAttempt;
+  final int? focus;
+  final int? stress;
+  final int? energia;
+  final int? fiducia;
+  final int? distrazioni;
+  final String? commento;
 
   const LocalTrainingRecord({
     required this.localId,
@@ -42,6 +48,12 @@ class LocalTrainingRecord {
     required this.syncStatus,
     this.retryCount = 0,
     this.lastSyncAttempt,
+    this.focus,
+    this.stress,
+    this.energia,
+    this.fiducia,
+    this.distrazioni,
+    this.commento,
   });
 
   LocalTrainingRecord copyWith({
@@ -49,6 +61,12 @@ class LocalTrainingRecord {
     LocalTrainingSyncStatus? syncStatus,
     int? retryCount,
     DateTime? lastSyncAttempt,
+    int? focus,
+    int? stress,
+    int? energia,
+    int? fiducia,
+    int? distrazioni,
+    String? commento,
   }) {
     return LocalTrainingRecord(
       localId: localId,
@@ -61,6 +79,12 @@ class LocalTrainingRecord {
       syncStatus: syncStatus ?? this.syncStatus,
       retryCount: retryCount ?? this.retryCount,
       lastSyncAttempt: lastSyncAttempt ?? this.lastSyncAttempt,
+      focus: focus ?? this.focus,
+      stress: stress ?? this.stress,
+      energia: energia ?? this.energia,
+      fiducia: fiducia ?? this.fiducia,
+      distrazioni: distrazioni ?? this.distrazioni,
+      commento: commento ?? this.commento,
     );
   }
 
@@ -92,6 +116,12 @@ class LocalTrainingRecord {
       'syncStatus': syncStatus.name,
       'retryCount': retryCount,
       'lastSyncAttempt': lastSyncAttempt?.toIso8601String(),
+      'focus': focus,
+      'stress': stress,
+      'energia': energia,
+      'fiducia': fiducia,
+      'distrazioni': distrazioni,
+      'commento': commento,
     };
   }
 
@@ -129,6 +159,12 @@ class LocalTrainingRecord {
       lastSyncAttempt: map['lastSyncAttempt'] != null
           ? DateTime.parse(map['lastSyncAttempt'])
           : null,
+      focus: map['focus'] as int?,
+      stress: map['stress'] as int?,
+      energia: map['energia'] as int?,
+      fiducia: map['fiducia'] as int?,
+      distrazioni: map['distrazioni'] as int?,
+      commento: map['commento']?.toString(),
     );
   }
 }
@@ -160,6 +196,12 @@ class LocalTrainingSyncService {
     required DateTime start,
     required DateTime end,
     required List<DartThrow> throwsList,
+    int? focus,
+    int? stress,
+    int? energia,
+    int? fiducia,
+    int? distrazioni,
+    String? commento,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final lockKey = '${_key}_lock';
@@ -186,6 +228,12 @@ class LocalTrainingSyncService {
         syncStatus: LocalTrainingSyncStatus.pending,
         retryCount: 0,
         lastSyncAttempt: null,
+        focus: focus,
+        stress: stress,
+        energia: energia,
+        fiducia: fiducia,
+        distrazioni: distrazioni,
+        commento: commento,
       );
 
       final all = await _getAll();
@@ -267,6 +315,12 @@ class LocalTrainingSyncService {
     required DateTime start,
     required DateTime end,
     required List<DartThrow> throwsList,
+    int? focus,
+    int? stress,
+    int? energia,
+    int? fiducia,
+    int? distrazioni,
+    String? commento,
   }) async {
     final record = LocalTrainingRecord(
       localId: 'local_${_uuid.v4()}',
@@ -279,6 +333,12 @@ class LocalTrainingSyncService {
       syncStatus: LocalTrainingSyncStatus.pending,
       retryCount: 0,
       lastSyncAttempt: null,
+      focus: focus,
+      stress: stress,
+      energia: energia,
+      fiducia: fiducia,
+      distrazioni: distrazioni,
+      commento: commento,
     );
     final all = await _getAll();
     all.add(record);
@@ -342,6 +402,12 @@ class LocalTrainingSyncService {
           startTime: r.startTime,
           endTime: r.endTime,
           throwsList: r.throwsList,
+          focus: r.focus,
+          stress: r.stress,
+          energia: r.energia,
+          fiducia: r.fiducia,
+          distrazioni: r.distrazioni,
+          commento: r.commento,
           trainingIdOverride: r.localId,
         );
 
@@ -392,6 +458,12 @@ class LocalTrainingSyncService {
         endTime: (data['endTime'] as Timestamp).toDate(),
         throwsList: [], // opzionale: puoi ricostruirli
         syncStatus: LocalTrainingSyncStatus.synced,
+        focus: data['focus'] as int?,
+        stress: data['stress'] as int?,
+        energia: data['energia'] as int?,
+        fiducia: data['fiducia'] as int?,
+        distrazioni: data['distrazioni'] as int?,
+        commento: data['commento']?.toString(),
       );
 
       local.add(record);
@@ -410,6 +482,51 @@ class LocalTrainingSyncService {
 // Ottieni tutti i record locali
   Future<List<LocalTrainingRecord>> getAllRecords() async {
     return await _getAll();
+  }
+
+  Future<void> updateSessionReview({
+    required String id,
+    int? focus,
+    int? stress,
+    int? energia,
+    int? fiducia,
+    int? distrazioni,
+    String? commento,
+  }) async {
+    final all = await _getAll();
+    final index = all.indexWhere((r) => r.localId == id || r.remoteId == id);
+    if (index == -1) return;
+
+    final updated = all[index].copyWith(
+      focus: focus,
+      stress: stress,
+      energia: energia,
+      fiducia: fiducia,
+      distrazioni: distrazioni,
+      commento: commento,
+    );
+    all[index] = updated;
+    await _saveAll(all);
+
+    if (updated.remoteId != null) {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('trainings')
+            .doc(updated.remoteId)
+            .set({
+          'focus': focus,
+          'stress': stress,
+          'energia': energia,
+          'fiducia': fiducia,
+          'distrazioni': distrazioni,
+          'commento': commento,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+    }
   }
   // Metodo di debug per vedere tutti i record
   Future<void> debugPrintAllRecords() async {
