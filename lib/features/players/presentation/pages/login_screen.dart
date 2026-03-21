@@ -44,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
         password: passwordController.text.trim(),
       );
 
-      if (mounted) {
+      if (mounted && Navigator.canPop(context)) {
         Navigator.pop(context, true);
       }
 

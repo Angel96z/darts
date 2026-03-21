@@ -132,10 +132,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
   }
   String? _hostId;
   String? get hostId => _hostId;
-  String get currentPlayerId {
-    if (state.players.isEmpty) return '';
-    return state.players.first.id;
-  }
+  String get currentPlayerId => FirebaseAuth.instance.currentUser?.uid ?? '';
   String? get isCurrentUserHostId => _hostId;
   bool get isCurrentUserHost {
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -285,7 +282,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       clearLoading: true,
     );
     await _watchRoom(roomId);
-    await addCurrentUser();
+    await addAuthenticatedUser();
   }
 
   Future<void> _watchRoom(String roomId) async {
@@ -333,17 +330,10 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     await _syncPlayers();
   }
   Future<void> addLocalGuest(String name) async {
-    if (name.trim().isEmpty) return;
-    final id = 'guest_${DateTime.now().millisecondsSinceEpoch}';
-    final next = [
-      ...state.players,
-      LobbyPlayerVm(id: id, name: name.trim(), isGuest: true, connection: ConnectionState.connected),
-    ];
-    state = state.copyWith(players: next);
-    await _syncPlayers();
+    await createGuestPlayer(name);
   }
 
-  Future<void> addAuthenticatedLocalGuest() async {
+  Future<void> addAuthenticatedUser() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
@@ -369,23 +359,21 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     await _syncPlayers();
   }
 
-  Future<void> addCurrentUser({String? guestName}) async {
-    final user = FirebaseAuth.instance.currentUser;
-    final cleanGuestName = guestName?.trim() ?? '';
-    final isGuest = user == null;
-    if (isGuest && cleanGuestName.isEmpty) return;
+  Future<void> createGuestPlayer(String name) async {
+    final guestName = name.trim();
+    if (guestName.isEmpty) return;
 
-    final name = isGuest ? cleanGuestName : (user!.displayName ?? user.email ?? 'Player');
-    final id = isGuest ? 'guest_${DateTime.now().millisecondsSinceEpoch}' : user!.uid;
+    final id = 'guest_${DateTime.now().millisecondsSinceEpoch}';
     final exists = state.players.any((p) => p.id == id);
     if (exists) return;
+
     state = state.copyWith(
       players: [
         ...state.players,
         LobbyPlayerVm(
           id: id,
-          name: name,
-          isGuest: isGuest,
+          name: guestName,
+          isGuest: true,
           connection: ConnectionState.connected,
         ),
       ],
