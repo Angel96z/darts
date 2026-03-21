@@ -112,6 +112,31 @@ class LobbyViewModel {
 
 class LobbyController extends StateNotifier<LobbyViewModel> {
   Timer? _connectionTimer;
+  // 👇 NUOVO: guest "autenticato proxy" (NON usa FirebaseAuth app)
+  Future<void> addGuestFromExternalAuth({
+    required String externalId,
+    required String name,
+    String? email,
+  }) async {
+    final id = 'guest_ext_$externalId';
+
+    final exists = state.players.any((p) => p.id == id);
+    if (exists) return;
+
+    state = state.copyWith(
+      players: [
+        ...state.players,
+        LobbyPlayerVm(
+          id: id,
+          name: name.isNotEmpty ? name : (email ?? 'Guest'),
+          isGuest: true, // 👈 sempre guest nella room
+          connection: ConnectionState.connected,
+        ),
+      ],
+    );
+
+    await _syncPlayers();
+  }
   LobbyViewModel _initialState() {
     return const LobbyViewModel(
       roomState: RoomState.waiting,
@@ -364,13 +389,11 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
   }
 
   Future<void> addAuthenticatedUser() async {
+// SOLO per host iniziale. Non usare per aggiungere altri player.
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     final id = user.uid;
-    final name = (user.displayName != null && user.displayName!.trim().isNotEmpty)
-        ? user.displayName!.trim()
-        : (user.email ?? 'Guest');
 
     final exists = state.players.any((p) => p.id == id);
     if (exists) return;
@@ -380,12 +403,13 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
         ...state.players,
         LobbyPlayerVm(
           id: id,
-          name: name,
+          name: user.displayName ?? user.email ?? 'Player',
           isGuest: false,
           connection: ConnectionState.connected,
         ),
       ],
     );
+
     await _syncPlayers();
   }
 
@@ -394,8 +418,6 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     if (guestName.isEmpty) return;
 
     final id = 'guest_${DateTime.now().millisecondsSinceEpoch}';
-    final exists = state.players.any((p) => p.id == id);
-    if (exists) return;
 
     state = state.copyWith(
       players: [
@@ -408,6 +430,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
         ),
       ],
     );
+
     await _syncPlayers();
   }
 

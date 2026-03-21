@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart' hide OverlayState;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../../core/widgets/blocking_overlay.dart';
 import '../../../domain/entities/match.dart';
@@ -10,6 +9,7 @@ import '../../../../players/presentation/pages/login_screen.dart';
 import '../../shared/view_models/connection_badge_vm.dart';
 import '../../shared/widgets/connection_badge.dart';
 import '../controllers/lobby_controller.dart';
+import 'guest_login_screen.dart';
 
 class RoomLobbyShellPage extends ConsumerWidget {
   const RoomLobbyShellPage({super.key});
@@ -38,17 +38,20 @@ class RoomLobbyShellPage extends ConsumerWidget {
             const SizedBox(height: 8),
             TextButton(
               onPressed: () async {
-                if (FirebaseAuth.instance.currentUser != null) {
-                  await ref.read(lobbyControllerProvider.notifier).addAuthenticatedUser();
-                  if (context.mounted) Navigator.pop(context);
-                  return;
-                }
-                await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                final result = await Navigator.of(context, rootNavigator: true).push(
+                  MaterialPageRoute(builder: (_) => const GuestLoginScreen()),
                 );
-                await ref.read(lobbyControllerProvider.notifier).addAuthenticatedUser();
+
+                if (result != null) {
+                  await ref.read(lobbyControllerProvider.notifier).addGuestFromExternalAuth(
+                    externalId: result.uid,
+                    name: result.name ?? '',
+                    email: result.email,
+                  );
+                }
+
                 if (context.mounted) Navigator.pop(context);
+
               },
               child: const Text('Accedi'),
             ),
@@ -78,24 +81,22 @@ class RoomLobbyShellPage extends ConsumerWidget {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: ctrl, decoration: const InputDecoration(labelText: 'Nome guest')),
-            const SizedBox(height: 10),
-            FilledButton(
-              onPressed: () async {
-                await ref.read(lobbyControllerProvider.notifier).createGuestPlayer(ctrl.text);
-                if (context.mounted) Navigator.pop(context);
-              },
-              child: const Text('Entra come guest'),
-            ),
             TextButton(
               onPressed: () async {
-                if (FirebaseAuth.instance.currentUser != null) {
-                  await ref.read(lobbyControllerProvider.notifier).addAuthenticatedUser();
-                  if (context.mounted) Navigator.pop(context);
-                  return;
+                final result = await Navigator.of(context, rootNavigator: true).push(
+                  MaterialPageRoute(builder: (_) => const GuestLoginScreen()),
+                );
+
+                if (result != null) {
+                  await ref.read(lobbyControllerProvider.notifier).addGuestFromExternalAuth(
+                    externalId: result.uid,
+                    name: result.name ?? '',
+                    email: result.email,
+                  );
                 }
-                await Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
-                await ref.read(lobbyControllerProvider.notifier).addAuthenticatedUser();
+
+                if (context.mounted) Navigator.pop(context);
+
               },
               child: const Text('Login / Registrazione'),
             )
