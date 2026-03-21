@@ -37,14 +37,12 @@ class RoomLobbyShellPage extends ConsumerWidget {
             const SizedBox(height: 8),
             TextButton(
               onPressed: () async {
-                final logged = await Navigator.push<bool>(
+                await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
                 );
-                if (logged == true) {
-                  await ref.read(lobbyControllerProvider.notifier).addAuthenticatedLocalGuest();
-                  if (context.mounted) Navigator.pop(context);
-                }
+                await ref.read(lobbyControllerProvider.notifier).addAuthenticatedUser();
+                if (context.mounted) Navigator.pop(context);
               },
               child: const Text('Accedi'),
             ),
@@ -78,7 +76,7 @@ class RoomLobbyShellPage extends ConsumerWidget {
             const SizedBox(height: 10),
             FilledButton(
               onPressed: () async {
-                await ref.read(lobbyControllerProvider.notifier).addCurrentUser(guestName: ctrl.text);
+                await ref.read(lobbyControllerProvider.notifier).createGuestPlayer(ctrl.text);
                 if (context.mounted) Navigator.pop(context);
               },
               child: const Text('Entra come guest'),
