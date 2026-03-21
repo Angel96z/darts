@@ -125,12 +125,13 @@ class TrainingCharts {
     return Column(
       children: [
         _barChart(
-          title: 'Hit per freccia',
+          title: 'Hit per freccia del turno',
           data: percentMap,
           isPercent: true,
           extraLabels: ratioMap,
-          description: 'Percentuale hit per ogni freccia del turno.',
-          tip: 'Se D3 cala vs D1, rallenta e resetta stance tra le frecce.',
+          description: 'Percentuale di hit su D1, D2 e D3.',
+          insight: 'Se D3 scende rispetto a D1, perdi stabilità nel finale.',
+          tip: 'Rallenta il ritmo e resetta la routine tra una freccia e l’altra.',
         ),
         _box(
           'Hit esatte per turno',
@@ -144,8 +145,9 @@ class TrainingCharts {
               buildTurnRow(label: '3 obiettivi', hitCount: 3),
             ],
           ),
-          description: 'Quanti turni chiudi con 1, 2 o 3 hit sul target.',
-          tip: 'Punta a far crescere i turni con 2 hit prima del 3/3.',
+          description: 'Quanti turni completi chiudi con 1, 2 o 3 hit.',
+          insight: 'La base solida è aumentare i turni da 2 hit, non solo cercare 3/3.',
+          tip: 'Lavora per rendere frequenti i turni con almeno 2 hit.',
         ),
       ],
     );
@@ -172,10 +174,11 @@ class TrainingCharts {
         .toList();
 
     return BaseChartWidget(
-      title: singleDart ? 'Trend D$selectedDart' : 'Trend turni (3 freccette)',
+      title: singleDart ? 'Hit nel tempo (D$selectedDart)' : 'Trend hit per turno',
       series: [series],
-      description: 'Andamento hit turno dopo turno.',
-      tip: 'Se la curva scende, riduci ritmo e riparti dalla routine base.',
+      description: 'Numero di hit per ogni turno da 3 freccette.',
+      insight: 'Se la linea scende stai perdendo controllo.',
+      tip: 'Rallenta il ritmo e resetta la routine base.',
       config: ChartConfig(
         minY: 0,
         maxY: singleDart ? 1 : 3,
@@ -191,7 +194,7 @@ class TrainingCharts {
             'Distanza: ${mmByTurn[index].toStringAsFixed(1)} mm';
       },
       legendText:
-          'Vedi quanti hit fai a turno. Se la linea scende, stai perdendo controllo: rallenta il ritmo e cura la routine.',
+          'Controlla la direzione generale: salita = più controllo, discesa = meno controllo.',
       rendererBuilder: (ctx) => LineChartRenderer(ctx: ctx, showDots: true),
     );
   }
@@ -209,10 +212,11 @@ class TrainingCharts {
     final hitByTurn = turns.map((t) => t.where((e) => e.sector == target).length).toList();
 
     return BaseChartWidget(
-      title: 'Trend distanza (mm)',
+      title: 'Precisione nel tempo',
       series: [series],
-      description: 'Distanza media dal target per turno.',
-      tip: 'Se i mm salgono, riduci forza e cerca rilascio morbido.',
+      description: 'Distanza media dal target in ogni turno.',
+      insight: 'Se i mm salgono, la precisione sta calando.',
+      tip: 'Riduci forza e cerca un rilascio più morbido.',
       config: ChartConfig(
         minY: 0,
         maxY: maxY == 0 ? 100 : maxY * 1.2,
@@ -227,7 +231,7 @@ class TrainingCharts {
             'Distanza: ${series.points[index].y.toStringAsFixed(1)} mm';
       },
       legendText:
-          'Vedi la distanza media dal target per turno. Se i mm salgono, riduci forza e cerca un rilascio più morbido.',
+          'Linea più bassa = migliore precisione.',
       rendererBuilder: (ctx) => LineChartRenderer(ctx: ctx, showDots: false),
     );
   }
@@ -273,7 +277,7 @@ class TrainingCharts {
     }
 
     return _box(
-      'Direzione errore',
+      'Bias direzionale',
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -284,8 +288,9 @@ class TrainingCharts {
           row('Dispersione Y', '${stdYmm.toStringAsFixed(0)} mm'),
         ],
       ),
-      description: 'Mostra dove tende a cadere il gruppo frecce.',
-      tip: 'Se il bias è fisso, correggi setup e allineamento iniziale.',
+      description: 'Mostra dove tende a spostarsi il gruppo frecce.',
+      insight: 'Se lo spostamento è sempre nella stessa direzione, l’errore è strutturale.',
+      tip: 'Correggi setup iniziale e allineamento del corpo.',
     );
   }
   static Widget streak(List<DartThrow> throws, String target) {
@@ -366,7 +371,7 @@ class TrainingCharts {
     }
 
     return _box(
-      'Streak',
+      'Serie consecutive',
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -377,8 +382,9 @@ class TrainingCharts {
           row('3 hit', best3),
         ],
       ),
-      description: 'Miglior serie consecutiva di hit tra freccette e turni.',
-      tip: 'Difendi serie brevi e stabili prima di cercare streak lunghi.',
+      description: 'Miglior serie di hit consecutive su freccette e turni.',
+      insight: 'Serie corte ma frequenti indicano controllo reale.',
+      tip: 'Difendi serie brevi e stabili prima di cercare sequenze lunghe.',
     );
   }
 
@@ -461,8 +467,9 @@ class TrainingCharts {
           ),
         ],
       ),
-      description: 'Indice unico da hit, precisione e consistenza.',
-      tip: 'Lavora prima sulla metrica più bassa tra le tre.',
+      description: 'Sintesi unica di hit, precisione e consistenza.',
+      insight: 'La metrica più bassa è il tuo collo di bottiglia.',
+      tip: 'Allena prima la metrica più bassa tra le tre.',
     );
   }
 
@@ -490,10 +497,11 @@ class TrainingCharts {
     final series = ChartDataSource.relationalSeries(metrics);
 
     return BaseChartWidget(
-      title: 'Analisi completa',
+      title: 'Confronto performance',
       series: series,
-      description: 'Confronto tra hit, precisione e consistenza per turno.',
-      tip: 'Allena la linea più instabile nella prossima sessione.',
+      description: 'Confronto tra hit, precisione e consistenza turno per turno.',
+      insight: 'La linea più instabile è la priorità tecnica.',
+      tip: 'Nella prossima sessione lavora sulla linea più instabile.',
       config: const ChartConfig(
         minY: 0,
         maxY: 100,
@@ -522,7 +530,7 @@ class TrainingCharts {
             'Distanza: ${m.avgMm.toStringAsFixed(1)} mm';
       },
       legendText:
-      'Confronti hit, precisione e consistenza. Se una linea cala spesso, concentra il lavoro su quella metrica nella prossima sessione.',
+      'Confronta le tre linee e trova subito la metrica più fragile.',
       rendererBuilder: (ctx) => MultiLineChartRenderer(ctx: ctx),
 
     );
@@ -564,7 +572,7 @@ class TrainingCharts {
     final deltaConsistency = best.consistencyNorm - worst.consistencyNorm;
 
     return _box(
-      'Best vs Worst',
+      'Migliore vs peggiore',
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -587,8 +595,9 @@ class TrainingCharts {
           Text('${signed(deltaConsistency, unit: '%')} consistency'),
         ],
       ),
-      description: 'Confronto rapido tra turno migliore e peggiore.',
-      tip: 'Replica routine del BEST e correggi subito l’errore del WORST.',
+      description: 'Confronto diretto tra turno migliore e peggiore.',
+      insight: 'Il delta mostra dove perdi più punti: hit, distanza o consistenza.',
+      tip: 'Replica la routine del turno migliore e correggi subito l’errore principale.',
     );
   }
 
@@ -615,10 +624,11 @@ class TrainingCharts {
         .toList();
 
     return BaseChartWidget(
-      title: 'Trend consistenza',
+      title: 'Controllo nel tempo',
       series: [series],
-      description: 'Stabilità tra frecce per ogni turno.',
-      tip: 'Linea piatta alta: mantieni stessa routine e stesso tempo.',
+      description: 'Stabilità delle 3 frecce in ogni turno.',
+      insight: 'Linea alta e stabile = esecuzione sotto controllo.',
+      tip: 'Mantieni stesso ritmo e stessa routine nei turni migliori.',
       config: const ChartConfig(minY: 0, maxY: 100, yInterval: 20, xInterval: 1),
       tooltipBuilder: (index) {
         if (index < 0 || index >= points.length) return '';
@@ -626,7 +636,7 @@ class TrainingCharts {
             'Hit: ${hitByTurn[index]}\n'
             'Distanza: ${mmByTurn[index].toStringAsFixed(1)} mm';
       },
-      legendText: 'Più è alta e stabile, più controlli l’esecuzione.',
+      legendText: 'Più la linea resta alta, più il gesto è ripetibile.',
       rendererBuilder: (ctx) => LineChartRenderer(ctx: ctx, showDots: false),
     );
   }
@@ -789,7 +799,7 @@ class TrainingCharts {
     }
 
     return _box(
-      'Distanza dal target',
+      'Analisi distanza dal target',
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -800,8 +810,9 @@ class TrainingCharts {
           row('D3', d3),
         ],
       ),
-      description: 'Media distanza totale e per freccia D1-D2-D3.',
-      tip: 'Se D3 peggiora, prenditi un micro reset prima del lancio.',
+      description: 'Distanza media totale e per freccia D1, D2, D3.',
+      insight: 'Se una freccia è molto peggiore delle altre, c’è un problema di ritmo o postura.',
+      tip: 'Inserisci un micro-reset prima della freccia più debole.',
     );
   }
   static Widget ringDistribution(List<DartThrow> throws, String target) {
@@ -810,7 +821,7 @@ class TrainingCharts {
     final stats = _buildSectorStats(throws);
 
     return _box(
-      'Distribuzione settori',
+      'Distribuzione colpi',
       SizedBox(
         height: 400,
         child: TrainingSectorHits(
@@ -819,8 +830,9 @@ class TrainingCharts {
           totalThrows: throws.length,
         ),
       ),
-      description: 'Distribuzione lanci tra settori e moltiplicatori.',
-      tip: 'Concentra il lavoro sui settori con hit più basse.',
+      description: 'Dove finiscono i lanci tra settori e moltiplicatori.',
+      insight: 'I settori più frequenti fuori target mostrano la tua deriva tipica.',
+      tip: 'Allena prima i settori dove sbagli più spesso.',
     );
   }
   static Map<String, Map<String, int>> _buildSectorStats(List<DartThrow> throws) {
@@ -888,6 +900,7 @@ class TrainingCharts {
     bool isPercent = false,
     Map<String, String>? extraLabels,
     String? description,
+    String? insight,
     String? tip,
   }) {
     if (data.isEmpty) return _empty();
@@ -942,6 +955,7 @@ class TrainingCharts {
         }).toList(),
       ),
       description: description,
+      insight: insight,
       tip: tip,
     );
   }
@@ -950,6 +964,7 @@ class TrainingCharts {
     String title,
     Widget child, {
     String? description,
+    String? insight,
     String? tip,
   }) {
     return Container(
@@ -964,14 +979,30 @@ class TrainingCharts {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+          ),
           if (description != null) ...[
             const SizedBox(height: 4),
-            Text(description, style: TextStyle(color: Colors.grey.shade700)),
+            Text(
+              description,
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+            ),
+          ],
+          if (insight != null) ...[
+            const SizedBox(height: 8),
+            Text('Cosa guardare: $insight'),
           ],
           if (tip != null) ...[
-            const SizedBox(height: 2),
-            Text('Azione: $tip', style: const TextStyle(fontWeight: FontWeight.w500)),
+            const SizedBox(height: 6),
+            Text(
+              'Cosa fare: $tip',
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: Colors.blue,
+              ),
+            ),
           ],
           const SizedBox(height: 8),
           child,
@@ -1108,6 +1139,7 @@ class BaseChartWidget extends StatefulWidget {
   final List<ChartSeries> series;
   final ChartConfig config;
   final String? description;
+  final String? insight;
   final String? tip;
   final String Function(int index)? tooltipBuilder;
   final List<ChartRange> highlightedRanges;
@@ -1119,6 +1151,7 @@ class BaseChartWidget extends StatefulWidget {
   required this.series,
   required this.config,
   this.description,
+  this.insight,
   this.tip,
   this.legendText = '',
   this.rendererBuilder = _defaultRenderer,
@@ -1320,13 +1353,14 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
                   color: Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(_tooltipText ?? 'Passa il mouse sul grafico per dettagli'),
+                child: Text(_tooltipText ?? 'Tocca un punto del grafico per vedere Turno, Hit e Distanza'),
               ),
               const SizedBox(height: 8),
               _SimpleLegend(series: widget.series, text: widget.legendText),
             ],
           ),
           description: widget.description,
+          insight: widget.insight,
           tip: widget.tip,
         );
       },
