@@ -9,6 +9,10 @@ class ConnectionBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Chip(label: Text(vm.label));
+    return Chip(
+      label: Text(vm.label),
+      backgroundColor: vm.isOnline ? Colors.green : Colors.grey,
+      labelStyle: const TextStyle(color: Colors.white),
+    );
   }
 }

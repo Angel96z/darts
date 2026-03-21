@@ -69,7 +69,7 @@ class RoomLobbyShellPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ctrl = ref.read(lobbyControllerProvider.notifier);
     final vm = ref.watch(lobbyControllerProvider);
-    final canInvite = vm.connection == ConnectionState.connected;
+    final canInvite = vm.isOnline;
     return WillPopScope(
       onWillPop: () async {
         final ctrl = ref.watch(lobbyControllerProvider.notifier);
@@ -100,7 +100,9 @@ class RoomLobbyShellPage extends ConsumerWidget {
         appBar: AppBar(
           title: const Text('Room Lobby'),
           actions: [
-            ConnectionBadge(vm: ConnectionBadgeVm(state: vm.connection)),
+            ConnectionBadge(
+              vm: ConnectionBadgeVm(isOnline: vm.isOnline),
+            ),
             const SizedBox(width: 8),
           ],
         ),

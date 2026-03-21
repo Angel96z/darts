@@ -111,6 +111,7 @@ class LobbyViewModel {
 }
 
 class LobbyController extends StateNotifier<LobbyViewModel> {
+  Timer? _connectionTimer;
   LobbyViewModel _initialState() {
     return const LobbyViewModel(
       roomState: RoomState.waiting,
@@ -170,11 +171,35 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
   LobbyController(this._ref) : super(_emptyInitialState()) {
     state = _initialState();
-    _refreshBackendConnection();
+
+    _startConnectionMonitoring(); // 👈 AGGIUNGI QUESTO
+
     _checkLinkJoin();
     _autoAddAuthenticatedUser();
   }
+  void _startConnectionMonitoring() {
+    _connectionTimer?.cancel();
 
+    // 👇 CHECK IMMEDIATO
+    _refreshBackendConnection();
+
+    _connectionTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+      final prev = state.isOnline;
+
+      final now = await _ref
+          .read(backendConnectionServiceProvider)
+          .checkBackendConnection();
+
+      if (prev != now) {
+        state = state.copyWith(
+          isOnline: now,
+          connection: now
+              ? ConnectionState.connected
+              : ConnectionState.disconnected,
+        );
+      }
+    });
+  }
   static LobbyViewModel _emptyInitialState() {
     return const LobbyViewModel(
       roomState: RoomState.waiting,
@@ -199,11 +224,16 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _roomSub;
 
   Future<bool> _refreshBackendConnection() async {
-    final ok = await _ref.read(backendConnectionServiceProvider).checkBackendConnection();
+    final ok = await _ref
+        .read(backendConnectionServiceProvider)
+        .checkBackendConnection();
+
     state = state.copyWith(
       isOnline: ok,
-      connection: ok ? ConnectionState.connected : ConnectionState.disconnected,
+      connection:
+      ok ? ConnectionState.connected : ConnectionState.disconnected,
     );
+
     return ok;
   }
 
@@ -564,6 +594,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
   @override
   void dispose() {
+    _connectionTimer?.cancel(); // 👈 AGGIUNGI
     _roomSub?.cancel();
     super.dispose();
   }

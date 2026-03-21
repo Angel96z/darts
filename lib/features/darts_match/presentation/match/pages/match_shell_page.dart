@@ -45,9 +45,7 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
         title: Text('Match ${match.config.variant.name.toUpperCase()}'),
         actions: [
           ConnectionBadge(
-            vm: ConnectionBadgeVm(
-              state: vm.isOnline ? ConnectionState.connected : ConnectionState.disconnected,
-            ),
+            vm: ConnectionBadgeVm(isOnline: vm.isOnline),
           ),
           const SizedBox(width: 8),
         ],

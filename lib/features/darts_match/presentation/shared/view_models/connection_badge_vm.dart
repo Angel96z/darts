@@ -1,9 +1,7 @@
-import '../../../domain/entities/room.dart';
-
 class ConnectionBadgeVm {
-  const ConnectionBadgeVm({required this.state});
+  const ConnectionBadgeVm({required this.isOnline});
 
-  final ConnectionState state;
+  final bool isOnline;
 
-  String get label => state.name;
+  String get label => isOnline ? 'ONLINE' : 'OFFLINE';
 }
