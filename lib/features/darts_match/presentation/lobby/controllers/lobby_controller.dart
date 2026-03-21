@@ -133,6 +133,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
           ),
         ) {
     _checkLinkJoin();
+    _autoAddAuthenticatedUser();
   }
 
   final Ref _ref;
@@ -146,6 +147,11 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     final roomId = Uri.base.queryParameters['roomId'];
     if (roomId == null || roomId.isEmpty) return;
     await joinFromLink(roomId);
+  }
+
+  Future<void> _autoAddAuthenticatedUser() async {
+    if (FirebaseAuth.instance.currentUser == null) return;
+    await addCurrentUser();
   }
 
   Future<void> joinFromLink(String roomId) async {
