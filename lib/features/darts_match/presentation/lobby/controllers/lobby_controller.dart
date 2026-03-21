@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/widgets/blocking_overlay.dart';
+import '../../../../../core/widgets/blocking_overlay.dart';
 import '../../../application/usecases/providers.dart';
 import '../../../application/usecases/start_match_usecase.dart';
 import '../../../domain/entities/identity.dart';

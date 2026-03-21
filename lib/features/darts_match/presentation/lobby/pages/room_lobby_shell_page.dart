@@ -1,5 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide OverlayState;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -233,7 +233,7 @@ class RoomLobbyShellPage extends ConsumerWidget {
             ),
           ),
           if (vm.loading != null)
-            const Positioned.fill(
+            Positioned.fill(
               child: BlockingOverlay(
                 state: OverlayState.loading,
                 message: 'Caricamento...',
