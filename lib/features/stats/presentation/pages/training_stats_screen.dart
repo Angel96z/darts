@@ -18,6 +18,7 @@ enum StatsViewType {
   accuracy,     // target + radial error
   precision,    // dispersion
   bias,         // punto medio
+  directionalBias, // bande direzionali
 }
 
 class StatsFilter {
@@ -519,7 +520,10 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
           TrainingCharts.mmTrend(throws, _target),
           TrainingCharts.streak(throws, _target),
           TrainingCharts.performanceScore(throws, _target),
+          TrainingCharts.directionalBias(throws),
           TrainingCharts.ringDistribution(throws, _target),
+          TrainingCharts.relationalPerformance(throws),
+          TrainingCharts.bestWorstAnalysis(throws),
         ],
       ),
     );
@@ -598,6 +602,12 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
           'Il punto rosso mostra dove tendi a tirare.\n'
               'Correggi nella direzione opposta.',
         );
+      case StatsViewType.directionalBias:
+        return _insightBox(
+          'Bias direzionale (bande)',
+          'Le bande mostrano media e dispersione orizzontale/verticale.\n'
+              'Banda più larga = più variabilità su quell\'asse.',
+        );
     }
   }
   Widget _insightBox(String title, String text) {
@@ -658,6 +668,16 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       },
     );
   }
+  Widget _buildDirectionalBiasView(List<DartThrow> throws) {
+    return DartboardWidget(
+      throws: throws,
+      target: _target,
+      overlays: const {
+        DartboardOverlayType.targetCenter,
+        DartboardOverlayType.directionalBias,
+      },
+    );
+  }
   Widget _buildDistanceView(List<DartThrow> throws) {
     if (throws.isEmpty) {
       return const Center(child: Text('Nessun dato'));
@@ -704,6 +724,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
           _buildAccuracyView(throws),
           _buildPrecisionView(throws),
           _buildBiasView(throws),
+          _buildDirectionalBiasView(throws),
         ],
       ),
     );
@@ -762,6 +783,8 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
                           _viewBtn('P', StatsViewType.precision),
                           const SizedBox(height: 8),
                           _viewBtn('B', StatsViewType.bias),
+                          const SizedBox(height: 8),
+                          _viewBtn('DB', StatsViewType.directionalBias),
                         ],
                       ),
                     ),
@@ -821,6 +844,8 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
                           _viewBtn('P', StatsViewType.precision),
                           const SizedBox(height: 8),
                           _viewBtn('B', StatsViewType.bias),
+                          const SizedBox(height: 8),
+                          _viewBtn('DB', StatsViewType.directionalBias),
                         ],
                       ),
                     ),

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import '../../../game/domain/entities/dart_models.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -163,10 +165,7 @@ class TrainingCharts {
 
     if (turns.isEmpty) return _empty();
 
-    const maxTurns = 30;
-    final visibleTurns = turns.length > maxTurns
-        ? turns.sublist(turns.length - maxTurns)
-        : turns;
+    final visibleTurns = turns;
 
     final spots = <FlSpot>[];
 
@@ -195,57 +194,26 @@ class TrainingCharts {
       spots.add(FlSpot(i.toDouble(), percent));
     }
 
-    return _box(
-      singleDart
-          ? 'Trend D$selectedDart'
-          : 'Trend turni (3 freccette)',
-      SizedBox(
-        height: 180,
-        child: LineChart(
-          LineChartData(
-            minY: 0,
-            maxY: 100,
-            gridData: FlGridData(show: true),
-            titlesData: FlTitlesData(
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  interval: singleDart ? 100 : 33,
-                  getTitlesWidget: (v, _) {
-                    if (singleDart) {
-                      if (v == 0) return const Text('0');
-                      if (v == 100) return const Text('1');
-                      return const SizedBox.shrink();
-                    } else {
-                      if (v == 0) return const Text('0');
-                      if (v == 33) return const Text('1');
-                      if (v == 66) return const Text('2');
-                      if (v == 100) return const Text('3');
-                      return const SizedBox.shrink();
-                    }
-                  },
-                ),
-              ),
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  interval: 5,
-                  getTitlesWidget: (v, _) => Text('${v.toInt() + 1}'),
-                ),
-              ),
-            ),
-            borderData: FlBorderData(show: true),
-            lineBarsData: [
-              LineChartBarData(
-                spots: spots,
-                isCurved: false,
-                barWidth: 2,
-                dotData: FlDotData(show: true),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return _ZoomableTrendBox(
+      title: singleDart ? 'Trend D$selectedDart' : 'Trend turni (3 freccette)',
+      spots: spots,
+      minY: 0,
+      maxY: 100,
+      showDots: true,
+      leftTitleBuilder: (v) {
+        if (singleDart) {
+          if (v == 0) return const Text('0');
+          if (v == 100) return const Text('1');
+          return const SizedBox.shrink();
+        } else {
+          if (v == 0) return const Text('0');
+          if (v == 33) return const Text('1');
+          if (v == 66) return const Text('2');
+          if (v == 100) return const Text('3');
+          return const SizedBox.shrink();
+        }
+      },
+      leftInterval: singleDart ? 100 : 33,
     );
   }
 
@@ -265,11 +233,7 @@ class TrainingCharts {
 
     if (turns.isEmpty) return _empty();
 
-    // ultimi 30 turni
-    const maxTurns = 30;
-    final visibleTurns = turns.length > maxTurns
-        ? turns.sublist(turns.length - maxTurns)
-        : turns;
+    final visibleTurns = turns;
 
     final spots = <FlSpot>[];
 
@@ -290,44 +254,220 @@ class TrainingCharts {
 
     if (spots.isEmpty) return _empty();
 
+    return _ZoomableTrendBox(
+      title: 'Trend distanza (mm)',
+      spots: spots,
+      minY: 0,
+      maxY: maxY == 0 ? 100 : maxY * 1.2,
+      showDots: false,
+      leftTitleBuilder: (v) => Text('${v.toInt()}'),
+      leftInterval: (maxY / 4).clamp(5, 50),
+    );
+  }
+  static Widget directionalBias(List<DartThrow> throws) {
+    if (throws.isEmpty) return _empty();
+
+    final valid = throws.where((t) => !t.isPass).toList();
+    if (valid.isEmpty) return _empty();
+
+    final meanX = valid.map((t) => t.position.dx).reduce((a, b) => a + b) / valid.length;
+    final meanY = valid.map((t) => t.position.dy).reduce((a, b) => a + b) / valid.length;
+
+    double varX = 0;
+    double varY = 0;
+    for (final t in valid) {
+      varX += pow(t.position.dx - meanX, 2);
+      varY += pow(t.position.dy - meanY, 2);
+    }
+
+    final stdX = sqrt(varX / valid.length);
+    final stdY = sqrt(varY / valid.length);
+
+    const boardMm = 451.0;
+    final meanXmm = (meanX - 0.5) * boardMm;
+    final meanYmm = (meanY - 0.5) * boardMm;
+    final stdXmm = stdX * boardMm;
+    final stdYmm = stdY * boardMm;
+
+    final xDir = meanXmm >= 0 ? 'destra' : 'sinistra';
+    final yDir = meanYmm >= 0 ? 'basso' : 'alto';
+
+    Widget row(String label, String value) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label),
+            Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+      );
+    }
+
     return _box(
-      'Trend distanza (mm)',
+      'Bias direzionale',
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          row('Orizzontale', '${meanXmm >= 0 ? '+' : ''}${meanXmm.toStringAsFixed(0)} mm ($xDir)'),
+          row('Verticale', '${meanYmm >= 0 ? '+' : ''}${meanYmm.toStringAsFixed(0)} mm ($yDir)'),
+          const Divider(),
+          row('Dispersione X', '${stdXmm.toStringAsFixed(0)} mm'),
+          row('Dispersione Y', '${stdYmm.toStringAsFixed(0)} mm'),
+        ],
+      ),
+    );
+  }
+
+  static Widget relationalPerformance(List<DartThrow> throws) {
+    final windows = _buildPerformanceWindows(throws, windowSize: 10);
+    if (windows.isEmpty) return _empty();
+
+    final bestIndex = _bestWindowIndex(windows);
+    final worstIndex = _worstWindowIndex(windows);
+
+    final hitSpots = <FlSpot>[];
+    final precisionSpots = <FlSpot>[];
+    final consistencySpots = <FlSpot>[];
+
+    for (int i = 0; i < windows.length; i++) {
+      final w = windows[i];
+      hitSpots.add(FlSpot(i.toDouble(), w.hitRatePct));
+      precisionSpots.add(FlSpot(i.toDouble(), w.precisionPct));
+      consistencySpots.add(FlSpot(i.toDouble(), w.consistencyPct));
+    }
+
+    return _box(
+      'Relational performance',
       SizedBox(
-        height: 180,
+        height: 220,
         child: LineChart(
           LineChartData(
             minY: 0,
-            maxY: maxY == 0 ? 100 : maxY * 1.2,
+            maxY: 100,
             gridData: FlGridData(show: true),
+            rangeAnnotations: RangeAnnotations(
+              verticalRangeAnnotations: [
+                VerticalRangeAnnotation(
+                  x1: bestIndex - 0.5,
+                  x2: bestIndex + 0.5,
+                  color: Colors.green.withOpacity(0.15),
+                ),
+                VerticalRangeAnnotation(
+                  x1: worstIndex - 0.5,
+                  x2: worstIndex + 0.5,
+                  color: Colors.red.withOpacity(0.15),
+                ),
+              ],
+            ),
             titlesData: FlTitlesData(
               leftTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
-                  interval: (maxY / 4).clamp(5, 50),
-                  getTitlesWidget: (v, _) =>
-                      Text('${v.toInt()}'),
+                  interval: 25,
+                  getTitlesWidget: (v, _) => Text('${v.toInt()}'),
                 ),
               ),
               bottomTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
-                  interval: 5,
-                  getTitlesWidget: (v, _) =>
-                      Text('${v.toInt() + 1}'),
+                  interval: max(1, (windows.length / 6).round()).toDouble(),
+                  getTitlesWidget: (v, _) => Text('W${v.toInt() + 1}'),
                 ),
               ),
             ),
             borderData: FlBorderData(show: true),
             lineBarsData: [
               LineChartBarData(
-                spots: spots,
+                spots: hitSpots,
                 isCurved: false,
                 barWidth: 2,
+                color: Colors.blue,
+                dotData: FlDotData(show: false),
+              ),
+              LineChartBarData(
+                spots: precisionSpots,
+                isCurved: false,
+                barWidth: 2,
+                color: Colors.green,
+                dotData: FlDotData(show: false),
+              ),
+              LineChartBarData(
+                spots: consistencySpots,
+                isCurved: false,
+                barWidth: 2,
+                color: Colors.orange,
                 dotData: FlDotData(show: false),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  static Widget bestWorstAnalysis(List<DartThrow> throws) {
+    final windows = _buildPerformanceWindows(throws, windowSize: 10);
+    if (windows.isEmpty) return _empty();
+
+    final best = windows[_bestWindowIndex(windows)];
+    final worst = windows[_worstWindowIndex(windows)];
+
+    final deltaHit = best.hitRatePct - worst.hitRatePct;
+    final deltaMm = best.avgMm - worst.avgMm;
+    final deltaBiasX = best.meanXmm - worst.meanXmm;
+    final deltaBiasY = best.meanYmm - worst.meanYmm;
+    final deltaConsistency = best.consistencyPct - worst.consistencyPct;
+
+    Widget col(String title, _PerformanceWindow w) {
+      return Expanded(
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
+              Text('Hit rate: ${w.hitRatePct.toStringAsFixed(0)}%'),
+              Text('Avg mm: ${w.avgMm.toStringAsFixed(0)}'),
+              Text('Bias X: ${w.meanXmm.toStringAsFixed(0)} mm'),
+              Text('Bias Y: ${w.meanYmm.toStringAsFixed(0)} mm'),
+              Text('Consistenza: ${w.consistencyPct.toStringAsFixed(0)}%'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    String dir(double v, String pos, String neg) => v >= 0 ? pos : neg;
+
+    return _box(
+      'Best vs worst state',
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              col('BEST', best),
+              const SizedBox(width: 8),
+              col('WORST', worst),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Quando migliori: '
+            '${deltaHit >= 0 ? '+' : ''}${deltaHit.toStringAsFixed(0)}% hit, '
+            '${deltaMm >= 0 ? '+' : ''}${deltaMm.toStringAsFixed(0)} mm, '
+            'bias X ${deltaBiasX.abs().toStringAsFixed(0)} mm ${dir(deltaBiasX, 'a destra', 'a sinistra')}, '
+            'bias Y ${deltaBiasY.abs().toStringAsFixed(0)} mm ${dir(deltaBiasY, 'in basso', 'in alto')}, '
+            '${deltaConsistency >= 0 ? '+' : ''}${deltaConsistency.toStringAsFixed(0)}% consistenza.',
+          ),
+        ],
       ),
     );
   }
@@ -742,5 +882,223 @@ class TrainingCharts {
 
   static Widget _empty() {
     return const Center(child: Text('Nessun dato'));
+  }
+
+  static List<_PerformanceWindow> _buildPerformanceWindows(
+      List<DartThrow> throws, {
+        required int windowSize,
+      }) {
+    final turns = <List<DartThrow>>[];
+    for (int i = 0; i < throws.length; i += 3) {
+      final turn = throws.skip(i).take(3).toList();
+      if (turn.length == 3) turns.add(turn);
+    }
+
+    if (turns.length < windowSize) return [];
+
+    final out = <_PerformanceWindow>[];
+    const boardMm = 451.0;
+
+    for (int start = 0; start <= turns.length - windowSize; start++) {
+      final windowTurns = turns.sublist(start, start + windowSize);
+      final allThrows = windowTurns.expand((e) => e).where((t) => !t.isPass).toList();
+      if (allThrows.isEmpty) continue;
+
+      final hits = allThrows.where((t) => t.sector.toUpperCase() != 'MISS').length;
+      final hitRate = hits / allThrows.length;
+      final hitRatePct = hitRate * 100.0;
+
+      final avgMm = allThrows.map((t) => t.distanceMm).reduce((a, b) => a + b) / allThrows.length;
+      final precisionPct = (1 - (avgMm / 100)).clamp(0.0, 1.0) * 100.0;
+
+      final hitPerTurn = windowTurns.map((t) {
+        return t.where((e) => !e.isPass && e.sector.toUpperCase() != 'MISS').length.toDouble();
+      }).toList();
+
+      final meanHit = hitPerTurn.reduce((a, b) => a + b) / hitPerTurn.length;
+      final variance = hitPerTurn.map((v) => (v - meanHit) * (v - meanHit)).reduce((a, b) => a + b) / hitPerTurn.length;
+      final consistencyPct = (1 - (variance / 2)).clamp(0.0, 1.0) * 100.0;
+
+      final meanX = allThrows.map((t) => t.position.dx).reduce((a, b) => a + b) / allThrows.length;
+      final meanY = allThrows.map((t) => t.position.dy).reduce((a, b) => a + b) / allThrows.length;
+      final meanXmm = (meanX - 0.5) * boardMm;
+      final meanYmm = (meanY - 0.5) * boardMm;
+
+      final score = hitRatePct * 0.5 + precisionPct * 0.3 + consistencyPct * 0.2;
+
+      out.add(
+        _PerformanceWindow(
+          index: start,
+          hitRatePct: hitRatePct,
+          avgMm: avgMm,
+          variance: variance,
+          consistencyPct: consistencyPct,
+          precisionPct: precisionPct,
+          meanXmm: meanXmm,
+          meanYmm: meanYmm,
+          score: score,
+        ),
+      );
+    }
+
+    return out;
+  }
+
+  static int _bestWindowIndex(List<_PerformanceWindow> windows) {
+    int best = 0;
+    for (int i = 1; i < windows.length; i++) {
+      if (windows[i].score > windows[best].score) best = i;
+    }
+    return best;
+  }
+
+  static int _worstWindowIndex(List<_PerformanceWindow> windows) {
+    int worst = 0;
+    for (int i = 1; i < windows.length; i++) {
+      if (windows[i].score < windows[worst].score) worst = i;
+    }
+    return worst;
+  }
+}
+
+class _PerformanceWindow {
+  final int index;
+  final double hitRatePct;
+  final double avgMm;
+  final double variance;
+  final double consistencyPct;
+  final double precisionPct;
+  final double meanXmm;
+  final double meanYmm;
+  final double score;
+
+  const _PerformanceWindow({
+    required this.index,
+    required this.hitRatePct,
+    required this.avgMm,
+    required this.variance,
+    required this.consistencyPct,
+    required this.precisionPct,
+    required this.meanXmm,
+    required this.meanYmm,
+    required this.score,
+  });
+}
+
+class _ZoomableTrendBox extends StatefulWidget {
+  final String title;
+  final List<FlSpot> spots;
+  final double minY;
+  final double maxY;
+  final bool showDots;
+  final Widget Function(double) leftTitleBuilder;
+  final double leftInterval;
+
+  const _ZoomableTrendBox({
+    required this.title,
+    required this.spots,
+    required this.minY,
+    required this.maxY,
+    required this.showDots,
+    required this.leftTitleBuilder,
+    required this.leftInterval,
+  });
+
+  @override
+  State<_ZoomableTrendBox> createState() => _ZoomableTrendBoxState();
+}
+
+class _ZoomableTrendBoxState extends State<_ZoomableTrendBox> {
+  late final TransformationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TransformationController();
+    _controller.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  List<FlSpot> _visibleSpots(double zoomX) {
+    if (widget.spots.length <= 2) return widget.spots;
+
+    const baseWidth = 360.0;
+    const minPxPerPoint = 3.0;
+
+    final visibleCapacity = max(40, ((baseWidth * zoomX) / minPxPerPoint).round());
+    if (widget.spots.length <= visibleCapacity) return widget.spots;
+
+    final step = (widget.spots.length / visibleCapacity).ceil();
+    final out = <FlSpot>[];
+    for (int i = 0; i < widget.spots.length; i += step) {
+      out.add(widget.spots[i]);
+    }
+    if (out.isEmpty || out.last.x != widget.spots.last.x) {
+      out.add(widget.spots.last);
+    }
+    return out;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final zoomX = _controller.value.getMaxScaleOnAxis().clamp(1.0, 6.0);
+    final spots = _visibleSpots(zoomX);
+    final bottomInterval = max(1, (spots.length / 8).round()).toDouble();
+    final chartWidth = max(360.0, widget.spots.length * 12.0);
+
+    return TrainingCharts._box(
+      widget.title,
+      SizedBox(
+        height: 180,
+        child: InteractiveViewer(
+          transformationController: _controller,
+          constrained: false,
+          minScale: 1,
+          maxScale: 6,
+          boundaryMargin: const EdgeInsets.symmetric(horizontal: 80),
+          child: SizedBox(
+            width: chartWidth,
+            height: 180,
+            child: LineChart(
+              LineChartData(
+                minY: widget.minY,
+                maxY: widget.maxY,
+                gridData: FlGridData(show: true),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: widget.leftInterval,
+                      getTitlesWidget: (v, _) => widget.leftTitleBuilder(v),
+                    ),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: bottomInterval,
+                      getTitlesWidget: (v, _) => Text('${v.toInt() + 1}'),
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: true),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: false,
+                    barWidth: 2,
+                    dotData: FlDotData(show: widget.showDots),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
