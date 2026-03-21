@@ -9,6 +9,27 @@ import 'package:fl_chart/fl_chart.dart';
 import '../widgets/training_sector_hits.dart';
 
 class TrainingCharts {
+  static List<DartThrow> _sortThrowsChronologically(List<DartThrow> throws) {
+    final ordered = [...throws];
+    ordered.sort((a, b) {
+      final byTime = a.timestamp.compareTo(b.timestamp);
+      if (byTime != 0) return byTime;
+
+      final byTurn = a.turnNumber.compareTo(b.turnNumber);
+      if (byTurn != 0) return byTurn;
+
+      return a.dartInTurn.compareTo(b.dartInTurn);
+    });
+    return ordered;
+  }
+
+  static List<SessionPerformancePoint> _sortSessionsChronologically(
+      List<SessionPerformancePoint> sessions,
+      ) {
+    final ordered = [...sessions];
+    ordered.sort((a, b) => a.sessionDate.compareTo(b.sessionDate));
+    return ordered;
+  }
   // =========================
   // PUBLIC API (compatibile)
   // =========================
@@ -16,16 +37,15 @@ class TrainingCharts {
   static Widget dartBreakdown(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
 
-    // =========================
-    // HIT PER FRECCIA 1 / 2 / 3
-    // =========================
+    final orderedThrows = _sortThrowsChronologically(throws);
+
     final dartMap = <int, List<DartThrow>>{
       1: [],
       2: [],
       3: [],
     };
 
-    for (final t in throws) {
+    for (final t in orderedThrows) {
       if (dartMap.containsKey(t.dartInTurn)) {
         dartMap[t.dartInTurn]!.add(t);
       }
@@ -58,16 +78,11 @@ class TrainingCharts {
       }
     }
 
-    // =========================
-    // HIT ESATTE PER TURNO
-    // usa solo turni completi da 3 freccette
-    // =========================
     final turns = <int, List<DartThrow>>{};
 
-// costruzione turni sequenziale: ogni 3 freccette = 1 turno
-    for (int i = 0; i < throws.length; i++) {
+    for (int i = 0; i < orderedThrows.length; i++) {
       final turnIndex = i ~/ 3;
-      turns.putIfAbsent(turnIndex, () => []).add(throws[i]);
+      turns.putIfAbsent(turnIndex, () => []).add(orderedThrows[i]);
     }
 
     final exactHitsCount = <int, int>{
@@ -83,7 +98,8 @@ class TrainingCharts {
 
       totalCompleteTurns++;
 
-      final hitsOnTarget = turnThrows.where((t) => t.sector == target).length;
+      final hitsOnTarget =
+          turnThrows.where((t) => t.sector == target).length;
 
       if (hitsOnTarget >= 1 && hitsOnTarget <= 3) {
         exactHitsCount[hitsOnTarget] =
@@ -146,20 +162,21 @@ class TrainingCharts {
             ],
           ),
           description: 'Quanti turni completi chiudi con 1, 2 o 3 hit.',
-          insight: 'La base solida è aumentare i turni da 2 hit, non solo cercare 3/3.',
+          insight:
+          'La base solida è aumentare i turni da 2 hit, non solo cercare 3/3.',
           tip: 'Lavora per rendere frequenti i turni con almeno 2 hit.',
         ),
       ],
     );
   }
-
   static Widget hitTrend(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
 
-    final dartSet = throws.map((t) => t.dartInTurn).toSet();
+    final orderedThrows = _sortThrowsChronologically(throws);
+    final dartSet = orderedThrows.map((t) => t.dartInTurn).toSet();
     final bool singleDart = dartSet.length == 1;
     final int? selectedDart = singleDart ? dartSet.first : null;
-    final turns = _buildTurns(throws);
+    final turns = _buildTurns(orderedThrows);
 
     if (turns.isEmpty) return _empty();
 
@@ -170,11 +187,13 @@ class TrainingCharts {
       selectedDart: selectedDart,
     );
     final mmByTurn = turns
-        .map((t) => t.map((e) => e.distanceMm).reduce((a, b) => a + b) / t.length)
+        .map((t) =>
+    t.map((e) => e.distanceMm).reduce((a, b) => a + b) / t.length)
         .toList();
 
     return BaseChartWidget(
-      title: singleDart ? 'Hit nel tempo (D$selectedDart)' : 'Trend hit per turno',
+      title:
+      singleDart ? 'Hit nel tempo (D$selectedDart)' : 'Trend hit per turno',
       series: [series],
       description: 'Numero di hit per ogni turno da 3 freccette.',
       insight: 'Se la linea scende stai perdendo controllo.',
@@ -194,22 +213,24 @@ class TrainingCharts {
             'Distanza: ${mmByTurn[index].toStringAsFixed(1)} mm';
       },
       legendText:
-          'Controlla la direzione generale: salita = più controllo, discesa = meno controllo.',
+      'Controlla la direzione generale: salita = più controllo, discesa = meno controllo.',
       rendererBuilder: (ctx) => LineChartRenderer(ctx: ctx, showDots: true),
     );
   }
 
-
   static Widget mmTrend(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
-    final turns = _buildTurns(throws);
+
+    final orderedThrows = _sortThrowsChronologically(throws);
+    final turns = _buildTurns(orderedThrows);
 
     if (turns.isEmpty) return _empty();
 
     final series = ChartDataSource.mmTrendSeries(turns: turns);
     if (series.points.isEmpty) return _empty();
     final maxY = series.points.map((e) => e.y).fold<double>(0, max);
-    final hitByTurn = turns.map((t) => t.where((e) => e.sector == target).length).toList();
+    final hitByTurn =
+    turns.map((t) => t.where((e) => e.sector == target).length).toList();
 
     return BaseChartWidget(
       title: 'Precisione nel tempo',
@@ -230,34 +251,36 @@ class TrainingCharts {
             'Hit: ${hitByTurn[index]}\n'
             'Distanza: ${series.points[index].y.toStringAsFixed(1)} mm';
       },
-      legendText:
-          'Linea più bassa = migliore precisione.',
+      legendText: 'Linea più bassa = migliore precisione.',
       rendererBuilder: (ctx) => LineChartRenderer(ctx: ctx, showDots: false),
     );
   }
-
   static Widget topSessions(List<SessionPerformancePoint> sessions) {
     if (sessions.isEmpty) return _empty();
-    final sorted = [...sessions]..sort((a, b) => b.performance.compareTo(a.performance));
-    final top = sorted.take(5).toList();
+
+    final selected = [...sessions]
+      ..sort((a, b) => b.performance.compareTo(a.performance));
+    final top = _sortSessionsChronologically(selected.take(5).toList());
+
     return _sessionScatterChart(
       title: 'Top 5 sessioni',
       sessions: top,
       color: Colors.green,
     );
   }
-
   static Widget worstSessions(List<SessionPerformancePoint> sessions) {
     if (sessions.isEmpty) return _empty();
-    final sorted = [...sessions]..sort((a, b) => a.performance.compareTo(b.performance));
-    final worst = sorted.take(5).toList();
+
+    final selected = [...sessions]
+      ..sort((a, b) => a.performance.compareTo(b.performance));
+    final worst = _sortSessionsChronologically(selected.take(5).toList());
+
     return _sessionScatterChart(
       title: 'Worst 5 sessioni',
       sessions: worst,
       color: Colors.red,
     );
   }
-
   static Widget _sessionScatterChart({
     required String title,
     required List<SessionPerformancePoint> sessions,
@@ -536,7 +559,8 @@ class TrainingCharts {
       }) {
     if (throws.length < 3) return _empty();
 
-    final turns = _buildTurns(throws);
+    final orderedThrows = _sortThrowsChronologically(throws);
+    final turns = _buildTurns(orderedThrows);
     if (turns.isEmpty) return _empty();
 
     final metrics = TurnMetricsBuilder.build(
@@ -546,16 +570,18 @@ class TrainingCharts {
     );
     if (metrics.isEmpty) return _empty();
 
-    final sorted = [...metrics]..sort((a, b) => b.score.compareTo(a.score));
-    final best = sorted.first;
-    final worst = sorted.last;
+    final sortedByScore = [...metrics]
+      ..sort((a, b) => b.score.compareTo(a.score));
+    final best = sortedByScore.first;
+    final worst = sortedByScore.last;
 
     final series = ChartDataSource.relationalSeries(metrics);
 
     return BaseChartWidget(
       title: 'Confronto performance',
       series: series,
-      description: 'Confronto tra hit, precisione e consistenza turno per turno.',
+      description:
+      'Confronto tra hit, precisione e consistenza turno per turno.',
       insight: 'La linea più instabile è la priorità tecnica.',
       tip: 'Nella prossima sessione lavora sulla linea più instabile.',
       config: const ChartConfig(
@@ -588,22 +614,27 @@ class TrainingCharts {
       legendText:
       'Confronta le tre linee e trova subito la metrica più fragile.',
       rendererBuilder: (ctx) => MultiLineChartRenderer(ctx: ctx),
-
     );
   }
 
   static Widget bestWorstAnalysis(List<DartThrow> throws, String target) {
     if (throws.length < 3) return _empty();
 
-    final turns = _buildTurns(throws);
+    final orderedThrows = _sortThrowsChronologically(throws);
+    final turns = _buildTurns(orderedThrows);
     if (turns.isEmpty) return _empty();
 
-    final metrics = TurnMetricsBuilder.build(turns: turns, target: target, showSessionTime: false);
+    final metrics = TurnMetricsBuilder.build(
+      turns: turns,
+      target: target,
+      showSessionTime: false,
+    );
     if (metrics.isEmpty) return _empty();
 
-    final sorted = [...metrics]..sort((a, b) => b.score.compareTo(a.score));
-    final best = sorted.first;
-    final worst = sorted.last;
+    final sortedByScore = [...metrics]
+      ..sort((a, b) => b.score.compareTo(a.score));
+    final best = sortedByScore.first;
+    final worst = sortedByScore.last;
 
     Widget row(String label, String value) {
       return Padding(
@@ -652,31 +683,45 @@ class TrainingCharts {
         ],
       ),
       description: 'Confronto diretto tra turno migliore e peggiore.',
-      insight: 'Il delta mostra dove perdi più punti: hit, distanza o consistenza.',
+      insight:
+      'Il delta mostra dove perdi più punti: hit, distanza o consistenza.',
       tip: 'Replica la routine del turno migliore e correggi subito l’errore principale.',
     );
   }
-
   static Widget consistencyTrend(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
-    final turns = _buildTurns(throws);
+
+    final orderedThrows = _sortThrowsChronologically(throws);
+    final turns = _buildTurns(orderedThrows);
     if (turns.isEmpty) return _empty();
 
     final varianceByTurn = turns.map((turn) {
-      final avgMm = turn.map((e) => e.distanceMm).reduce((a, b) => a + b) / turn.length;
-      return turn.map((e) => pow(e.distanceMm - avgMm, 2).toDouble()).reduce((a, b) => a + b) / turn.length;
+      final avgMm =
+          turn.map((e) => e.distanceMm).reduce((a, b) => a + b) / turn.length;
+      return turn
+          .map((e) => pow(e.distanceMm - avgMm, 2).toDouble())
+          .reduce((a, b) => a + b) /
+          turn.length;
     }).toList();
-    final maxVariance = varianceByTurn.fold<double>(0, (p, v) => v > p ? v : p);
+
+    final maxVariance =
+    varianceByTurn.fold<double>(0, (p, v) => v > p ? v : p);
+
     final points = <ChartDataPoint>[];
     for (int i = 0; i < varianceByTurn.length; i++) {
-      final consistency = maxVariance == 0 ? 100.0 : (1 - (varianceByTurn[i] / maxVariance)).clamp(0.0, 1.0) * 100;
+      final consistency = maxVariance == 0
+          ? 100.0
+          : (1 - (varianceByTurn[i] / maxVariance)).clamp(0.0, 1.0) * 100;
       points.add(ChartDataPoint(x: i.toDouble(), y: consistency));
     }
 
-    final series = ChartSeries(name: 'Consistenza', points: points, color: Colors.purple);
-    final hitByTurn = turns.map((t) => t.where((e) => e.sector == target).length).toList();
+    final series =
+    ChartSeries(name: 'Consistenza', points: points, color: Colors.purple);
+    final hitByTurn =
+    turns.map((t) => t.where((e) => e.sector == target).length).toList();
     final mmByTurn = turns
-        .map((t) => t.map((e) => e.distanceMm).reduce((a, b) => a + b) / t.length)
+        .map((t) =>
+    t.map((e) => e.distanceMm).reduce((a, b) => a + b) / t.length)
         .toList();
 
     return BaseChartWidget(
@@ -685,7 +730,12 @@ class TrainingCharts {
       description: 'Stabilità delle 3 frecce in ogni turno.',
       insight: 'Linea alta e stabile = esecuzione sotto controllo.',
       tip: 'Mantieni stesso ritmo e stessa routine nei turni migliori.',
-      config: const ChartConfig(minY: 0, maxY: 100, yInterval: 20, xInterval: 1),
+      config: const ChartConfig(
+        minY: 0,
+        maxY: 100,
+        yInterval: 20,
+        xInterval: 1,
+      ),
       tooltipBuilder: (index) {
         if (index < 0 || index >= points.length) return '';
         return 'Turno ${index + 1}\n'
@@ -696,11 +746,11 @@ class TrainingCharts {
       rendererBuilder: (ctx) => LineChartRenderer(ctx: ctx, showDots: false),
     );
   }
-
   static List<List<DartThrow>> _buildTurns(List<DartThrow> throws) {
+    final orderedThrows = _sortThrowsChronologically(throws);
     final turns = <List<DartThrow>>[];
-    for (int i = 0; i < throws.length; i += 3) {
-      final turn = throws.skip(i).take(3).toList();
+    for (int i = 0; i < orderedThrows.length; i += 3) {
+      final turn = orderedThrows.skip(i).take(3).toList();
       if (turn.length == 3) turns.add(turn);
     }
     return turns;
@@ -1082,6 +1132,7 @@ class ChartDataPoint {
 class SessionPerformancePoint {
   final String id;
   final double performance;
+  final DateTime sessionDate;
   final int? focus;
   final int? stress;
   final int? energia;
@@ -1092,6 +1143,7 @@ class SessionPerformancePoint {
   const SessionPerformancePoint({
     required this.id,
     required this.performance,
+    required this.sessionDate,
     this.focus,
     this.stress,
     this.energia,

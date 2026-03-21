@@ -566,6 +566,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     return SessionPerformancePoint(
       id: s.id,
       performance: s.hitPercent.toDouble(),
+      sessionDate: s.startTime, // ← FIX
       focus: s.focus,
       stress: s.stress,
       energia: s.energia,
