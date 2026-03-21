@@ -69,6 +69,7 @@ class RoomLobbyShellPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ctrl = ref.read(lobbyControllerProvider.notifier);
     final vm = ref.watch(lobbyControllerProvider);
+    final isOnline = vm.isOnline;
     return WillPopScope(
       onWillPop: () async {
         final ctrl = ref.watch(lobbyControllerProvider.notifier);
@@ -249,13 +250,15 @@ class RoomLobbyShellPage extends ConsumerWidget {
                         label: const Text('Aggiungi giocatore locale'),
                       ),
                       FilledButton.icon(
-                        onPressed: () async {
+                        onPressed: isOnline
+                            ? () async {
                           await ref.read(lobbyControllerProvider.notifier).invite();
                           final link = ref.read(lobbyControllerProvider).inviteLink;
                           if (context.mounted && link != null) {
                             await Clipboard.setData(ClipboardData(text: link));
                           }
-                        },
+                        }
+                            : null,
                         icon: const Icon(Icons.share),
                         label: const Text('Invita'),
                       ),
