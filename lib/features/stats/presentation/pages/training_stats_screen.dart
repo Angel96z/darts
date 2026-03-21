@@ -515,10 +515,12 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       child: Column(
         children: [
           TrainingCharts.dartBreakdown(throws, _target),
-          TrainingCharts.distanceAnalysis(throws, _target),
           TrainingCharts.hitTrend(throws, _target),
-          TrainingCharts.mmTrend(throws, _target),
           TrainingCharts.streak(throws, _target),
+          TrainingCharts.distanceAnalysis(throws, _target),
+          TrainingCharts.mmTrend(throws, _target),
+          TrainingCharts.consistencyTrend(throws, _target),
+          TrainingCharts.directionalBias(throws),
           TrainingCharts.performanceScore(throws, _target),
           TrainingCharts.relationalPerformance(
             throws,
@@ -526,7 +528,6 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
             showSessionTime: _mode == StatsMode.period,
           ),
           TrainingCharts.bestWorstAnalysis(throws, _target),
-          TrainingCharts.directionalBias(throws),
           TrainingCharts.ringDistribution(throws, _target),
         ],
       ),
