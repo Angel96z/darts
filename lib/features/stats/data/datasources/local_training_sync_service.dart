@@ -19,6 +19,16 @@ enum LocalTrainingSyncStatus {
   failed,
 }
 
+class LocalTrainingSaveResult {
+  final String localId;
+  final LocalTrainingSyncStatus status;
+
+  const LocalTrainingSaveResult({
+    required this.localId,
+    required this.status,
+  });
+}
+
 class LocalTrainingRecord {
   final String localId;
   final String? remoteId;
@@ -189,8 +199,8 @@ class LocalTrainingSyncService {
 
 // Costruttore privato
   LocalTrainingSyncService._internal(this._repo);
-  // ✅ NUOVO: Transaction locale per salvataggio atomico
-  Future<String> saveLocalTransactional({
+
+  Future<LocalTrainingSaveResult> saveSession({
     required String mode,
     required String target,
     required DateTime start,
@@ -203,111 +213,39 @@ class LocalTrainingSyncService {
     int? distrazioni,
     String? commento,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final lockKey = '${_key}_lock';
-    debugPrint('🔄 saveLocalTransactional: INIZIO');
-    debugPrint(' mode: $mode, target: $target');
-    debugPrint(' throws: ${throwsList.length}');
-    debugPrint(' start: $start, end: $end');
-// Acquisisci lock per evitare race conditions
-    while (prefs.getBool(lockKey) == true) {
-      await Future.delayed(const Duration(milliseconds: 50));
-    }
-    await prefs.setBool(lockKey, true);
-
-    try {
-
-      final record = LocalTrainingRecord(
-        localId: 'local_${_uuid.v4()}',
-        remoteId: null,
-        mode: mode,
-        target: target,
-        startTime: start,
-        endTime: end,
-        throwsList: List.from(throwsList),
-        syncStatus: LocalTrainingSyncStatus.pending,
-        retryCount: 0,
-        lastSyncAttempt: null,
-        focus: focus,
-        stress: stress,
-        energia: energia,
-        fiducia: fiducia,
-        distrazioni: distrazioni,
-        commento: commento,
-      );
-
-      final all = await _getAll();
-      debugPrint('📋 Record prima: ${all.length}');
-
-      all.add(record);
-      await _saveAll(all);
-
-      debugPrint('📋 Record dopo: ${all.length + 1}');
-      debugPrint('✅ SALVATO IN LOCALE: ${record.localId}');
-
-// Verifica immediata
-      final verify = await _getAll();
-      debugPrint('🔍 Verifica: trovati ${verify.length} record');
-      final saved = verify.any((r) => r.localId == record.localId);
-      debugPrint('🔍 Record salvato verificato: $saved');
-
-      return record.localId;
-    } finally {
-// Rilascia il lock
-      await prefs.setBool(lockKey, false);
-    }
-  }
-
-// ✅ NUOVO: Marca record per sync ritardato
-  Future<void> markPendingSync(String localId) async {
-    final all = await _getAll();
-    final index = all.indexWhere((r) => r.localId == localId);
-    if (index == -1) return;
-
-    all[index] = all[index].copyWith(
-      syncStatus: LocalTrainingSyncStatus.pending,
-      lastSyncAttempt: null,
+    final localId = await saveLocal(
+      mode: mode,
+      target: target,
+      start: start,
+      end: end,
+      throwsList: throwsList,
+      focus: focus,
+      stress: stress,
+      energia: energia,
+      fiducia: fiducia,
+      distrazioni: distrazioni,
+      commento: commento,
     );
-    await _saveAll(all);
-  }
 
-// ✅ NUOVO: Sync con retry
-// ✅ Sync con retry e verifica connettività
-  Future<void> syncAllWithRetry({int maxRetries = 3}) async {
-// Verifica se siamo online prima di iniziare
     final connectivity = Connectivity();
     final status = await connectivity.checkConnectivity();
 
     if (status == ConnectivityResult.none) {
-      debugPrint('📡 Offline rilevato - salto sync e salvo solo locale');
-      return; // Esci subito senza tentativi
+      return LocalTrainingSaveResult(
+        localId: localId,
+        status: LocalTrainingSyncStatus.pending,
+      );
     }
 
-    for (var i = 0; i < maxRetries; i++) {
-      try {
-        await syncAll();
-        debugPrint('✅ Sync completato con successo');
-        return;
-      } catch (e) {
-        debugPrint('❌ Tentativo ${i + 1} fallito: $e');
+    await syncAll();
+    final updated = await getById(localId);
 
-// Controlla se siamo ancora offline
-        final currentStatus = await connectivity.checkConnectivity();
-        if (currentStatus == ConnectivityResult.none) {
-          debugPrint('📡 Connessione persa durante sync - interrompo');
-          return; // Esci se la connessione è stata persa
-        }
-
-        if (i == maxRetries - 1) {
-          debugPrint('⚠️ Sync fallito dopo $maxRetries tentativi');
-          rethrow;
-        }
-
-        debugPrint('⏳ Attendo ${2 * (i + 1)} secondi...');
-        await Future.delayed(Duration(seconds: 2 * (i + 1)));
-      }
-    }
+    return LocalTrainingSaveResult(
+      localId: localId,
+      status: updated?.syncStatus ?? LocalTrainingSyncStatus.failed,
+    );
   }
+
   // SAVE LOCALE
   Future<String> saveLocal({
     required String mode,
