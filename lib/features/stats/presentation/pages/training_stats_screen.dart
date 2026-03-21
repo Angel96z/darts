@@ -520,6 +520,8 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
           TrainingCharts.mmTrend(throws, _target),
           TrainingCharts.streak(throws, _target),
           TrainingCharts.performanceScore(throws, _target),
+          TrainingCharts.relationalPerformance(throws),
+          TrainingCharts.bestWorstAnalysis(throws),
           TrainingCharts.directionalBias(throws),
           TrainingCharts.ringDistribution(throws, _target),
         ],

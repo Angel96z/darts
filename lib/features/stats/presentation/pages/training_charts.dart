@@ -493,6 +493,246 @@ class TrainingCharts {
     );
   }
 
+  static Widget relationalPerformance(List<DartThrow> throws) {
+    if (throws.length < 3) return _empty();
+
+    final turns = _buildTurns(throws);
+    if (turns.isEmpty) return _empty();
+
+    final segments = _buildDynamicSegments(turns);
+    if (segments.isEmpty) return _empty();
+
+    final variances = segments.map((s) => s.variance).toList();
+    final maxVariance = variances.isEmpty
+        ? 0.0
+        : variances.reduce((a, b) => a > b ? a : b);
+
+    final enriched = segments.map((s) {
+      final hitRate = (s.hitRate * 100).clamp(0.0, 100.0);
+      final precision = (1 - (s.avgMm / 100)).clamp(0.0, 1.0) * 100;
+      final consistency = maxVariance == 0
+          ? 100.0
+          : (1 - (s.variance / maxVariance)).clamp(0.0, 1.0) * 100;
+      final score = hitRate * 0.5 + precision * 0.3 + consistency * 0.2;
+      return _RelationalSegment(
+        startTurn: s.startTurn,
+        endTurn: s.endTurn,
+        hitRate: hitRate,
+        precision: precision,
+        consistency: consistency,
+        avgMm: s.avgMm,
+        variance: s.variance,
+        meanXmm: s.meanXmm,
+        meanYmm: s.meanYmm,
+        score: score,
+      );
+    }).toList();
+
+    final sorted = [...enriched]..sort((a, b) => b.score.compareTo(a.score));
+    final best = sorted.first;
+    final worst = sorted.last;
+
+    final hitSpots = <FlSpot>[];
+    final precisionSpots = <FlSpot>[];
+    final consistencySpots = <FlSpot>[];
+
+    for (int i = 0; i < enriched.length; i++) {
+      final x = i.toDouble();
+      hitSpots.add(FlSpot(x, enriched[i].hitRate));
+      precisionSpots.add(FlSpot(x, enriched[i].precision));
+      consistencySpots.add(FlSpot(x, enriched[i].consistency));
+    }
+
+    return _ZoomableMultiTrendBox(
+      title: 'Relational performance',
+      allSeries: [
+        _SeriesData(name: 'Hit', color: Colors.blue, spots: hitSpots),
+        _SeriesData(name: 'Precisione', color: Colors.orange, spots: precisionSpots),
+        _SeriesData(name: 'Consistenza', color: Colors.purple, spots: consistencySpots),
+      ],
+      bestRange: _RangeMarker(
+        start: enriched.indexOf(best).toDouble(),
+        end: enriched.indexOf(best).toDouble(),
+        color: Colors.green.withOpacity(0.18),
+      ),
+      worstRange: _RangeMarker(
+        start: enriched.indexOf(worst).toDouble(),
+        end: enriched.indexOf(worst).toDouble(),
+        color: Colors.red.withOpacity(0.18),
+      ),
+    );
+  }
+
+  static Widget bestWorstAnalysis(List<DartThrow> throws) {
+    if (throws.length < 3) return _empty();
+
+    final turns = _buildTurns(throws);
+    if (turns.isEmpty) return _empty();
+
+    final segments = _buildDynamicSegments(turns);
+    if (segments.isEmpty) return _empty();
+
+    final variances = segments.map((s) => s.variance).toList();
+    final maxVariance = variances.isEmpty
+        ? 0.0
+        : variances.reduce((a, b) => a > b ? a : b);
+
+    final enriched = segments.map((s) {
+      final hitRate = (s.hitRate * 100).clamp(0.0, 100.0);
+      final precision = (1 - (s.avgMm / 100)).clamp(0.0, 1.0) * 100;
+      final consistency = maxVariance == 0
+          ? 100.0
+          : (1 - (s.variance / maxVariance)).clamp(0.0, 1.0) * 100;
+      final score = hitRate * 0.5 + precision * 0.3 + consistency * 0.2;
+      return _RelationalSegment(
+        startTurn: s.startTurn,
+        endTurn: s.endTurn,
+        hitRate: hitRate,
+        precision: precision,
+        consistency: consistency,
+        avgMm: s.avgMm,
+        variance: s.variance,
+        meanXmm: s.meanXmm,
+        meanYmm: s.meanYmm,
+        score: score,
+      );
+    }).toList();
+
+    final sorted = [...enriched]..sort((a, b) => b.score.compareTo(a.score));
+    final best = sorted.first;
+    final worst = sorted.last;
+
+    Widget row(String label, String value) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label),
+            Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+      );
+    }
+
+    String signed(double v, {String unit = ''}) {
+      final sign = v > 0 ? '+' : '';
+      return '$sign${v.toStringAsFixed(1)}$unit';
+    }
+
+    final deltaHit = best.hitRate - worst.hitRate;
+    final deltaMm = best.avgMm - worst.avgMm;
+    final deltaX = best.meanXmm - worst.meanXmm;
+    final deltaY = best.meanYmm - worst.meanYmm;
+    final deltaConsistency = best.consistency - worst.consistency;
+
+    return _box(
+      'Best vs Worst',
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('BEST', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          row('Hit rate', '${best.hitRate.toStringAsFixed(1)}%'),
+          row('Avg mm', '${best.avgMm.toStringAsFixed(1)} mm'),
+          row('Bias X', '${signed(best.meanXmm, unit: ' mm')}'),
+          row('Bias Y', '${signed(best.meanYmm, unit: ' mm')}'),
+          row('Consistency', '${best.consistency.toStringAsFixed(1)}%'),
+          const Divider(),
+          const Text('WORST', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          row('Hit rate', '${worst.hitRate.toStringAsFixed(1)}%'),
+          row('Avg mm', '${worst.avgMm.toStringAsFixed(1)} mm'),
+          row('Bias X', '${signed(worst.meanXmm, unit: ' mm')}'),
+          row('Bias Y', '${signed(worst.meanYmm, unit: ' mm')}'),
+          row('Consistency', '${worst.consistency.toStringAsFixed(1)}%'),
+          const Divider(),
+          Text('${signed(deltaHit, unit: '%')} hit'),
+          Text('${signed(deltaMm, unit: 'mm')} distanza'),
+          Text('bias X ${signed(deltaX, unit: 'mm')}'),
+          Text('bias Y ${signed(deltaY, unit: 'mm')}'),
+          Text('${signed(deltaConsistency, unit: '%')} consistency'),
+        ],
+      ),
+    );
+  }
+
+  static List<List<DartThrow>> _buildTurns(List<DartThrow> throws) {
+    final turns = <List<DartThrow>>[];
+    for (int i = 0; i < throws.length; i += 3) {
+      final turn = throws.skip(i).take(3).toList();
+      if (turn.length == 3) turns.add(turn);
+    }
+    return turns;
+  }
+
+  static List<_RawSegment> _buildDynamicSegments(List<List<DartThrow>> turns) {
+    final total = turns.length;
+    if (total == 0) return [];
+
+    final segmentCount = sqrt(total).ceil().clamp(1, total);
+    final out = <_RawSegment>[];
+
+    int start = 0;
+    for (int i = 0; i < segmentCount; i++) {
+      final remainingSegments = segmentCount - i;
+      final remainingTurns = total - start;
+      final size = (remainingTurns / remainingSegments).ceil();
+      final end = (start + size).clamp(start + 1, total);
+
+      final flat = turns.sublist(start, end).expand((t) => t).toList();
+      if (flat.isNotEmpty) {
+        out.add(_buildRawSegment(flat, start, end - 1));
+      }
+      start = end;
+      if (start >= total) break;
+    }
+
+    return out;
+  }
+
+  static _RawSegment _buildRawSegment(
+    List<DartThrow> list,
+    int startTurn,
+    int endTurn,
+  ) {
+    final valid = list.where((t) => !t.isPass).toList();
+    if (valid.isEmpty) {
+      return _RawSegment(
+        startTurn: startTurn,
+        endTurn: endTurn,
+        hitRate: 0,
+        avgMm: 0,
+        variance: 0,
+        meanXmm: 0,
+        meanYmm: 0,
+      );
+    }
+
+    final hits = valid.where((t) => t.sector.toUpperCase() != 'MISS').length;
+    final hitRate = hits / valid.length;
+    final avgMm = valid.map((e) => e.distanceMm).reduce((a, b) => a + b) / valid.length;
+    final meanX = valid.map((e) => e.position.dx).reduce((a, b) => a + b) / valid.length;
+    final meanY = valid.map((e) => e.position.dy).reduce((a, b) => a + b) / valid.length;
+
+    double variance = 0;
+    for (final t in valid) {
+      variance += pow(t.distanceMm - avgMm, 2).toDouble();
+    }
+    variance = variance / valid.length;
+
+    const boardMm = 451.0;
+    return _RawSegment(
+      startTurn: startTurn,
+      endTurn: endTurn,
+      hitRate: hitRate,
+      avgMm: avgMm,
+      variance: variance,
+      meanXmm: (meanX - 0.5) * boardMm,
+      meanYmm: (meanY - 0.5) * boardMm,
+    );
+  }
+
   static Widget _perfRow(String label, double value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -754,6 +994,232 @@ class _ZoomableTrendBox extends StatefulWidget {
 
   @override
   State<_ZoomableTrendBox> createState() => _ZoomableTrendBoxState();
+}
+
+class _ZoomableMultiTrendBox extends StatefulWidget {
+  final String title;
+  final List<_SeriesData> allSeries;
+  final _RangeMarker bestRange;
+  final _RangeMarker worstRange;
+
+  const _ZoomableMultiTrendBox({
+    required this.title,
+    required this.allSeries,
+    required this.bestRange,
+    required this.worstRange,
+  });
+
+  @override
+  State<_ZoomableMultiTrendBox> createState() => _ZoomableMultiTrendBoxState();
+}
+
+class _ZoomableMultiTrendBoxState extends State<_ZoomableMultiTrendBox> {
+  late final TransformationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TransformationController();
+    _controller.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  List<FlSpot> _visibleSpots(List<FlSpot> input, double zoomX) {
+    if (input.length <= 2) return input;
+
+    const baseWidth = 360.0;
+    const minPxPerPoint = 3.0;
+    final visibleCapacity = max(40, ((baseWidth * zoomX) / minPxPerPoint).round());
+    if (input.length <= visibleCapacity) return input;
+
+    final step = (input.length / visibleCapacity).ceil();
+    final out = <FlSpot>[];
+    for (int i = 0; i < input.length; i += step) {
+      out.add(input[i]);
+    }
+    if (out.isEmpty || out.last.x != input.last.x) {
+      out.add(input.last);
+    }
+    return out;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final zoomX = _controller.value.getMaxScaleOnAxis().clamp(1.0, 6.0);
+
+    final series = widget.allSeries.map((s) {
+      return _SeriesData(
+        name: s.name,
+        color: s.color,
+        spots: _visibleSpots(s.spots, zoomX),
+      );
+    }).toList();
+
+    final totalPoints = widget.allSeries.isEmpty ? 0 : widget.allSeries.first.spots.length;
+    final chartWidth = max(360.0, totalPoints * 18.0);
+    final bottomInterval = max(1, (max(1, totalPoints) / 8).round()).toDouble();
+
+    return TrainingCharts._box(
+      widget.title,
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: widget.allSeries.map((s) {
+              return Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(width: 10, height: 10, color: s.color),
+                    const SizedBox(width: 4),
+                    Text(s.name, style: const TextStyle(fontSize: 12)),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 220,
+            child: InteractiveViewer(
+              transformationController: _controller,
+              constrained: false,
+              minScale: 1,
+              maxScale: 6,
+              boundaryMargin: const EdgeInsets.symmetric(horizontal: 80),
+              child: SizedBox(
+                width: chartWidth,
+                height: 220,
+                child: LineChart(
+                  LineChartData(
+                    minY: 0,
+                    maxY: 100,
+                    gridData: FlGridData(show: true),
+                    rangeAnnotations: RangeAnnotations(
+                      verticalRangeAnnotations: [
+                        VerticalRangeAnnotation(
+                          x1: widget.bestRange.start - 0.5,
+                          x2: widget.bestRange.end + 0.5,
+                          color: widget.bestRange.color,
+                        ),
+                        VerticalRangeAnnotation(
+                          x1: widget.worstRange.start - 0.5,
+                          x2: widget.worstRange.end + 0.5,
+                          color: widget.worstRange.color,
+                        ),
+                      ],
+                    ),
+                    titlesData: FlTitlesData(
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          interval: 20,
+                          getTitlesWidget: (v, _) => Text('${v.toInt()}'),
+                        ),
+                      ),
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          interval: bottomInterval,
+                          getTitlesWidget: (v, _) => Text('${v.toInt() + 1}'),
+                        ),
+                      ),
+                    ),
+                    borderData: FlBorderData(show: true),
+                    lineBarsData: series.map((s) {
+                      return LineChartBarData(
+                        spots: s.spots,
+                        isCurved: false,
+                        barWidth: 2,
+                        color: s.color,
+                        dotData: const FlDotData(show: false),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RawSegment {
+  final int startTurn;
+  final int endTurn;
+  final double hitRate;
+  final double avgMm;
+  final double variance;
+  final double meanXmm;
+  final double meanYmm;
+
+  const _RawSegment({
+    required this.startTurn,
+    required this.endTurn,
+    required this.hitRate,
+    required this.avgMm,
+    required this.variance,
+    required this.meanXmm,
+    required this.meanYmm,
+  });
+}
+
+class _RelationalSegment {
+  final int startTurn;
+  final int endTurn;
+  final double hitRate;
+  final double precision;
+  final double consistency;
+  final double avgMm;
+  final double variance;
+  final double meanXmm;
+  final double meanYmm;
+  final double score;
+
+  const _RelationalSegment({
+    required this.startTurn,
+    required this.endTurn,
+    required this.hitRate,
+    required this.precision,
+    required this.consistency,
+    required this.avgMm,
+    required this.variance,
+    required this.meanXmm,
+    required this.meanYmm,
+    required this.score,
+  });
+}
+
+class _SeriesData {
+  final String name;
+  final Color color;
+  final List<FlSpot> spots;
+
+  const _SeriesData({
+    required this.name,
+    required this.color,
+    required this.spots,
+  });
+}
+
+class _RangeMarker {
+  final double start;
+  final double end;
+  final Color color;
+
+  const _RangeMarker({
+    required this.start,
+    required this.end,
+    required this.color,
+  });
 }
 
 class _ZoomableTrendBoxState extends State<_ZoomableTrendBox> {
