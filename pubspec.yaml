@@ -39,6 +39,7 @@ dependencies:
   firebase_core: ^4.1.1
   firebase_auth: ^6.0.2
   cloud_firestore: ^6.0.1
+  firebase_database: ^12.0.1
 
   flutter_secure_storage: ^9.2.4
   shared_preferences: ^2.5.3
