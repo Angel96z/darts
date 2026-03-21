@@ -514,22 +514,45 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       padding: const EdgeInsets.all(12),
       child: Column(
         children: [
-          TrainingCharts.dartBreakdown(throws, _target),
-          TrainingCharts.hitTrend(throws, _target),
-          TrainingCharts.streak(throws, _target),
-          TrainingCharts.distanceAnalysis(throws, _target),
+          _clusterTitle('PRECISIONE'),
           TrainingCharts.mmTrend(throws, _target),
-          TrainingCharts.consistencyTrend(throws, _target),
+          TrainingCharts.distanceAnalysis(throws, _target),
           TrainingCharts.directionalBias(throws),
-          TrainingCharts.performanceScore(throws, _target),
+          const SizedBox(height: 4),
+          _clusterTitle('PERFORMANCE'),
+          TrainingCharts.hitTrend(throws, _target),
+          TrainingCharts.dartBreakdown(throws, _target),
+          TrainingCharts.streak(throws, _target),
+          const SizedBox(height: 4),
+          _clusterTitle('CONTROLLO'),
+          TrainingCharts.consistencyTrend(throws, _target),
           TrainingCharts.relationalPerformance(
             throws,
             _target,
             showSessionTime: _mode == StatsMode.period,
           ),
+          const SizedBox(height: 4),
+          _clusterTitle('RIEPILOGO'),
+          TrainingCharts.performanceScore(throws, _target),
           TrainingCharts.bestWorstAnalysis(throws, _target),
           TrainingCharts.ringDistribution(throws, _target),
         ],
+      ),
+    );
+  }
+
+  Widget _clusterTitle(String title) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8, top: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.blue.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.w700),
       ),
     );
   }
