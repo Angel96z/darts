@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../lobby/pages/room_lobby_shell_page.dart';
 import '../controllers/result_controller.dart';
 
 class ResultShellPage extends ConsumerWidget {
@@ -10,26 +11,39 @@ class ResultShellPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final result = ref.watch(resultControllerProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Match Result')),
+      appBar: AppBar(title: const Text('Risultato')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: result == null
-            ? const Text('Result not available yet.')
+            ? const Center(child: Text('Risultato non disponibile'))
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Winner: ${result.winnerPlayerId?.value ?? result.winnerTeamId?.value ?? '-'}'),
-                  Text('MVP: ${result.mvpPlayerId?.value ?? '-'}'),
+                  Text('Vincitore: ${result.winnerId}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
                   Text('Highest score: ${result.highestScore}'),
-                  const SizedBox(height: 12),
-                  const Wrap(
-                    spacing: 8,
-                    children: [
-                      FilledButton(onPressed: null, child: Text('Rigioca')),
-                      FilledButton(onPressed: null, child: Text('Nuova room')),
-                      FilledButton(onPressed: null, child: Text('Home')),
-                      FilledButton(onPressed: null, child: Text('Dettaglio statistiche')),
-                    ],
+                  Text('Average: ${result.average}'),
+                  const Spacer(),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (_) => const RoomLobbyShellPage()),
+                          (r) => false,
+                        );
+                      },
+                      child: const Text('Nuova partita (stessa room)'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
+                      child: const Text('Torna home'),
+                    ),
                   ),
                 ],
               ),
