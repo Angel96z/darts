@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
 
-enum OverlayState { loading, success, error }
+enum OverlayState { loading, success, error, pending }
 
 class BlockingOverlay extends StatelessWidget {
   final OverlayState state;
   final String? message;
-  final VoidCallback? onClose;
+  final String? primaryActionLabel;
+  final String? secondaryActionLabel;
+  final VoidCallback? onPrimaryAction;
+  final VoidCallback? onSecondaryAction;
 
   const BlockingOverlay({
     super.key,
     required this.state,
     this.message,
-    this.onClose,
+    this.primaryActionLabel,
+    this.secondaryActionLabel,
+    this.onPrimaryAction,
+    this.onSecondaryAction,
   });
 
   @override
@@ -27,6 +33,10 @@ class BlockingOverlay extends StatelessWidget {
       case OverlayState.error:
         icon = Icons.error;
         color = Colors.red;
+        break;
+      case OverlayState.pending:
+        icon = Icons.cloud_off;
+        color = Colors.orange;
         break;
       default:
         icon = Icons.hourglass_empty;
@@ -67,12 +77,21 @@ class BlockingOverlay extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
 
-                if (state == OverlayState.error) ...[
+                if (state != OverlayState.loading &&
+                    (onPrimaryAction != null || onSecondaryAction != null)) ...[
                   const SizedBox(height: 20),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: onClose,
-                  )
+                  if (onPrimaryAction != null)
+                    ElevatedButton(
+                      onPressed: onPrimaryAction,
+                      child: Text(primaryActionLabel ?? 'Continua'),
+                    ),
+                  if (onSecondaryAction != null) ...[
+                    const SizedBox(height: 8),
+                    OutlinedButton(
+                      onPressed: onSecondaryAction,
+                      child: Text(secondaryActionLabel ?? 'Chiudi'),
+                    ),
+                  ],
                 ]
               ],
             ),
