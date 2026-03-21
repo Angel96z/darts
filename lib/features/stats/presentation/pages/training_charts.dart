@@ -1709,18 +1709,29 @@ FlTitlesData _titles(ChartConfig config) {
 LineTouchData _touch(void Function(int? index) onHoverIndex) {
   return LineTouchData(
     enabled: true,
-    handleBuiltInTouches: false,
+    handleBuiltInTouches: true,
     touchCallback: (event, response) {
-      if (!event.isInterestedForInteractions ||
-          response == null ||
+      if (response == null ||
           response.lineBarSpots == null ||
           response.lineBarSpots!.isEmpty) {
         onHoverIndex(null);
         return;
       }
-      onHoverIndex(response.lineBarSpots!.first.x.toInt());
+
+      final spot = response.lineBarSpots!.first;
+      onHoverIndex(spot.x.toInt());
     },
-  touchTooltipData: LineTouchTooltipData(),
+    touchTooltipData: LineTouchTooltipData(
+      getTooltipColor: (_) => Colors.black87,
+      getTooltipItems: (spots) {
+        return spots.map((spot) {
+          return LineTooltipItem(
+            'Turno ${(spot.x + 1).toInt()}\n${spot.y.toStringAsFixed(1)}',
+            const TextStyle(color: Colors.white),
+          );
+        }).toList();
+      },
+    ),
   );
 }
 

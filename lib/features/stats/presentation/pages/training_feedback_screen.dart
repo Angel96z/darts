@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide OverlayState;
 
 import '../../../../core/widgets/blocking_overlay.dart';
 import '../../data/datasources/local_training_sync_service.dart';
