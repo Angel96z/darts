@@ -129,6 +129,8 @@ class TrainingCharts {
           data: percentMap,
           isPercent: true,
           extraLabels: ratioMap,
+          description: 'Percentuale hit per ogni freccia del turno.',
+          tip: 'Se D3 cala vs D1, rallenta e resetta stance tra le frecce.',
         ),
         _box(
           'Hit esatte per turno',
@@ -142,6 +144,8 @@ class TrainingCharts {
               buildTurnRow(label: '3 obiettivi', hitCount: 3),
             ],
           ),
+          description: 'Quanti turni chiudi con 1, 2 o 3 hit sul target.',
+          tip: 'Punta a far crescere i turni con 2 hit prima del 3/3.',
         ),
       ],
     );
@@ -163,10 +167,15 @@ class TrainingCharts {
       singleDart: singleDart,
       selectedDart: selectedDart,
     );
+    final mmByTurn = turns
+        .map((t) => t.map((e) => e.distanceMm).reduce((a, b) => a + b) / t.length)
+        .toList();
 
     return BaseChartWidget(
       title: singleDart ? 'Trend D$selectedDart' : 'Trend turni (3 freccette)',
       series: [series],
+      description: 'Andamento hit turno dopo turno.',
+      tip: 'Se la curva scende, riduci ritmo e riparti dalla routine base.',
       config: ChartConfig(
         minY: 0,
         maxY: singleDart ? 1 : 3,
@@ -177,8 +186,9 @@ class TrainingCharts {
       tooltipBuilder: (index) {
         if (index < 0 || index >= series.points.length) return '';
         final v = series.points[index].y.toInt();
-        final label = singleDart ? 'Hit' : 'Hit nel turno';
-        return 'Turno ${index + 1} • $label: $v';
+        return 'Turno ${index + 1}\n'
+            'Hit: $v\n'
+            'Distanza: ${mmByTurn[index].toStringAsFixed(1)} mm';
       },
       legendText:
           'Vedi quanti hit fai a turno. Se la linea scende, stai perdendo controllo: rallenta il ritmo e cura la routine.',
@@ -196,10 +206,13 @@ class TrainingCharts {
     final series = ChartDataSource.mmTrendSeries(turns: turns);
     if (series.points.isEmpty) return _empty();
     final maxY = series.points.map((e) => e.y).fold<double>(0, max);
+    final hitByTurn = turns.map((t) => t.where((e) => e.sector == target).length).toList();
 
     return BaseChartWidget(
       title: 'Trend distanza (mm)',
       series: [series],
+      description: 'Distanza media dal target per turno.',
+      tip: 'Se i mm salgono, riduci forza e cerca rilascio morbido.',
       config: ChartConfig(
         minY: 0,
         maxY: maxY == 0 ? 100 : maxY * 1.2,
@@ -209,7 +222,9 @@ class TrainingCharts {
       ),
       tooltipBuilder: (index) {
         if (index < 0 || index >= series.points.length) return '';
-        return 'Turno ${index + 1} • ${series.points[index].y.toStringAsFixed(1)} mm';
+        return 'Turno ${index + 1}\n'
+            'Hit: ${hitByTurn[index]}\n'
+            'Distanza: ${series.points[index].y.toStringAsFixed(1)} mm';
       },
       legendText:
           'Vedi la distanza media dal target per turno. Se i mm salgono, riduci forza e cerca un rilascio più morbido.',
@@ -258,7 +273,7 @@ class TrainingCharts {
     }
 
     return _box(
-      'Bias direzionale',
+      'Direzione errore',
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -269,6 +284,8 @@ class TrainingCharts {
           row('Dispersione Y', '${stdYmm.toStringAsFixed(0)} mm'),
         ],
       ),
+      description: 'Mostra dove tende a cadere il gruppo frecce.',
+      tip: 'Se il bias è fisso, correggi setup e allineamento iniziale.',
     );
   }
   static Widget streak(List<DartThrow> throws, String target) {
@@ -360,6 +377,8 @@ class TrainingCharts {
           row('3 hit', best3),
         ],
       ),
+      description: 'Miglior serie consecutiva di hit tra freccette e turni.',
+      tip: 'Difendi serie brevi e stabili prima di cercare streak lunghi.',
     );
   }
 
@@ -423,7 +442,7 @@ class TrainingCharts {
             100;
 
     return _box(
-      'Performance',
+      'Indice performance',
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -442,6 +461,8 @@ class TrainingCharts {
           ),
         ],
       ),
+      description: 'Indice unico da hit, precisione e consistenza.',
+      tip: 'Lavora prima sulla metrica più bassa tra le tre.',
     );
   }
 
@@ -469,8 +490,10 @@ class TrainingCharts {
     final series = ChartDataSource.relationalSeries(metrics);
 
     return BaseChartWidget(
-      title: 'Relational performance',
+      title: 'Analisi completa',
       series: series,
+      description: 'Confronto tra hit, precisione e consistenza per turno.',
+      tip: 'Allena la linea più instabile nella prossima sessione.',
       config: const ChartConfig(
         minY: 0,
         maxY: 100,
@@ -494,15 +517,9 @@ class TrainingCharts {
 
         final m = metrics[index];
 
-        final session =
-        showSessionTime && m.sessionDuration != null
-            ? '\nSessione: ${_formatDurationHHmm(m.sessionDuration!)}'
-            : '';
-
         return 'Turno ${m.turnNumber}\n'
             'Hit: ${m.hits}/3\n'
-            'Precisione: ${m.avgMm.toStringAsFixed(1)} mm\n'
-            'Consistenza: ${m.variance.toStringAsFixed(1)}$session';
+            'Distanza: ${m.avgMm.toStringAsFixed(1)} mm';
       },
       legendText:
       'Confronti hit, precisione e consistenza. Se una linea cala spesso, concentra il lavoro su quella metrica nella prossima sessione.',
@@ -570,6 +587,47 @@ class TrainingCharts {
           Text('${signed(deltaConsistency, unit: '%')} consistency'),
         ],
       ),
+      description: 'Confronto rapido tra turno migliore e peggiore.',
+      tip: 'Replica routine del BEST e correggi subito l’errore del WORST.',
+    );
+  }
+
+  static Widget consistencyTrend(List<DartThrow> throws, String target) {
+    if (throws.isEmpty) return _empty();
+    final turns = _buildTurns(throws);
+    if (turns.isEmpty) return _empty();
+
+    final varianceByTurn = turns.map((turn) {
+      final avgMm = turn.map((e) => e.distanceMm).reduce((a, b) => a + b) / turn.length;
+      return turn.map((e) => pow(e.distanceMm - avgMm, 2).toDouble()).reduce((a, b) => a + b) / turn.length;
+    }).toList();
+    final maxVariance = varianceByTurn.fold<double>(0, (p, v) => v > p ? v : p);
+    final points = <ChartDataPoint>[];
+    for (int i = 0; i < varianceByTurn.length; i++) {
+      final consistency = maxVariance == 0 ? 100.0 : (1 - (varianceByTurn[i] / maxVariance)).clamp(0.0, 1.0) * 100;
+      points.add(ChartDataPoint(x: i.toDouble(), y: consistency));
+    }
+
+    final series = ChartSeries(name: 'Consistenza', points: points, color: Colors.purple);
+    final hitByTurn = turns.map((t) => t.where((e) => e.sector == target).length).toList();
+    final mmByTurn = turns
+        .map((t) => t.map((e) => e.distanceMm).reduce((a, b) => a + b) / t.length)
+        .toList();
+
+    return BaseChartWidget(
+      title: 'Trend consistenza',
+      series: [series],
+      description: 'Stabilità tra frecce per ogni turno.',
+      tip: 'Linea piatta alta: mantieni stessa routine e stesso tempo.',
+      config: const ChartConfig(minY: 0, maxY: 100, yInterval: 20, xInterval: 1),
+      tooltipBuilder: (index) {
+        if (index < 0 || index >= points.length) return '';
+        return 'Turno ${index + 1}\n'
+            'Hit: ${hitByTurn[index]}\n'
+            'Distanza: ${mmByTurn[index].toStringAsFixed(1)} mm';
+      },
+      legendText: 'Più è alta e stabile, più controlli l’esecuzione.',
+      rendererBuilder: (ctx) => LineChartRenderer(ctx: ctx, showDots: false),
     );
   }
 
@@ -742,6 +800,8 @@ class TrainingCharts {
           row('D3', d3),
         ],
       ),
+      description: 'Media distanza totale e per freccia D1-D2-D3.',
+      tip: 'Se D3 peggiora, prenditi un micro reset prima del lancio.',
     );
   }
   static Widget ringDistribution(List<DartThrow> throws, String target) {
@@ -759,6 +819,8 @@ class TrainingCharts {
           totalThrows: throws.length,
         ),
       ),
+      description: 'Distribuzione lanci tra settori e moltiplicatori.',
+      tip: 'Concentra il lavoro sui settori con hit più basse.',
     );
   }
   static Map<String, Map<String, int>> _buildSectorStats(List<DartThrow> throws) {
@@ -825,6 +887,8 @@ class TrainingCharts {
     required Map<String, double> data,
     bool isPercent = false,
     Map<String, String>? extraLabels,
+    String? description,
+    String? tip,
   }) {
     if (data.isEmpty) return _empty();
 
@@ -877,10 +941,17 @@ class TrainingCharts {
           );
         }).toList(),
       ),
+      description: description,
+      tip: tip,
     );
   }
 
-  static Widget _box(String title, Widget child) {
+  static Widget _box(
+    String title,
+    Widget child, {
+    String? description,
+    String? tip,
+  }) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 12),
@@ -894,6 +965,14 @@ class TrainingCharts {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+          if (description != null) ...[
+            const SizedBox(height: 4),
+            Text(description, style: TextStyle(color: Colors.grey.shade700)),
+          ],
+          if (tip != null) ...[
+            const SizedBox(height: 2),
+            Text('Azione: $tip', style: const TextStyle(fontWeight: FontWeight.w500)),
+          ],
           const SizedBox(height: 8),
           child,
         ],
@@ -1028,6 +1107,8 @@ class BaseChartWidget extends StatefulWidget {
   final String title;
   final List<ChartSeries> series;
   final ChartConfig config;
+  final String? description;
+  final String? tip;
   final String Function(int index)? tooltipBuilder;
   final List<ChartRange> highlightedRanges;
   final String legendText;
@@ -1037,6 +1118,8 @@ class BaseChartWidget extends StatefulWidget {
   required this.title,
   required this.series,
   required this.config,
+  this.description,
+  this.tip,
   this.legendText = '',
   this.rendererBuilder = _defaultRenderer,
   this.tooltipBuilder,
@@ -1058,6 +1141,7 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
   double _viewEnd = 0;
   double _lastScale = 1;
   String? _tooltipText;
+  final FocusNode _focusNode = FocusNode();
 
   int get _totalTurns {
     if (widget.series.isEmpty) return 0;
@@ -1082,6 +1166,12 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
     final maxIndex = max(0, _totalTurns - 1).toDouble();
     _viewStart = 0;
     _viewEnd = maxIndex;
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
   }
 
   void _onHoverIndex(int? index) {
@@ -1184,21 +1274,30 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
                     _zoomAround(factor, centerX);
                   }
                 },
-                child: GestureDetector(
-                  onScaleStart: (_) => _lastScale = 1,
-                  onScaleUpdate: (details) {
-                    if (details.pointerCount != 2) return;
-                    if ((details.scale - _lastScale).abs() > 0.02) {
-                      final centerX = _viewStart + ((details.localFocalPoint.dx / width) * span);
-                      final factor = details.scale / _lastScale;
-                      _zoomAround(factor, centerX);
-                      _lastScale = details.scale;
-                    } else {
-                      final deltaTurns = (details.focalPointDelta.dx / width) * span;
-                      _pan(deltaTurns);
-                    }
-                  },
-                  child: SizedBox(height: 220, width: double.infinity, child: widget.rendererBuilder(ctx)),
+                child: RawKeyboardListener(
+                  focusNode: _focusNode,
+                  onKey: (_) {},
+                  child: Focus(
+                    focusNode: _focusNode,
+                    autofocus: true,
+                    child: GestureDetector(
+                      onTap: () => _focusNode.requestFocus(),
+                      onScaleStart: (_) => _lastScale = 1,
+                      onScaleUpdate: (details) {
+                        if (details.pointerCount != 2) return;
+                        if ((details.scale - _lastScale).abs() > 0.02) {
+                          final centerX = _viewStart + ((details.localFocalPoint.dx / width) * span);
+                          final factor = details.scale / _lastScale;
+                          _zoomAround(factor, centerX);
+                          _lastScale = details.scale;
+                        } else {
+                          final deltaTurns = (details.focalPointDelta.dx / width) * span;
+                          _pan(deltaTurns);
+                        }
+                      },
+                      child: SizedBox(height: 220, width: double.infinity, child: widget.rendererBuilder(ctx)),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -1215,6 +1314,8 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
               _SimpleLegend(series: widget.series, text: widget.legendText),
             ],
           ),
+          description: widget.description,
+          tip: widget.tip,
         );
       },
     );
