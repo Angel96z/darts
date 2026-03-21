@@ -4,7 +4,6 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../../../core/widgets/blocking_overlay.dart';
 import '../../../application/usecases/providers.dart';
 import '../../../application/usecases/start_match_usecase.dart';
@@ -112,21 +111,6 @@ class LobbyViewModel {
 }
 
 class LobbyController extends StateNotifier<LobbyViewModel> {
-
-  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
-
-  void _listenConnectivity() {
-    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
-      final online = results.isNotEmpty && !results.contains(ConnectivityResult.none);
-
-      state = state.copyWith(
-        isOnline: online,
-        connection: online
-            ? ConnectionState.connected
-            : ConnectionState.disconnected,
-      );
-    });
-  }
   LobbyViewModel _initialState() {
     return const LobbyViewModel(
       roomState: RoomState.waiting,
@@ -168,10 +152,14 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
     state = state.copyWith(players: next);
 
-    if (state.isOnline && currentRoomId != null) {
-      await FirebaseFirestore.instance.collection('rooms').doc(currentRoomId).set({
-        'players': _playersToMap(next),
-      }, SetOptions(merge: true));
+    if (currentRoomId != null && await _refreshBackendConnection()) {
+      try {
+        await FirebaseFirestore.instance.collection('rooms').doc(currentRoomId).set({
+          'players': _playersToMap(next),
+        }, SetOptions(merge: true));
+      } catch (_) {
+        _setOffline();
+      }
     }
 
     _roomSub?.cancel();
@@ -181,8 +169,8 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
 
   LobbyController(this._ref) : super(_emptyInitialState()) {
-    _listenConnectivity();
     state = _initialState();
+    _refreshBackendConnection();
     _checkLinkJoin();
     _autoAddAuthenticatedUser();
   }
@@ -209,6 +197,23 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
   final Ref _ref;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _roomSub;
+
+  Future<bool> _refreshBackendConnection() async {
+    final ok = await _ref.read(backendConnectionServiceProvider).checkBackendConnection();
+    state = state.copyWith(
+      isOnline: ok,
+      connection: ok ? ConnectionState.connected : ConnectionState.disconnected,
+    );
+    return ok;
+  }
+
+  void _setOffline() {
+    state = state.copyWith(
+      isOnline: false,
+      connection: ConnectionState.disconnected,
+      clearLoading: true,
+    );
+  }
 
   void _setLoading(String step) {
     state = state.copyWith(loading: OverlayState.loading, roomState: RoomState.waiting);
@@ -249,7 +254,17 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
   Future<void> joinFromLink(String roomId) async {
     _setLoading('join');
-    final snap = await FirebaseFirestore.instance.collection('rooms').doc(roomId).get();
+    if (!await _refreshBackendConnection()) {
+      _setOffline();
+      return;
+    }
+    DocumentSnapshot<Map<String, dynamic>> snap;
+    try {
+      snap = await FirebaseFirestore.instance.collection('rooms').doc(roomId).get();
+    } catch (_) {
+      _setOffline();
+      return;
+    }
     if (!snap.exists) {
       state = state.copyWith(clearLoading: true);
       return;
@@ -268,12 +283,12 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       players: players,
       clearLoading: true,
     );
-    _watchRoom(roomId);
+    await _watchRoom(roomId);
     await addCurrentUser();
   }
 
-  void _watchRoom(String roomId) {
-    if (!state.isOnline) return;
+  Future<void> _watchRoom(String roomId) async {
+    if (!await _refreshBackendConnection()) return;
     _roomSub?.cancel();
     _roomSub = FirebaseFirestore.instance.collection('rooms').doc(roomId).snapshots().listen((doc) {
       final data = doc.data();
@@ -290,7 +305,10 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       state = state.copyWith(
         players: players,
         connection: ConnectionState.connected,
+        isOnline: true,
       );
+    }, onError: (_) {
+      _setOffline();
     });
   }
 
@@ -365,6 +383,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
   }
   Future<void> closeRoom() async {
     final roomId = state.roomId;
+    final canCallBackend = roomId != null && await _refreshBackendConnection();
 
     _roomSub?.cancel();
 
@@ -373,22 +392,27 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     await _autoAddAuthenticatedUser();
 
     // se online → segna chiusa, STOP
-    if (state.isOnline && roomId != null) {
-      await FirebaseFirestore.instance.collection('rooms').doc(roomId).set({
-        'closed': true,
-        'closedAt': DateTime.now().toIso8601String(),
-      }, SetOptions(merge: true));
+    if (canCallBackend) {
+      try {
+        await FirebaseFirestore.instance.collection('rooms').doc(roomId!).set({
+          'closed': true,
+          'closedAt': DateTime.now().toIso8601String(),
+        }, SetOptions(merge: true));
 
-      // cleanup silenzioso
-      Future.delayed(const Duration(seconds: 20), () async {
-        try {
-          await FirebaseFirestore.instance.collection('rooms').doc(roomId).delete();
-        } catch (_) {}
-      });
+        // cleanup silenzioso
+        Future.delayed(const Duration(seconds: 20), () async {
+          try {
+            await FirebaseFirestore.instance.collection('rooms').doc(roomId!).delete();
+          } catch (_) {}
+        });
+      } catch (_) {
+        _setOffline();
+      }
     }
   }
   Future<void> invite() async {
-    if (!state.isOnline) {
+    final online = await _refreshBackendConnection();
+    if (!online) {
       // modalità locale → niente DB
       final roomId = 'local_${DateTime.now().millisecondsSinceEpoch}';
 
@@ -420,12 +444,17 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     // 👇 host già definito prima
     final hostId = _hostId;
 
-    await FirebaseFirestore.instance.collection('rooms').doc(roomId).set({
-      'id': roomId,
-      'createdAt': DateTime.now().toIso8601String(),
-      'hostId': hostId,
-      'players': _playersToMap(players),
-    });
+    try {
+      await FirebaseFirestore.instance.collection('rooms').doc(roomId).set({
+        'id': roomId,
+        'createdAt': DateTime.now().toIso8601String(),
+        'hostId': hostId,
+        'players': _playersToMap(players),
+      });
+    } catch (_) {
+      _setOffline();
+      return;
+    }
 
     state = state.copyWith(
       roomId: roomId,
@@ -434,14 +463,18 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       clearLoading: true,
     );
 
-    _watchRoom(roomId);
+    await _watchRoom(roomId);
   }
   Future<void> _syncPlayers() async {
-    if (!state.isOnline) return;
-    if (!state.isOnline || state.roomId == null) return;
-    await FirebaseFirestore.instance.collection('rooms').doc(state.roomId!).set({
-      'players': _playersToMap(state.players),
-    }, SetOptions(merge: true));
+    if (state.roomId == null) return;
+    if (!await _refreshBackendConnection()) return;
+    try {
+      await FirebaseFirestore.instance.collection('rooms').doc(state.roomId!).set({
+        'players': _playersToMap(state.players),
+      }, SetOptions(merge: true));
+    } catch (_) {
+      _setOffline();
+    }
   }
 
   List<Map<String, dynamic>> _playersToMap(List<LobbyPlayerVm> players) {
@@ -531,7 +564,6 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
   @override
   void dispose() {
-    _connectivitySub?.cancel();
     _roomSub?.cancel();
     super.dispose();
   }

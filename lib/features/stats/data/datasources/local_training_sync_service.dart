@@ -1,9 +1,7 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -188,7 +186,6 @@ class LocalTrainingSyncService {
   final TrainingRepository _repo;
   final _uuid = const Uuid();
 
-  StreamSubscription? _connSub;
   bool _running = false;
 
 // Factory per inizializzare il singleton
@@ -227,10 +224,7 @@ class LocalTrainingSyncService {
       commento: commento,
     );
 
-    final connectivity = Connectivity();
-    final status = await connectivity.checkConnectivity();
-
-    if (status == ConnectivityResult.none) {
+    if (!await _checkBackendConnection()) {
       return LocalTrainingSaveResult(
         localId: localId,
         status: LocalTrainingSyncStatus.pending,
@@ -288,23 +282,31 @@ class LocalTrainingSyncService {
   // START
   Future<void> start() async {
     await syncAll();
-
-    _connSub = Connectivity().onConnectivityChanged.listen((r) {
-      if (r != ConnectivityResult.none) {
-        syncAll();
-      }
-    });
   }
 
   // SYNC BIDIREZIONALE
   Future<void> syncAll() async {
     if (_running) return;
+    if (!await _checkBackendConnection()) return;
     _running = true;
 
     await _pushLocalToRemote();
     await _pullRemoteToLocal();
 
     _running = false;
+  }
+
+  Future<bool> _checkBackendConnection() async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .limit(1)
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 3));
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   // LOCALE → DB
