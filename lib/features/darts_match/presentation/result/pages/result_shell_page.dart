@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../lobby/controllers/lobby_controller.dart';
 import '../../lobby/pages/room_lobby_shell_page.dart';
 import '../controllers/result_controller.dart';
 
@@ -10,6 +11,8 @@ class ResultShellPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final result = ref.watch(resultControllerProvider);
+    final lobby = ref.read(lobbyControllerProvider.notifier);
+    final isHost = lobby.isCurrentUserHost;
     return Scaffold(
       appBar: AppBar(title: const Text('Risultato')),
       body: Padding(
@@ -23,11 +26,15 @@ class ResultShellPage extends ConsumerWidget {
                   const SizedBox(height: 8),
                   Text('Highest score: ${result.highestScore}'),
                   Text('Average: ${result.average}'),
+                  const SizedBox(height: 16),
+                  const Text('Placeholder salvataggio statistiche completato'),
                   const Spacer(),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: () {
+                      onPressed: () async {
+                        await lobby.reopenRoomFromResult();
+                        if (!context.mounted) return;
                         Navigator.pushAndRemoveUntil(
                           context,
                           MaterialPageRoute(builder: (_) => const RoomLobbyShellPage()),
@@ -37,6 +44,20 @@ class ResultShellPage extends ConsumerWidget {
                       child: const Text('Nuova partita (stessa room)'),
                     ),
                   ),
+                  if (isHost) ...[
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () async {
+                          await lobby.closeRoom();
+                          if (!context.mounted) return;
+                          Navigator.popUntil(context, (route) => route.isFirst);
+                        },
+                        child: const Text('Chiudi room'),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,

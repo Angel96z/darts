@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../app/router/home_shell_screen.dart';
 import '../../../../../core/widgets/blocking_overlay.dart';
 import '../../../domain/entities/match.dart';
+import '../../../domain/entities/room.dart';
 import '../../match/pages/match_shell_page.dart';
 import '../../../../players/presentation/pages/login_screen.dart';
 import '../../shared/view_models/connection_badge_vm.dart';
@@ -22,6 +23,7 @@ class RoomLobbyShellPage extends ConsumerStatefulWidget {
 }
 
 class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
+  bool _openingMatch = false;
 
   @override
   void initState() {
@@ -185,6 +187,30 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     );
   }
 
+  Future<void> _openLiveMatchIfNeeded(
+    LobbyViewModel next,
+    bool canPlayCurrentMatch,
+  ) async {
+    if (!mounted || _openingMatch) return;
+    if (next.roomState != RoomState.inMatch) return;
+    _openingMatch = true;
+    final liveMatch =
+        await ref.read(lobbyControllerProvider.notifier).loadCurrentMatch();
+    if (mounted && liveMatch != null) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MatchShellPage(
+            match: liveMatch,
+            isOnline: next.isOnline,
+            canPlay: canPlayCurrentMatch,
+          ),
+        ),
+      );
+    }
+    _openingMatch = false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final ctrl = ref.read(lobbyControllerProvider.notifier);
@@ -198,6 +224,11 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
 
     final isAuthenticated = FirebaseAuth.instance.currentUser != null;
     final isSpectator = ctrl.isSpectator;
+    final canPlayCurrentMatch = isPlayer && !isSpectator;
+
+    ref.listen<LobbyViewModel>(lobbyControllerProvider, (prev, next) {
+      _openLiveMatchIfNeeded(next, canPlayCurrentMatch);
+    });
 
     final _debugOnceKey = 'room_vm_dump';
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -592,6 +623,7 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
                                   builder: (_) => MatchShellPage(
                                     match: match,
                                     isOnline: vm.isOnline,
+                                    canPlay: true,
                                   ),
                                 ),
                               );

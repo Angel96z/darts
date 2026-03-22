@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../lobby/controllers/lobby_controller.dart';
+import '../../lobby/pages/room_lobby_shell_page.dart';
 import '../../../domain/entities/room.dart';
 import '../../result/controllers/result_controller.dart';
 import '../../result/pages/result_shell_page.dart';
@@ -9,10 +11,16 @@ import '../../shared/widgets/connection_badge.dart';
 import '../controllers/match_controller.dart';
 import '../../../domain/entities/match.dart';
 class MatchShellPage extends ConsumerStatefulWidget {
-  const MatchShellPage({super.key, required this.match, required this.isOnline});
+  const MatchShellPage({
+    super.key,
+    required this.match,
+    required this.isOnline,
+    required this.canPlay,
+  });
 
   final Match match;
   final bool isOnline;
+  final bool canPlay;
 
   @override
   ConsumerState<MatchShellPage> createState() => _MatchShellPageState();
@@ -44,6 +52,30 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
       appBar: AppBar(
         title: Text('Match ${match.config.variant.name.toUpperCase()}'),
         actions: [
+          if (ref.read(lobbyControllerProvider.notifier).isCurrentUserHost)
+            PopupMenuButton<String>(
+              onSelected: (value) async {
+                final lobby = ref.read(lobbyControllerProvider.notifier);
+                if (value == 'restart') {
+                  await lobby.reopenRoomFromResult();
+                  if (!mounted) return;
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => const RoomLobbyShellPage()),
+                    (r) => false,
+                  );
+                }
+                if (value == 'close') {
+                  await lobby.closeRoom();
+                  if (!mounted) return;
+                  Navigator.popUntil(context, (route) => route.isFirst);
+                }
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'restart', child: Text('Torna alla room')),
+                PopupMenuItem(value: 'close', child: Text('Chiudi room')),
+              ],
+            ),
           ConnectionBadge(
             vm: ConnectionBadgeVm(isOnline: vm.isOnline),
           ),
@@ -90,6 +122,11 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
               ),
               child: Column(
                 children: [
+                  if (!widget.canPlay)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
+                      child: Text('Partita iniziata: modalità spettatore'),
+                    ),
                   Text('Input: $_input', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
                   Wrap(
@@ -100,13 +137,15 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
                       (i) => SizedBox(
                         width: 64,
                         child: FilledButton(
-                          onPressed: () {
+                          onPressed: widget.canPlay
+                              ? () {
                             setState(() {
                               final nextText = '$_input$i';
                               _input = int.tryParse(nextText) ?? 0;
                               if (_input > 180) _input = 180;
                             });
-                          },
+                          }
+                              : null,
                           child: Text('$i'),
                         ),
                       ),
@@ -117,26 +156,29 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: () => setState(() => _input = 0),
+                          onPressed: widget.canPlay ? () => setState(() => _input = 0) : null,
                           child: const Text('Reset'),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: () async => ref.read(matchControllerProvider.notifier).undoLastTurn(),
+                          onPressed: widget.canPlay
+                              ? () async => ref.read(matchControllerProvider.notifier).undoLastTurn()
+                              : null,
                           child: const Text('Undo ultimo turno'),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: FilledButton(
-                          onPressed: () async {
+                          onPressed: widget.canPlay ? () async {
                             await ref.read(matchControllerProvider.notifier).submitTurn(_input);
                             final after = ref.read(matchControllerProvider)?.match;
                             setState(() => _input = 0);
                             if (after != null && after.snapshot.scoreboard.playerScores.values.any((s) => s == 0)) {
                               final winner = after.snapshot.scoreboard.playerScores.entries.firstWhere((e) => e.value == 0).key;
+                              await ref.read(lobbyControllerProvider.notifier).markRoomTerminated();
                               ref.read(resultControllerProvider.notifier).setResult(
                                     winnerId: winner.value,
                                     highestScore: 180,
@@ -149,7 +191,7 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
                                 );
                               }
                             }
-                          },
+                          } : null,
                           child: const Text('Submit turno'),
                         ),
                       ),

@@ -11,7 +11,6 @@ import '../../../domain/entities/identity.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/entities/room.dart';
 import '../../../domain/value_objects/identifiers.dart';
-import '../../match/controllers/match_controller.dart';
 import '../../../domain/policies/input_fidelity_policy.dart';
 
 
@@ -278,6 +277,11 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
   bool get isCurrentUserHost {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     return uid != null && uid == _hostId;
+  }
+  bool get isCurrentUserPlayer {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return false;
+    return state.players.any((p) => p.id == uid || p.id == 'guest_ext_$uid');
   }
 
 
@@ -645,21 +649,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       final data = doc.data();
       if (data == null) return;
       final status = data['status'];
-
-      if (status == 'inGame') {
-        // evita loop
-        _roomSub?.cancel();
-        _roomSub = null;
-
-        // apri match
-        final matchCtrl = _ref.read(matchControllerProvider.notifier);
-
-        // opzionale: se hai già match salvato
-        // matchCtrl.loadFromRoom(roomId);
-
-        return;
-      }
-
+      final mappedStatus = _mapRoomState(status);
 
       final players = _mapPlayers(
         data['players'] as Map<String, dynamic>?,
@@ -694,12 +684,27 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       state = state.copyWith(
         players: players,
         config: config, // 👈 AGGIUNTO
+        roomState: mappedStatus,
         connection: ConnectionState.connected,
         isOnline: true,
       );
     }, onError: (_) {
       _setOffline();
     });
+  }
+
+  RoomState _mapRoomState(dynamic rawStatus) {
+    switch (rawStatus) {
+      case 'inGame':
+        return RoomState.inMatch;
+      case 'terminato':
+        return RoomState.finished;
+      case 'chiuso':
+        return RoomState.closed;
+      case 'inRoom':
+      default:
+        return RoomState.waiting;
+    }
   }
 
 
@@ -951,6 +956,56 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     state = state.copyWith(clearLoading: true);
   }
 
+  Future<Match?> loadCurrentMatch() async {
+    final roomId = state.roomId;
+    if (roomId == null) return null;
+    try {
+      final roomSnap = await FirebaseFirestore.instance
+          .collection('rooms')
+          .doc(roomId)
+          .get();
+      final data = roomSnap.data();
+      if (data == null) return null;
+      final rawMatchId = data['currentMatchId'] as String?;
+      if (rawMatchId == null || rawMatchId.isEmpty) return null;
+      return _ref
+          .read(matchRepositoryProvider)
+          .getMatch(RoomId(roomId), MatchId(rawMatchId));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> reopenRoomFromResult() async {
+    final roomId = state.roomId;
+    if (roomId == null) return;
+    if (!await _refreshBackendConnection()) return;
+    try {
+      await FirebaseFirestore.instance.collection('rooms').doc(roomId).set({
+        'status': 'inRoom',
+        'currentMatchId': FieldValue.delete(),
+        'startedAt': FieldValue.delete(),
+      }, SetOptions(merge: true));
+      state = state.copyWith(roomState: RoomState.waiting);
+    } catch (_) {
+      _setOffline();
+    }
+  }
+
+  Future<void> markRoomTerminated() async {
+    final roomId = state.roomId;
+    if (roomId == null) return;
+    if (!await _refreshBackendConnection()) return;
+    try {
+      await FirebaseFirestore.instance.collection('rooms').doc(roomId).set({
+        'status': 'terminato',
+      }, SetOptions(merge: true));
+      state = state.copyWith(roomState: RoomState.finished);
+    } catch (_) {
+      _setOffline();
+    }
+  }
+
   Future<void> invite() async {
     if (_isSpectator) return;
     final online = await _refreshBackendConnection();
@@ -1169,8 +1224,9 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
         await FirebaseFirestore.instance
             .collection('rooms')
             .doc(state.roomId!)
-            .set({
+        .set({
           'status': 'inGame',
+          'currentMatchId': matchId.value,
           'startedAt': DateTime.now().toIso8601String(),
         }, SetOptions(merge: true));
       } catch (_) {}
