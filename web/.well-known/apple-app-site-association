@@ -3,7 +3,7 @@
     "details": [
       {
         "appID": "TEAMID.com.tuo.package",
-        "paths": ["/room*"]
+        "paths": ["/*"]
       }
     ]
   }
