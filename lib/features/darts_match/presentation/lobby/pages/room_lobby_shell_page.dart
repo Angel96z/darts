@@ -329,7 +329,11 @@ class RoomLobbyShellPage extends ConsumerWidget {
                   ),
                   if (vm.inviteLink != null) ...[
                     const SizedBox(height: 10),
-                    SelectableText('Link: ${vm.inviteLink!}'),
+                    SelectableText('JOIN: ${vm.inviteLink!}'),
+                  ],
+                  if (vm.watchLink != null) ...[
+                    const SizedBox(height: 10),
+                    SelectableText('WATCH: ${vm.watchLink!}'),
                   ],
                 ],
               ),

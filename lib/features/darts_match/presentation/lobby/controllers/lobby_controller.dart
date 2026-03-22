@@ -72,6 +72,7 @@ class LobbyViewModel {
     required this.isOnline,
     required this.roomId,
     required this.inviteLink,
+    required this.watchLink,
     required this.loading,
   });
 
@@ -82,6 +83,7 @@ class LobbyViewModel {
   final bool isOnline;
   final String? roomId;
   final String? inviteLink;
+  final String? watchLink;
   final OverlayState? loading;
 
   bool get canStart => players.isNotEmpty;
@@ -94,6 +96,7 @@ class LobbyViewModel {
     bool? isOnline,
     String? roomId,
     String? inviteLink,
+    String? watchLink,
     OverlayState? loading,
     bool clearLoading = false,
   }) {
@@ -105,12 +108,15 @@ class LobbyViewModel {
       isOnline: isOnline ?? this.isOnline,
       roomId: roomId ?? this.roomId,
       inviteLink: inviteLink ?? this.inviteLink,
+      watchLink: watchLink ?? this.watchLink,
       loading: clearLoading ? null : (loading ?? this.loading),
     );
   }
 }
 
 class LobbyController extends StateNotifier<LobbyViewModel> {
+  bool _isSpectator = false;
+  bool get isSpectator => _isSpectator;
   Timer? _connectionTimer;
   // 👇 NUOVO: guest "autenticato proxy" (NON usa FirebaseAuth app)
   Future<void> addGuestFromExternalAuth({
@@ -153,9 +159,11 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       isOnline: false,
       roomId: null,
       inviteLink: null,
+      watchLink: null,
       loading: null,
     );
   }
+  String? _joiningRoomId;
   String? _hostId;
   String? get hostId => _hostId;
   String get currentPlayerId => FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -165,19 +173,24 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     return uid != null && uid == _hostId;
   }
 
+
   Future<void> leaveRoom() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    if (uid == _hostId) return;
 
     final currentRoomId = state.roomId;
-    final next = state.players.where((p) => p.id != uid).toList();
+    final guestExternalId = 'guest_ext_$uid';
 
-    state = state.copyWith(players: next);
+    final next = state.players
+        .where((p) => p.id != uid && p.id != guestExternalId)
+        .toList();
 
     if (currentRoomId != null && await _refreshBackendConnection()) {
       try {
-        await FirebaseFirestore.instance.collection('rooms').doc(currentRoomId).set({
+        await FirebaseFirestore.instance
+            .collection('rooms')
+            .doc(currentRoomId)
+            .set({
           'players': _playersToMap(next),
         }, SetOptions(merge: true));
       } catch (_) {
@@ -186,10 +199,10 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     }
 
     _roomSub?.cancel();
+    _hostId = null;
     state = _initialState();
     await _autoAddAuthenticatedUser();
   }
-
 
   LobbyController(this._ref) : super(_emptyInitialState()) {
     state = _initialState();
@@ -237,6 +250,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       isOnline: false,
       roomId: null,
       inviteLink: null,
+      watchLink: null,
       loading: null,
     );
   }
@@ -297,65 +311,164 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       _hostId = id;
     }
   }
+  Future<void> joinAsSpectator(String roomId) async {
+    _isSpectator = true;
 
-  Future<void> joinFromLink(String roomId) async {
-    _setLoading('join');
-    if (!await _refreshBackendConnection()) {
-      _setOffline();
-      return;
-    }
-    DocumentSnapshot<Map<String, dynamic>> snap;
-    try {
-      snap = await FirebaseFirestore.instance.collection('rooms').doc(roomId).get();
-    } catch (_) {
-      _setOffline();
-      return;
-    }
-    if (!snap.exists) {
-      state = state.copyWith(clearLoading: true);
-      return;
-    }
-    final data = snap.data() ?? const <String, dynamic>{};
-    if (data['closed'] == true) {
-      state = state.copyWith(clearLoading: true);
-      return;
-    }
-    final players = _mapPlayers(data['players'] as List?);
-    _hostId = data['hostId'] as String?;
+    final snap = await FirebaseFirestore.instance
+        .collection('rooms')
+        .doc(roomId)
+        .get();
+
+    if (!snap.exists) return;
+
+    await FirebaseFirestore.instance
+        .collection('rooms')
+        .doc(roomId)
+        .set({
+      'spectators': FieldValue.arrayUnion([
+        {
+          'id': FirebaseAuth.instance.currentUser?.uid ?? 'anon_${DateTime.now().millisecondsSinceEpoch}',
+          'ts': DateTime.now().toIso8601String(),
+        }
+      ])
+    }, SetOptions(merge: true));
+
     state = state.copyWith(
       roomId: roomId,
       isOnline: true,
       inviteLink: _buildInviteLink(roomId),
-      players: players,
-      clearLoading: true,
+      watchLink: _buildWatchLink(roomId),
     );
-    await _watchRoom(roomId);
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      await addGuestFromExternalAuth(
-        externalId: user.uid,
-        name: user.displayName ?? '',
-        email: user.email,
+    await _watchRoom(roomId);
+  }
+  Future<void> joinFromLink(String roomId) async {
+    final targetRoomId = roomId.trim();
+    if (targetRoomId.isEmpty) return;
+
+    if (_joiningRoomId == targetRoomId) return;
+    if (state.roomId == targetRoomId && _roomSub != null) return;
+
+    _joiningRoomId = targetRoomId;
+
+    try {
+      if (state.roomId == targetRoomId) return;
+
+      final previousRoomId = state.roomId;
+
+      if (previousRoomId != null && previousRoomId != targetRoomId) {
+        if (_roomSub != null) {
+          await _roomSub!.cancel();
+          _roomSub = null;
+        }
+
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        final guestExternalId = uid != null ? 'guest_ext_$uid' : null;
+
+        final next = state.players
+            .where((p) => p.id != uid && p.id != guestExternalId)
+            .toList();
+
+        state = _initialState();
+        await _autoAddAuthenticatedUser();
+
+        if (uid != null) {
+          try {
+            await FirebaseFirestore.instance
+                .collection('rooms')
+                .doc(previousRoomId)
+                .set({
+              'players': _playersToMap(next),
+            }, SetOptions(merge: true));
+          } catch (_) {}
+        }
+      }
+
+      _setLoading('join');
+
+      if (!await _refreshBackendConnection()) {
+        _setOffline();
+        return;
+      }
+
+      DocumentSnapshot<Map<String, dynamic>> snap;
+      try {
+        snap = await FirebaseFirestore.instance
+            .collection('rooms')
+            .doc(targetRoomId)
+            .get();
+      } catch (_) {
+        _setOffline();
+        return;
+      }
+
+      if (!snap.exists) {
+        state = state.copyWith(clearLoading: true);
+        return;
+      }
+
+      final data = snap.data() ?? const <String, dynamic>{};
+
+      if (data['closed'] == true) {
+        state = state.copyWith(clearLoading: true);
+        return;
+      }
+
+      final players = _mapPlayers(data['players'] as List?);
+      _hostId = data['hostId'] as String?;
+
+      state = state.copyWith(
+        roomId: targetRoomId,
+        isOnline: true,
+        inviteLink: _buildInviteLink(targetRoomId),
+        watchLink: _buildWatchLink(targetRoomId),
+        players: players,
+        clearLoading: true,
       );
+
+      await _watchRoom(targetRoomId);
+
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user != null) {
+        await addGuestFromExternalAuth(
+          externalId: user.uid,
+          name: user.displayName ?? '',
+          email: user.email,
+        );
+      }
+    } finally {
+      _joiningRoomId = null;
     }
   }
 
+
   Future<void> _watchRoom(String roomId) async {
     if (!await _refreshBackendConnection()) return;
-    _roomSub?.cancel();
-    _roomSub = FirebaseFirestore.instance.collection('rooms').doc(roomId).snapshots().listen((doc) {
+
+    if (_roomSub != null) {
+      await _roomSub!.cancel();
+      _roomSub = null;
+    }
+
+    _roomSub = FirebaseFirestore.instance
+        .collection('rooms')
+        .doc(roomId)
+        .snapshots()
+        .listen((doc) {
       final data = doc.data();
       if (data == null) return;
 
       if (data['closed'] == true) {
         _roomSub?.cancel();
+        _roomSub = null;
         state = _initialState();
         return;
       }
 
       final players = _mapPlayers(data['players'] as List?);
       _hostId = data['hostId'] as String?;
+
       state = state.copyWith(
         players: players,
         connection: ConnectionState.connected,
@@ -365,6 +478,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       _setOffline();
     });
   }
+
 
   List<LobbyPlayerVm> _mapPlayers(List? rawPlayers) {
     return List<Map<String, dynamic>>.from(rawPlayers ?? const [])
@@ -523,6 +637,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
         'createdAt': DateTime.now().toIso8601String(),
         'hostId': hostId,
         'players': _playersToMap(players),
+        'isStarted': false,
       });
     } catch (_) {
       _setOffline();
@@ -533,6 +648,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       roomId: roomId,
       isOnline: true,
       inviteLink: _buildInviteLink(roomId),
+      watchLink: _buildWatchLink(roomId),
       clearLoading: true,
     );
 
@@ -560,12 +676,38 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
             })
         .toList();
   }
-
+/*
   String _buildInviteLink(String roomId) {
-    final uri = Uri.parse('https://dartsroses.netlify.app/?roomId=$roomId');
-        return uri.toString();
+    final uri = Uri(
+      scheme: 'https',
+      host: 'dartsroses.netlify.app',
+      path: '/room',
+      queryParameters: {
+        'roomId': roomId,
+      },
+    );
+    return uri.toString();
+  }*/
+  String _buildInviteLink(String roomId) {
+    final uri = Uri(
+      scheme: 'https',
+      host: 'dartsroses.netlify.app',
+      queryParameters: {
+        'roomId': roomId,
+      },
+    );
+    return uri.toString();
   }
-
+  String _buildWatchLink(String roomId) {
+    final uri = Uri(
+      scheme: 'https',
+      host: 'dartsroses.netlify.app',
+      queryParameters: {
+        'watchRoomId': roomId,
+      },
+    );
+    return uri.toString();
+  }
   Future<Match?> startMatch() async {
     if (!state.canStart) return null;
     _setLoading('start');
@@ -630,6 +772,18 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
     final useCase = StartMatchUseCase(_ref.read(matchRepositoryProvider));
     await useCase.call(match);
+    // segna la room come iniziata
+    if (state.roomId != null) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('rooms')
+            .doc(state.roomId!)
+            .set({
+          'isStarted': true,
+          'startedAt': DateTime.now().toIso8601String(),
+        }, SetOptions(merge: true));
+      } catch (_) {}
+    }
     _ref.read(matchControllerProvider.notifier).bindMatch(match: match, isOnline: state.isOnline);
     state = state.copyWith(clearLoading: true);
     return match;

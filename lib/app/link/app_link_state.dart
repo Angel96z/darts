@@ -1,5 +1,5 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:app_links/app_links.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -7,16 +7,17 @@ const _pendingRoomIdKey = 'pending_room_id';
 
 class AppLinkState {
   final String? pendingRoomId;
+  final String? pendingWatchRoomId;
 
-  const AppLinkState({
-    this.pendingRoomId,
-  });
+  const AppLinkState({this.pendingRoomId, this.pendingWatchRoomId});
 
   AppLinkState copyWith({
     String? pendingRoomId,
+    String? pendingWatchRoomId,
   }) {
     return AppLinkState(
-      pendingRoomId: pendingRoomId,
+      pendingRoomId: pendingRoomId ?? this.pendingRoomId,
+      pendingWatchRoomId: pendingWatchRoomId ?? this.pendingWatchRoomId,
     );
   }
 }
@@ -27,76 +28,91 @@ StateNotifierProvider<AppLinkCoordinator, AppLinkState>(
 );
 
 class AppLinkCoordinator extends StateNotifier<AppLinkState> {
-  @override
-  void dispose() {
-    _sub?.cancel();
-    super.dispose();
-  }
-  AppLinkCoordinator() : super(const AppLinkState()) {
-    // fallback web
-    final uri = Uri.base;
-    final roomId = uri.queryParameters['roomId'];
-    if (roomId != null && roomId.isNotEmpty) {
-      state = AppLinkState(
-        pendingRoomId: roomId,
-      );
-    }
-  }
+  bool _initialized = false;
+  AppLinkCoordinator() : super(const AppLinkState());
+
   final _appLinks = AppLinks();
   StreamSubscription? _sub;
 
   Future<void> init() async {
+    if (_initialized) return;
+    _initialized = true;
+
     final prefs = await SharedPreferences.getInstance();
-    final savedRoomId = prefs.getString(_pendingRoomIdKey);
-    if ((state.pendingRoomId == null || state.pendingRoomId!.isEmpty) &&
-        savedRoomId != null &&
-        savedRoomId.isNotEmpty) {
-      state = AppLinkState(pendingRoomId: savedRoomId);
-    }
 
     try {
-      // cold start
       final uri = await _appLinks.getInitialLink();
       if (uri != null) {
-        setIncomingLink(uri.toString());
+        await _handleUri(uri);
       }
     } catch (_) {}
 
-    _sub = _appLinks.uriLinkStream.listen(
-          (uri) {
-        if (uri != null) {
-          setIncomingLink(uri.toString());
-        }
-      },
-      onError: (_) {},
-    );
-  }
+    final webRoomId = Uri.base.queryParameters['roomId'];
+    if (webRoomId != null && webRoomId.isNotEmpty) {
+      await _handleUri(Uri.base);
+    }
 
-  void setIncomingLink(String url) {
-    final uri = Uri.tryParse(url);
-    if (uri == null) return;
+    if (state.pendingRoomId == null || state.pendingRoomId!.isEmpty) {
+      final saved = prefs.getString(_pendingRoomIdKey);
+      if (saved != null && saved.isNotEmpty) {
+        state = AppLinkState(pendingRoomId: saved.trim());
+      }
+    }
 
-    final roomId = uri.queryParameters['roomId'];
-    if (roomId == null || roomId.isEmpty) return;
-
-    state = AppLinkState(
-      pendingRoomId: roomId,
-    );
-
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setString(_pendingRoomIdKey, roomId);
+    _sub = _appLinks.uriLinkStream.listen((uri) async {
+      if (uri == null) return;
+      await _handleUri(uri);
     });
-
   }
 
-  String? consumeRoomId() {
+  Future<void> _handleUri(Uri uri) async {
+
+    final raw = uri.queryParameters['roomId'];
+    final rawWatch = uri.queryParameters['watchRoomId'];
+
+    if (raw == null && rawWatch == null) return;
+
+    if (raw != null) {
+      final roomId = raw.trim();
+      if (roomId.isNotEmpty) {
+        state = AppLinkState(pendingRoomId: roomId);
+      }
+    }
+
+    if (rawWatch != null) {
+      final watchId = rawWatch.trim();
+      if (watchId.isNotEmpty) {
+        state = AppLinkState(pendingWatchRoomId: watchId);
+      }
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    if (raw != null) {
+      final roomId = raw.trim();
+      if (roomId.isNotEmpty) {
+        await prefs.setString(_pendingRoomIdKey, roomId);
+      }
+    }
+  }
+
+  Future<String?> consumeRoomId() async {
     final id = state.pendingRoomId;
+    if (id == null || id.isEmpty) return null;
+
+// reset stato
     state = const AppLinkState(pendingRoomId: null);
 
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.remove(_pendingRoomIdKey);
-    });
+// pulizia storage
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_pendingRoomIdKey);
 
     return id;
+
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
   }
 }
