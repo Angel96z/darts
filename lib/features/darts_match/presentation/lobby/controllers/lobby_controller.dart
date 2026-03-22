@@ -196,7 +196,6 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
     _startConnectionMonitoring(); // 👈 AGGIUNGI QUESTO
 
-    _checkLinkJoin();
     _autoAddAuthenticatedUser();
   }
   void _startConnectionMonitoring() {
@@ -269,12 +268,6 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
   void _setLoading(String step) {
     state = state.copyWith(loading: OverlayState.loading, roomState: RoomState.waiting);
-  }
-
-  Future<void> _checkLinkJoin() async {
-    final roomId = Uri.base.queryParameters['roomId'];
-    if (roomId == null || roomId.isEmpty) return;
-    await joinFromLink(roomId);
   }
 
   Future<void> _autoAddAuthenticatedUser() async {
@@ -561,7 +554,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
   }
 
   String _buildInviteLink(String roomId) {
-    final uri = Uri.parse('https://dartsroses.netlify.app/room?roomId=$roomId');
+    final uri = Uri.parse('https://dartsroses.netlify.app/?roomId=$roomId');
         return uri.toString();
   }
 

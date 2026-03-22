@@ -35,24 +35,10 @@ class DartsApp extends ConsumerWidget {
                 return const LoginScreen();
               }
 
-              // 👇 QUI dentro inseriamo il deep link
               final linkState = ref.watch(appLinkCoordinatorProvider);
 
-              if (linkState.pendingRoomId != null &&
-                  !linkState.consumed) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  final roomId = ref
-                      .read(appLinkCoordinatorProvider.notifier)
-                      .consumeRoomId();
-
-                  if (roomId != null) {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            RoomLobbyShellPageWrapper(roomId: roomId),                      ),
-                    );
-                  }
-                });
+              if (linkState.pendingRoomId != null) {
+                return const RoomLobbyShellPageWrapper();
               }
 
               return const HomeScreen();
