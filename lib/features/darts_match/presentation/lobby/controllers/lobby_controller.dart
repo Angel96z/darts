@@ -561,8 +561,8 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
   }
 
   String _buildInviteLink(String roomId) {
-    final uri = Uri.base.replace(queryParameters: {'roomId': roomId});
-    return uri.toString();
+    final uri = Uri.parse('https://dartsroses.netlify.app/room?roomId=$roomId');
+        return uri.toString();
   }
 
   Future<Match?> startMatch() async {
@@ -640,6 +640,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     _roomSub?.cancel();
     super.dispose();
   }
+
 }
 
 final lobbyControllerProvider = StateNotifierProvider<LobbyController, LobbyViewModel>((ref) => LobbyController(ref));

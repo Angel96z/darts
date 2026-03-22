@@ -3,9 +3,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/app.dart';
 import 'app/di/app_dependencies.dart';
+import 'app/link/app_link_state.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppDependencies.initialize();
-  runApp(const ProviderScope(child: DartsApp()));
+
+  final container = ProviderContainer();
+
+// inizializza deep link handling
+  await container.read(appLinkCoordinatorProvider.notifier).init();
+
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const DartsApp(),
+    ),
+  );
 }

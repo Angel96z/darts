@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.az.darts",
+      "sha256_cert_fingerprints": [
+        "84:BB:4B:B7:42:0D:C4:AF:70:E6:5A:CA:CD:42:A9:66:B7:3B:6A:D1:7A:D3:05:F0:54:90:45:A2:AD:34:5D:79"
+      ]
+    }
+  }
+]
