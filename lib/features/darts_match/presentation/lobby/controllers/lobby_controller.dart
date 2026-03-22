@@ -12,6 +12,7 @@ import '../../../domain/entities/match.dart';
 import '../../../domain/entities/room.dart';
 import '../../../domain/value_objects/identifiers.dart';
 import '../../../domain/policies/input_fidelity_policy.dart';
+import '../../match/controllers/match_controller.dart';
 
 
 class LobbyPlayerVm {
