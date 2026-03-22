@@ -15,14 +15,25 @@ enum AppSection {
 }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({
+    super.key,
+    this.initialSection = AppSection.allenamento,
+  });
+
+  final AppSection initialSection;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  AppSection current = AppSection.allenamento;
+  late AppSection current;
+
+  @override
+  void initState() {
+    super.initState();
+    current = widget.initialSection;
+  }
 
   String get title {
     switch (current) {

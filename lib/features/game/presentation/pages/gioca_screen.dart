@@ -17,6 +17,19 @@ class GiocaScreen extends StatelessWidget {
             subtitle: const Text('Apri la nuova sezione Gioca'),
             trailing: const Icon(Icons.arrow_forward_ios),
             onTap: () {
+              final now = DateTime.now().toIso8601String();
+
+              // ignore: avoid_print
+              print('========== NAVIGATION DEBUG ==========');
+              // ignore: avoid_print
+              print('action: open_room_lobby');
+              // ignore: avoid_print
+              print('timestamp: $now');
+              // ignore: avoid_print
+              print('route: RoomLobbyShellPage');
+              // ignore: avoid_print
+              print('=====================================');
+
               Navigator.push(
                 context,
                 MaterialPageRoute(

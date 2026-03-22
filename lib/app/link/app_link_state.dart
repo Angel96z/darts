@@ -75,14 +75,20 @@ class AppLinkCoordinator extends StateNotifier<AppLinkState> {
     if (raw != null) {
       final roomId = raw.trim();
       if (roomId.isNotEmpty) {
-        state = AppLinkState(pendingRoomId: roomId);
+        state = AppLinkState(
+          pendingRoomId: roomId,
+          pendingWatchRoomId: null,
+        );
       }
     }
 
     if (rawWatch != null) {
       final watchId = rawWatch.trim();
       if (watchId.isNotEmpty) {
-        state = AppLinkState(pendingWatchRoomId: watchId);
+        state = AppLinkState(
+          pendingWatchRoomId: watchId,
+          pendingRoomId: null,
+        );
       }
     }
 

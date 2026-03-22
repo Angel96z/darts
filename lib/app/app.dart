@@ -1,3 +1,4 @@
+import 'package:darts/app/web_url_cleaner_web.dart' as WebUrlCleaner;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -60,9 +61,45 @@ class _AppBootstrapState extends ConsumerState<_AppBootstrap> {
         await ref
             .read(lobbyControllerProvider.notifier)
             .joinFromLink(roomId!);
+
+        final vm = ref.read(lobbyControllerProvider);
+
+        if (vm.roomId == null) {
+          setState(() => _loading = false);
+
+          if (!mounted) return;
+
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => AlertDialog(
+              title: const Text('Room non disponibile'),
+              content: const Text('La room non esiste più o è stata chiusa'),
+              actions: [
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+
+          if (!mounted) return;
+
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+                (route) => false,
+          );
+
+          return;
+        }
       }
 
-      await coordinator.consumeRoomId();
+      final vmAfterJoin = ref.read(lobbyControllerProvider);
+
+      if (vmAfterJoin.roomId != null) {
+        await coordinator.consumeRoomId();
+      }
       cleanUrl();
 
       if (!mounted) return;
