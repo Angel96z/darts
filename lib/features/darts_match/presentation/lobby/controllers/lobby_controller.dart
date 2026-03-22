@@ -330,7 +330,15 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       clearLoading: true,
     );
     await _watchRoom(roomId);
-    await addAuthenticatedUser();
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await addGuestFromExternalAuth(
+        externalId: user.uid,
+        name: user.displayName ?? '',
+        email: user.email,
+      );
+    }
   }
 
   Future<void> _watchRoom(String roomId) async {
