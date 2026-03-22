@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../pages/login_screen.dart';
 import '../pages/profile_screen.dart';
 import '../pages/settings_screen.dart';
 
@@ -14,6 +15,7 @@ class ProfilePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final isLogged = user != null;
 
     return Drawer(
       child: SafeArea(
@@ -65,11 +67,21 @@ class ProfilePanel extends StatelessWidget {
             const Spacer(),
 
             ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text("Logout"),
+              leading: Icon(isLogged ? Icons.logout : Icons.login),
+              title: Text(isLogged ? "Logout" : "Login"),
               onTap: () async {
                 Navigator.pop(context);
-                await _logout(context);
+
+                if (isLogged) {
+                  await _logout(context);
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const LoginScreen(),
+                    ),
+                  );
+                }
               },
             ),
 

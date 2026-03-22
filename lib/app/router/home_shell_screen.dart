@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../features/game/presentation/pages/allenamento_screen.dart';
 import '../../features/game/presentation/pages/campionati_screen.dart';
@@ -114,14 +115,32 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(title),
         actions: [
-          Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.account_circle),
-              onPressed: () {
-                Scaffold.of(context).openEndDrawer();
-              },
-            ),
-          )
+          StreamBuilder<User?>(
+            stream: FirebaseAuth.instance.authStateChanges(),
+            builder: (context, snapshot) {
+              final user = snapshot.data;
+
+              return Row(
+                children: [
+                  if (user != null)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Text(
+                        user.email ?? '',
+                        style: const TextStyle(fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.account_circle),
+                    onPressed: () {
+                      Scaffold.of(context).openEndDrawer();
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
         ],
       ),
       body: screen,
