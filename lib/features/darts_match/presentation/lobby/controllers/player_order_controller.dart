@@ -37,11 +37,92 @@ class PlayerOrderState {
 // -----------------------
 
 class PlayerOrderController extends StateNotifier<PlayerOrderState> {
-  List<int> computeValidTeamSizes(int playerCount) {
-    final result = <int>[];
+  Future<void> addPlayer(LobbyPlayerVm player) async {
+    final list = [...state.ordered, player];
 
-    for (int size = 1; size <= playerCount; size++) {
-      if (playerCount % size == 0) {
+    await _applyLayoutChange(
+      teamSize: state.teamSize,
+      reorderList: list,
+    );
+  }
+
+  Future<void> removePlayerById(String playerId) async {
+    final list = state.ordered.where((p) => p.id != playerId).toList();
+
+    await _applyLayoutChange(
+      teamSize: state.teamSize,
+      reorderList: list,
+    );
+  }
+  Future<void> _applyLayoutChange({
+    required int teamSize,
+    required List<LobbyPlayerVm> reorderList,
+  }) async {
+    final currentIds = state.ordered.map((e) => e.id).toList();
+    final newIds = reorderList.map((e) => e.id).toList();
+
+    if (currentIds.length == newIds.length) {
+      bool same = true;
+      for (int i = 0; i < currentIds.length; i++) {
+        if (currentIds[i] != newIds[i]) {
+          same = false;
+          break;
+        }
+      }
+      if (same && teamSize == state.teamSize) return;
+    }
+    final lobbyCtrl =
+    _ref.read(lobbyControllerProvider.notifier);
+
+    final roomId = _ref.read(lobbyControllerProvider).roomId;
+
+    if (roomId != null && !lobbyCtrl.isCurrentUserHost) {
+      _isReordering = false;
+      return;
+    }
+    _isReordering = true;
+
+    final updated = [
+      for (int i = 0; i < reorderList.length; i++)
+        LobbyPlayerVm(
+          id: reorderList[i].id,
+          name: reorderList[i].name,
+          isGuest: reorderList[i].isGuest,
+          connection: reorderList[i].connection,
+          ownerUid: reorderList[i].ownerUid,
+          order: i,
+          teamId: teamSize == 1 ? null : 'team_${i ~/ teamSize}',
+        )
+    ];
+
+    state = state.copyWith(
+      ordered: updated,
+      teamSize: teamSize,
+      teamsEnabled: teamSize > 1,
+    );
+
+    if (roomId != null) {
+      await _ref
+          .read(lobbyControllerProvider.notifier)
+          .updatePlayersFromOrder(updated);
+    }
+
+    _isReordering = false;
+  }
+
+
+  List<int> computeValidTeamSizes(int playerCount) {
+    if (playerCount <= 1) return const [1];
+
+    final result = <int>[1];
+
+    for (int size = 2; size < playerCount; size++) {
+      final teamsCount = playerCount ~/ size;
+
+      final dividesExactly = playerCount % size == 0;
+      final hasAtLeastTwoTeams = teamsCount >= 2;
+
+      if (dividesExactly && hasAtLeastTwoTeams) {
         result.add(size);
       }
     }
@@ -49,32 +130,13 @@ class PlayerOrderController extends StateNotifier<PlayerOrderState> {
     return result;
   }
 
-  void setTeamMode(int teamSize) {
-    final players = [...state.ordered];
-
-    for (int i = 0; i < players.length; i++) {
-      final teamIndex = i ~/ teamSize;
-      final teamId = teamSize == 1 ? null : 'team_$teamIndex';
-
-      final p = players[i];
-
-      players[i] = LobbyPlayerVm(
-        id: p.id,
-        name: p.name,
-        isGuest: p.isGuest,
-        connection: p.connection,
-        ownerUid: p.ownerUid,
-        order: i,
-        teamId: teamId,
-      );
-    }
-
-    state = state.copyWith(
-      ordered: players,
-      teamsEnabled: teamSize > 1,
+  Future<void> setTeamMode(int teamSize) async {
+    await _applyLayoutChange(
       teamSize: teamSize,
+      reorderList: state.ordered,
     );
   }
+
   PlayerOrderController(this._ref)
       : super(const PlayerOrderState(ordered: []));
 
@@ -93,8 +155,9 @@ class PlayerOrderController extends StateNotifier<PlayerOrderState> {
     final sorted = [...players]
       ..sort((a, b) => a.order.compareTo(b.order));
 
-    // 🔥 se team attivi → ricalcola SEMPRE
-    if (state.teamsEnabled && state.teamSize > 1) {
+    final allHaveTeam = sorted.every((p) => p.teamId != null);
+
+    if (!allHaveTeam && state.teamsEnabled && state.teamSize > 1) {
       final size = state.teamSize;
 
       final rebuilt = [
@@ -120,9 +183,7 @@ class PlayerOrderController extends StateNotifier<PlayerOrderState> {
   // DRAG LOCAL (UI ONLY)
   // -----------------------
 
-  void reorderLocal(int oldIndex, int newIndex) {
-    _isReordering = true;
-
+  Future<void> reorderLocal(int oldIndex, int newIndex) async {
     final list = [...state.ordered];
 
     if (newIndex > oldIndex) newIndex--;
@@ -130,66 +191,13 @@ class PlayerOrderController extends StateNotifier<PlayerOrderState> {
     final item = list.removeAt(oldIndex);
     list.insert(newIndex, item);
 
-    // 🔥 RICALCOLO TEAM
-    final teamSize = state.teamSize;
-
-    final updated = [
-      for (int i = 0; i < list.length; i++)
-        LobbyPlayerVm(
-          id: list[i].id,
-          name: list[i].name,
-          isGuest: list[i].isGuest,
-          connection: list[i].connection,
-          ownerUid: list[i].ownerUid,
-          order: i,
-          teamId: teamSize == 1
-              ? null
-              : 'team_${i ~/ teamSize}',
-        )
-    ];
-
-    state = state.copyWith(ordered: updated);
+    await _applyLayoutChange(
+      teamSize: state.teamSize,
+      reorderList: list,
+    );
   }
 
-  // -----------------------
-  // COMMIT TO DB
-  // -----------------------
 
-  Future<void> commitOrder() async {
-    final lobby = _ref.read(lobbyControllerProvider);
-    final roomId = lobby.roomId;
-
-    if (roomId == null) {
-      _isReordering = false;
-      return;
-    }
-
-    await _ref.read(lobbyControllerProvider.notifier)
-        .updatePlayersFromOrder(state.ordered);
-
-    // 🔑 sblocca dopo commit
-    _isReordering = false;
-  }
-
-  // -----------------------
-  // ASSIGN TEAM
-  // -----------------------
-
-  Future<void> assignTeam(String playerId, String? teamId) async {
-    final lobby = _ref.read(lobbyControllerProvider);
-    final roomId = lobby.roomId;
-
-    if (roomId == null) return;
-
-    try {
-      await FirebaseFirestore.instance
-          .collection('rooms')
-          .doc(roomId)
-          .update({
-        'players.$playerId.teamId': teamId,
-      });
-    } catch (_) {}
-  }
 }
 
 // -----------------------

@@ -126,12 +126,16 @@ class LobbyViewModel {
 
 class LobbyController extends StateNotifier<LobbyViewModel> {
   Timer? _heartbeatTimer;
+  bool _isSpectator = false;
+
   int _nextOrder() {
     if (state.players.isEmpty) return 0;
     return state.players.map((p) => p.order).reduce(max) + 1;
   }
+
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
+    if (_isSpectator) return;
 
     _heartbeatTimer = Timer.periodic(
       const Duration(seconds: 3),
@@ -149,9 +153,33 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
     final updates = <String, dynamic>{};
 
+    // 1. Trova tutti gli ownerUid che questo device controlla
+    final controlledOwnerUids = <String>{};
+
     for (final p in state.players) {
-      // 👉 tutti i player creati da questo device
-      if (p.ownerUid == uid) {
+      final isDirectUser = p.id == uid;
+      final isExternalGuestOfMe = p.id == 'guest_ext_$uid';
+
+      if (isDirectUser || isExternalGuestOfMe) {
+        if (p.ownerUid != null) {
+          controlledOwnerUids.add(p.ownerUid!);
+        }
+        controlledOwnerUids.add(uid);
+      }
+    }
+
+    if (controlledOwnerUids.isEmpty) return;
+
+    // 2. Aggiorna tutti i player che appartengono a questi owner
+    for (final p in state.players) {
+      final owner = p.ownerUid;
+
+      if (owner != null && controlledOwnerUids.contains(owner)) {
+        updates['players.${p.id}.lastSeen'] = now;
+      }
+
+      // fallback: player diretto (non guest)
+      if (!p.isGuest && controlledOwnerUids.contains(p.id)) {
         updates['players.${p.id}.lastSeen'] = now;
       }
     }
@@ -192,11 +220,10 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       loading: null,
     );
   }
+
   void _startConnectionMonitoring() {
     _connectionTimer?.cancel();
-
     _refreshConnectionState();
-
     _connectionTimer = Timer.periodic(
       const Duration(seconds: 2),
           (_) => _refreshConnectionState(),
@@ -220,16 +247,9 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       );
     }
   }
-  // -----------------------
-  // AUTH
-  // -----------------------
 
   String? get authUid => FirebaseAuth.instance.currentUser?.uid;
   String get currentPlayerId => authUid ?? '';
-
-  // -----------------------
-  // HOST
-  // -----------------------
 
   String? _hostId;
   String? get hostId => _hostId;
@@ -238,15 +258,15 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     final uid = authUid;
     return uid != null && uid == _hostId;
   }
-// -----------------------
-// INIT ROOM (HOST ENTRY)
-// -----------------------
+
+  bool get isSpectator => _isSpectator;
 
   Future<void> initAsHost() async {
     final uid = authUid;
     if (uid == null) return;
 
     _hostId = uid;
+    _isSpectator = false;
 
     final exists = state.players.any((p) => p.ownerUid == uid);
 
@@ -266,16 +286,17 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       );
     }
   }
-  // -----------------------
-  // CORE ROOM ACTIONS
-  // -----------------------
 
   Future<void> participateInRoom() async {
     final uid = authUid;
     if (uid == null) return;
 
-    final id = 'guest_ext_$uid';
+    if (state.players.length >= 8) {
+      return;
+    }
 
+    _isSpectator = false;
+    final id = 'guest_ext_$uid';
     final exists = state.players.any((p) => p.id == id);
     if (exists) return;
 
@@ -289,98 +310,71 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       teamId: null,
     );
 
-    final next = [...state.players, player];
-
-    state = state.copyWith(players: next);
-    _ref.read(playerOrderControllerProvider.notifier)
-        .syncFromLobby(next);
-    await _syncPlayers();
+    await _ref.read(playerOrderControllerProvider.notifier).addPlayer(player);
   }
 
-  Future<void> addLocalGuest(String name) async {
-    final trimmed = name.trim();
-    if (trimmed.isEmpty) return;
-
+  Future<LobbyPlayerVm> buildLocalGuestVm(String name) async {
     final id = 'guest_${DateTime.now().millisecondsSinceEpoch}';
 
-    final newPlayer = LobbyPlayerVm(
+    return LobbyPlayerVm(
       id: id,
-      name: trimmed,
-      isGuest: true,
-      connection: ConnectionState.connected,
-      ownerUid: authUid,
-      order: 0,
-      teamId: null,
-    );
-
-    if (state.roomId == null) {
-      // offline → locale
-      final next = [...state.players, newPlayer];
-      state = state.copyWith(players: next);
-
-      _ref.read(playerOrderControllerProvider.notifier)
-          .syncFromLobby(next);
-      return;
-    }
-
-    // online → transaction
-    await _updatePlayersTransaction(
-      roomId: state.roomId!,
-      transform: (current) => [...current, newPlayer],
-    );
-  }
-
-  Future<void> addGuestFromExternalAuth({
-    required String externalId,
-    required String name,
-    String? email,
-  }) async {
-    final id = 'guest_ext_$externalId';
-
-    final exists = state.players.any((p) => p.ownerUid == externalId);
-    if (exists) return;
-
-    final player = LobbyPlayerVm(
-      id: id,
-      name: name.isNotEmpty ? name : (email ?? 'Guest'),
+      name: name,
       isGuest: true,
       connection: ConnectionState.connected,
       ownerUid: authUid,
       order: _nextOrder(),
       teamId: null,
     );
+  }
 
-    final next = [...state.players, player];
+  Future<LobbyPlayerVm> buildExternalGuestVm({
+    required String externalId,
+    required String email,
+  }) async {
+    final name = email.split('@').first;
 
-    state = state.copyWith(players: next);
-    _ref.read(playerOrderControllerProvider.notifier)
-        .syncFromLobby(next);
-    await _syncPlayers();
+    return LobbyPlayerVm(
+      id: 'guest_ext_$externalId',
+      name: name,
+      isGuest: true,
+      connection: ConnectionState.connected,
+      ownerUid: authUid,
+      order: _nextOrder(),
+      teamId: null,
+    );
   }
 
   Future<void> removePlayer(String playerId) async {
     if (playerId == _hostId) return;
 
-    if (state.roomId == null) {
-      final next = state.players.where((p) => p.id != playerId).toList();
+    // 🔥 cleanup user_rooms
+    final player = state.players.firstWhere(
+          (p) => p.id == playerId,
+      orElse: () => LobbyPlayerVm(
+        id: '',
+        name: '',
+        isGuest: true,
+        connection: ConnectionState.disconnected,
+        ownerUid: null,
+        order: 0,
+        teamId: null,
+      ),
+    );
 
-      state = state.copyWith(players: next);
-
-      _ref.read(playerOrderControllerProvider.notifier)
-          .syncFromLobby(next);
-      return;
+    final uid = _extractAuthenticatedUidFromPlayer(player);
+    if (uid != null && uid.isNotEmpty) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('user_rooms')
+            .doc(uid)
+            .delete();
+      } catch (_) {}
     }
 
-    await _updatePlayersTransaction(
-      roomId: state.roomId!,
-      transform: (current) =>
-          current.where((p) => p.id != playerId).toList(),
-    );
+    await _ref
+        .read(playerOrderControllerProvider.notifier)
+        .removePlayerById(playerId);
   }
-
-  // -----------------------
-  // ROOM CREATION / INVITE
-  // -----------------------
 
   Future<void> invite() async {
     if (state.roomId != null) {
@@ -398,15 +392,17 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     final uid = authUid;
     _hostId = uid;
 
-    // 👉 PRENDE ORDINE LOCALE (UI)
     final ordered = _ref.read(playerOrderControllerProvider).ordered;
     final playersForDb = ordered.isNotEmpty ? ordered : state.players;
+    final orderState = _ref.read(playerOrderControllerProvider);
 
     try {
       await FirebaseFirestore.instance.collection('rooms').doc(roomId).set({
         'id': roomId,
         'hostId': uid,
-        'players': _playersToMap(playersForDb), // 👉 USA LISTA ORDINATA
+        'players': _playersToMap(playersForDb),
+        'teamSize': orderState.teamSize,
+        'teamsEnabled': orderState.teamsEnabled,
         'status': 'inRoom',
         'config': {
           'variant': state.config.variant.name,
@@ -419,7 +415,6 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       });
     } catch (_) {}
 
-    // 👉 ALLINEA STATO LOCALE ALL'ORDINE SALVATO
     state = state.copyWith(players: playersForDb);
 
     await _syncUserRoomBindingsForAuthenticatedPlayers(roomId);
@@ -438,6 +433,19 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
   Future<void> closeRoom() async {
     final roomId = state.roomId;
 
+    // 🔥 cleanup user_rooms per tutti i player
+    for (final player in state.players) {
+      final uid = _extractAuthenticatedUidFromPlayer(player);
+      if (uid != null && uid.isNotEmpty) {
+        try {
+          await FirebaseFirestore.instance
+              .collection('user_rooms')
+              .doc(uid)
+              .delete();
+        } catch (_) {}
+      }
+    }
+
     if (roomId != null) {
       try {
         await FirebaseFirestore.instance
@@ -448,92 +456,105 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     }
 
     _hostId = null;
-
     state = _initial();
   }
 
   Future<void> leaveRoom() async {
     final uid = authUid;
+    if (uid == null) return;
 
-    if (state.roomId == null) {
-      // 👉 offline
-      final next = state.players
-          .where((p) => p.ownerUid != uid && p.id != uid)
-          .toList()
-        ..sort((a, b) => a.order.compareTo(b.order));
+    final idsToRemove = state.players
+        .where((p) => p.ownerUid == uid || p.id == uid)
+        .map((p) => p.id)
+        .toList();
 
-      final reindexed = [
-        for (int i = 0; i < next.length; i++)
-          LobbyPlayerVm(
-            id: next[i].id,
-            name: next[i].name,
-            isGuest: next[i].isGuest,
-            connection: next[i].connection,
-            ownerUid: next[i].ownerUid,
-            order: i,
-            teamId: next[i].teamId,
-          )
-      ];
+    for (final id in idsToRemove) {
+      final player = state.players.firstWhere((p) => p.id == id);
 
-      state = state.copyWith(players: reindexed);
+      final playerUid = _extractAuthenticatedUidFromPlayer(player);
+      if (playerUid != null && playerUid.isNotEmpty) {
+        try {
+          await FirebaseFirestore.instance
+              .collection('user_rooms')
+              .doc(playerUid)
+              .delete();
+        } catch (_) {}
+      }
 
-      _ref.read(playerOrderControllerProvider.notifier)
-          .syncFromLobby(reindexed);
-
-      return;
+      await _ref
+          .read(playerOrderControllerProvider.notifier)
+          .removePlayerById(id);
     }
-
-    // 👉 ONLINE = TRANSACTION
-    await _updatePlayersTransaction(
-      roomId: state.roomId!,
-      transform: (players) {
-        return players
-            .where((p) => p.ownerUid != uid && p.id != uid)
-            .toList();
-      },
-    );
   }
+
   Future<void> updatePlayersFromOrder(List<LobbyPlayerVm> ordered) async {
     final roomId = state.roomId;
     if (roomId == null) return;
 
-    await _updatePlayersTransaction(
-      roomId: roomId,
-      transform: (_) => ordered,
-    );
+    final orderState = _ref.read(playerOrderControllerProvider);
+
+    // 🔥 SYNC user_rooms: aggiungi nuovi + rimuovi vecchi
+    final current = state.players;
+    final currentUids = current
+        .map(_extractAuthenticatedUidFromPlayer)
+        .whereType<String>()
+        .toSet();
+
+    final nextUids = ordered
+        .map(_extractAuthenticatedUidFromPlayer)
+        .whereType<String>()
+        .toSet();
+
+    final toRemove = currentUids.difference(nextUids);
+    final toAdd = nextUids.difference(currentUids);
+
+    final db = FirebaseFirestore.instance;
+    final batch = db.batch();
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    for (final uid in toRemove) {
+      batch.delete(db.collection('user_rooms').doc(uid));
+    }
+
+    for (final player in ordered) {
+      final uid = _extractAuthenticatedUidFromPlayer(player);
+      if (uid == null || !toAdd.contains(uid)) continue;
+
+      batch.set(
+        db.collection('user_rooms').doc(uid),
+        {
+          'roomId': roomId,
+          'playerId': player.id,
+          'ownerUid': player.ownerUid,
+          'updatedAt': now,
+        },
+      );
+    }
+
+    await batch.commit();
+
+    await FirebaseFirestore.instance
+        .collection('rooms')
+        .doc(roomId)
+        .set({
+      'players': _playersToMap(ordered),
+      'teamSize': orderState.teamSize,
+      'teamsEnabled': orderState.teamsEnabled,
+    }, SetOptions(merge: true));
   }
-  // -----------------------
-  // MATCH
-  // -----------------------
+
 
   Future<Match?> startMatch() async {
     if (!state.canStart) return null;
-
     state = state.copyWith(roomState: RoomState.inMatch);
-
     return null;
   }
 
-  // -----------------------
-  // DB SYNC
-  // -----------------------
   @override
   void dispose() {
     _connectionTimer?.cancel();
     _heartbeatTimer?.cancel();
     super.dispose();
-  }
-  Future<void> _syncPlayers() async {
-    if (state.roomId == null) return;
-
-    try {
-      await FirebaseFirestore.instance
-          .collection('rooms')
-          .doc(state.roomId!)
-          .set({
-        'players': _playersToMap(state.players),
-      }, SetOptions(merge: true));
-    } catch (_) {}
   }
 
   void _watchRoom(String roomId) {
@@ -542,21 +563,20 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
         .doc(roomId)
         .snapshots()
         .listen((doc) async {
-      if (!doc.exists) return;
+      if (!doc.exists) {
+        state = state.copyWith(loading: OverlayState.error);
+        return;
+      }
 
       final data = doc.data();
       if (data == null) return;
 
       final now = DateTime.now().millisecondsSinceEpoch;
-
-      final rawPlayers =
-          data['players'] as Map<String, dynamic>? ?? {};
+      final rawPlayers = data['players'] as Map<String, dynamic>? ?? {};
 
       final players = rawPlayers.entries.map((e) {
         final p = Map<String, dynamic>.from(e.value);
-
         final lastSeen = p['lastSeen'] as int? ?? 0;
-
         final isOnline = (now - lastSeen) < 10000;
 
         return LobbyPlayerVm(
@@ -570,30 +590,45 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
           order: p['order'] ?? 0,
           teamId: p['teamId'],
         );
-
       }).toList()
         ..sort((a, b) => a.order.compareTo(b.order));
 
       final host = data['hostId'] as String?;
+      final teamSize = data['teamSize'] as int? ?? 1;
+      final teamsEnabled = data['teamsEnabled'] as bool? ?? false;
+      final status = data['status'] as String? ?? 'inRoom';
 
       state = state.copyWith(
         players: players,
         isOnline: true,
+        roomState: status == 'inGame'
+            ? RoomState.inMatch
+            : status == 'terminated'
+            ? RoomState.closed
+            : RoomState.waiting,
       );
 
+      final orderCtrl = _ref.read(playerOrderControllerProvider.notifier);
+      orderCtrl.syncFromLobby(players);
+
+      if (orderCtrl.state.teamSize != teamSize ||
+          orderCtrl.state.teamsEnabled != teamsEnabled) {
+        orderCtrl.state = orderCtrl.state.copyWith(
+          teamSize: teamSize,
+          teamsEnabled: teamsEnabled,
+        );
+      }
+
       _hostId = host;
+
     });
   }
 
   String? _extractAuthenticatedUidFromPlayer(LobbyPlayerVm player) {
-    if (!player.isGuest) {
-      return player.id;
-    }
-
+    if (!player.isGuest) return player.id;
     if (player.id.startsWith('guest_ext_')) {
       return player.id.replaceFirst('guest_ext_', '');
     }
-
     return null;
   }
 
@@ -616,13 +651,11 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
         },
       );
     }
-
     await batch.commit();
   }
 
   Map<String, dynamic> _playersToMap(List<LobbyPlayerVm> players) {
     final now = DateTime.now().millisecondsSinceEpoch;
-
     return {
       for (final p in players)
         p.id: {
@@ -653,69 +686,21 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     ).toString();
   }
 
-  Future<void> _updatePlayersTransaction({
-    required String roomId,
-    required List<LobbyPlayerVm> Function(List<LobbyPlayerVm>) transform,
-  }) async {
-    final ref = FirebaseFirestore.instance.collection('rooms').doc(roomId);
-
-    await FirebaseFirestore.instance.runTransaction((tx) async {
-      final snap = await tx.get(ref);
-      final data = snap.data();
-      if (data == null) return;
-
-      final raw = data['players'] as Map<String, dynamic>? ?? {};
-
-      final current = raw.entries.map((e) {
-        final p = Map<String, dynamic>.from(e.value);
-        return LobbyPlayerVm(
-          id: e.key,
-          name: p['name'],
-          isGuest: p['isGuest'],
-          connection: ConnectionState.connected,
-          ownerUid: p['ownerUid'],
-          order: p['order'] ?? 0,
-          teamId: p['teamId'],
-        );
-      }).toList();
-
-      final updated = transform(current);
-
-      // 🔥 RIASSEGNA ORDINI SEMPRE
-      for (int i = 0; i < updated.length; i++) {
-        updated[i] = LobbyPlayerVm(
-          id: updated[i].id,
-          name: updated[i].name,
-          isGuest: updated[i].isGuest,
-          connection: updated[i].connection,
-          ownerUid: updated[i].ownerUid,
-          order: i,
-          teamId: updated[i].teamId,
-        );
-      }
-
-      tx.update(ref, {
-        'players': _playersToMap(updated),
-      });
-    });
-  }
-
-
-
-
-
-  // -----------------------
-// STUB COMPATIBILITÀ (DA RISCRIVERE)
-// -----------------------
-
-  bool get isSpectator => false;
-
   Future<void> joinFromLink(String roomId) async {
-    await invite();
+    if (roomId.isEmpty) return;
+    _hostId = null;
+    _isSpectator = false;
+    state = state.copyWith(roomId: roomId, isOnline: true);
+    _watchRoom(roomId);
+    _startHeartbeat();
   }
 
   Future<void> joinAsSpectator(String roomId) async {
-    // noop
+    if (roomId.isEmpty) return;
+    _hostId = null;
+    _isSpectator = true;
+    state = state.copyWith(roomId: roomId, isOnline: true);
+    _watchRoom(roomId);
   }
 
   void updateConfig({
@@ -734,20 +719,41 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       sets: sets,
       gameType: gameType,
     );
-
     state = state.copyWith(config: next);
   }
+  Future<void> autoRejoinRoomIfNeeded() async {
+    final uid = authUid;
+    if (uid == null) return;
 
-  Future<Match?> loadCurrentMatch() async {
-    return null;
-  }
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('user_rooms')
+          .doc(uid)
+          .get();
 
-  Future<void> reopenRoomFromResult() async {
-    // noop
-  }
+      if (!doc.exists) return;
 
-  Future<void> markRoomTerminated() async {
-    // noop
+      final data = doc.data();
+      if (data == null) return;
+
+      final roomId = data['roomId'] as String?;
+      if (roomId == null || roomId.isEmpty) return;
+
+      _hostId = null;
+      _isSpectator = false;
+
+      state = state.copyWith(
+        roomId: roomId,
+        isOnline: true,
+      );
+
+      _watchRoom(roomId);
+      _startHeartbeat();
+    } catch (_) {}
   }
+  Future<Match?> loadCurrentMatch() async => null;
+  Future<void> reopenRoomFromResult() async {}
+  Future<void> markRoomTerminated() async {}
 }
+
 final lobbyControllerProvider = StateNotifierProvider<LobbyController, LobbyViewModel>((ref) => LobbyController(ref));
