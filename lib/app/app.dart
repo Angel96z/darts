@@ -19,38 +19,56 @@ class _AppBootstrap extends ConsumerStatefulWidget {
 }
 
 class _AppBootstrapState extends ConsumerState<_AppBootstrap> {
-  bool _handled = false;
-  bool _loading = false;
-  bool _didRun = false;
   bool _processing = false;
+  bool _loading = false;
 
   @override
   void initState() {
     super.initState();
 
-    if (_didRun) return;
-    _didRun = true;
-
-    _handleLink();
+    Future.microtask(() {
+      ref.read(appLinkCoordinatorProvider.notifier).init();
+    });
   }
 
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<AppLinkState>(
+      appLinkCoordinatorProvider,
+          (prev, next) {
+        if (_processing) return;
 
-  Future<void> _handleLink() async {
-    if (_handled || _processing) return;
-    _handled = true;
-    _processing = true;
+        final roomId = next.pendingRoomId;
+        final watchId = next.pendingWatchRoomId;
 
-    final coordinator = ref.read(appLinkCoordinatorProvider.notifier);
-    final roomId = coordinator.state.pendingRoomId;
-    final watchId = coordinator.state.pendingWatchRoomId;
+        if ((roomId == null || roomId.isEmpty) &&
+            (watchId == null || watchId.isEmpty)) {
+          return;
+        }
 
-    if ((roomId == null || roomId.isEmpty) &&
-        (watchId == null || watchId.isEmpty)) {
-      _processing = false;
-      return;
+        _handleLink(next);
+      },
+    );
+
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
 
+    return const HomeScreen();
+  }
+
+  Future<void> _handleLink(AppLinkState linkState) async {
+    if (_processing) return;
+
+    _processing = true;
     setState(() => _loading = true);
+
+    final coordinator = ref.read(appLinkCoordinatorProvider.notifier);
+
+    final roomId = linkState.pendingRoomId;
+    final watchId = linkState.pendingWatchRoomId;
 
     try {
       if (watchId != null && watchId.isNotEmpty) {
@@ -86,11 +104,14 @@ class _AppBootstrapState extends ConsumerState<_AppBootstrap> {
 
           if (!mounted) return;
 
+          await coordinator.consumeRoomId();
+
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const HomeScreen()),
                 (route) => false,
           );
 
+          _processing = false;
           return;
         }
       }
@@ -100,6 +121,7 @@ class _AppBootstrapState extends ConsumerState<_AppBootstrap> {
       if (vmAfterJoin.roomId != null) {
         await coordinator.consumeRoomId();
       }
+
       cleanUrl();
 
       if (!mounted) return;
@@ -118,19 +140,9 @@ class _AppBootstrapState extends ConsumerState<_AppBootstrap> {
       _processing = false;
     }
   }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    return const HomeScreen();
-
-  }
 }
+
+
 class DartsApp extends ConsumerWidget {
   const DartsApp({super.key});
 

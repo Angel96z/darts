@@ -11,9 +11,6 @@ Future<void> main() async {
 
   final container = ProviderContainer();
 
-// inizializza deep link handling
-  await container.read(appLinkCoordinatorProvider.notifier).init();
-
   runApp(
     UncontrolledProviderScope(
       container: container,

@@ -1,12 +1,14 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/game/presentation/pages/allenamento_screen.dart';
 import '../../features/game/presentation/pages/campionati_screen.dart';
 import '../../features/stats/presentation/pages/classifiche_screen.dart';
 import '../../features/game/presentation/pages/gioca_screen.dart';
 import '../../features/players/presentation/widgets/profile_panel.dart';
 import '../../features/game/presentation/pages/tornei_screen.dart';
-
+import '../../app/link/app_link_state.dart';
+import '../../features/darts_match/presentation/lobby/pages/room_lobby_shell_page.dart';
 enum AppSection {
   allenamento,
   gioca,
@@ -34,6 +36,30 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     current = widget.initialSection;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final container = ProviderScope.containerOf(context, listen: false);
+      final linkCoordinator = container.read(appLinkCoordinatorProvider.notifier);
+
+      final roomId = await linkCoordinator.consumeRoomId();
+
+      if (roomId != null && roomId.isNotEmpty) {
+        setState(() {
+          current = AppSection.gioca;
+        });
+
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        if (!mounted) return;
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const RoomLobbyShellPage(),
+          ),
+        );
+      }
+    });
   }
 
   String get title {

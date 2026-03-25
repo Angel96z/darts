@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
+import '../../../../../app/link/app_link_state.dart';
 import '../../../../../app/router/home_shell_screen.dart';
 import '../../../../../core/widgets/blocking_overlay.dart';
 import '../../../domain/entities/match.dart';
@@ -38,7 +39,7 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _bootstrapTestLobby();
+      await _bootstrapEntryPoint();
     });
   }
 
@@ -50,18 +51,31 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     super.dispose();
   }
 
-  Future<void> _bootstrapTestLobby() async {
+  Future<void> _bootstrapEntryPoint() async {
     if (_bootstrapped || !mounted) return;
     _bootstrapped = true;
 
     final ctrl = ref.read(lobbyControllerProvider.notifier);
 
-    // 🔥 AUTO REJOIN PRIMA DI TUTTO
-    await ctrl.autoRejoinRoomIfNeeded();
+    // 1. DEEP LINK PRIORITARIO
+    final linkCoordinator = ref.read(appLinkCoordinatorProvider.notifier);
+    final pendingRoomId = await linkCoordinator.consumeRoomId();
 
-    // se non è rientrato in nessuna room → init host
-    if (ref.read(lobbyControllerProvider).roomId == null) {
-      await ctrl.initAsHost();
+    if (pendingRoomId != null && pendingRoomId.isNotEmpty) {
+      await ctrl.joinFromLink(pendingRoomId);
+    } else {
+      // 2. PROVA REJOIN
+      await ctrl.autoRejoinRoomIfNeeded();
+
+      final currentRoomId = ref.read(lobbyControllerProvider).roomId;
+
+      if (currentRoomId != null && currentRoomId.isNotEmpty) {
+        // già collegato → assicura watcher
+        await ctrl.joinFromLink(currentRoomId);
+      } else {
+        // 3. NUOVA SESSIONE LOCALE
+        await ctrl.initAsHost();
+      }
     }
 
     final players = ref.read(lobbyControllerProvider).players;
@@ -69,6 +83,8 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     ref.read(playerOrderControllerProvider.notifier)
         .syncFromLobby(players);
   }
+
+
   String? _currentAuthUid() {
     return FirebaseAuth.instance.currentUser?.uid;
   }
@@ -88,34 +104,35 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
 
   bool _canControlAsAdmin(LobbyViewModel vm) {
     final authUid = _currentAuthUid();
+    if (authUid == null) return false;
+
+    if (vm.players.isEmpty) return false;
+
     final hostId = _hostId();
 
-    if (authUid == null || hostId.isEmpty) return false;
-
-    // admin diretto
-    if (authUid == hostId) return true;
-
-    // 🔥 io sono sotto l'host (guest_ext o ownership chain)
-    final isUnderHost = vm.players.any((p) =>
-    p.ownerUid == hostId &&
-        (p.id == 'guest_ext_$authUid' || p.ownerUid == authUid));
-
-    return isUnderHost;
+    return vm.players.any((p) =>
+    (p.id == authUid || p.id == 'guest_ext_$authUid') &&
+        (p.id == hostId || p.ownerUid == hostId));
   }
 
   String _adminControlLabel(LobbyViewModel vm) {
     final authUid = _currentAuthUid();
+    if (authUid == null) return 'nessun accesso';
+
+    if (vm.players.isEmpty) return 'nessun accesso';
+
     final hostId = _hostId();
 
-    if (authUid == null || hostId.isEmpty) return 'nessun accesso';
+    final me = vm.players.where((p) =>
+    p.id == authUid || p.id == 'guest_ext_$authUid');
 
-    if (authUid == hostId) return 'admin diretto';
+    if (me.isEmpty) return 'nessun accesso';
 
-    final isUnderHost = vm.players.any((p) =>
-    p.ownerUid == hostId &&
-        (p.id == 'guest_ext_$authUid' || p.ownerUid == authUid));
+    final player = me.first;
 
-    if (isUnderHost) return 'proxy admin (sotto host)';
+    if (player.id == hostId) return 'admin';
+
+    if (player.ownerUid == hostId) return 'proxy admin';
 
     return 'nessun accesso';
   }
@@ -130,10 +147,12 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     final authUid = _currentAuthUid();
     if (authUid == null) return false;
 
+    // 🔥 stesso utente se:
+    // - è player diretto (id == authUid)
+    // - è guest_ext collegato a lui
     return vm.players.any((p) =>
-    p.ownerUid == authUid || // 🔥 vero identificatore
-        p.id == authUid ||       // utente reale
-        p.id == 'guest_ext_$authUid' // fallback vecchio
+    p.id == authUid ||
+        p.id == 'guest_ext_$authUid'
     );
   }
   String _playerTypeLabel(LobbyPlayerVm player, String hostId) {
@@ -299,30 +318,35 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
 
   Future<void> _startMatch(LobbyViewModel vm) async {
     final ctrl = ref.read(lobbyControllerProvider.notifier);
-    final match = await ctrl.startMatch();
-    if (!mounted || match == null) return;
 
-    Navigator.push(
+    await ctrl.startMatch();
+
+    final next = ref.read(lobbyControllerProvider);
+    if (!mounted || next.roomState != RoomState.inMatch) return;
+
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => MatchShellPage(
-          match: match,
-          isOnline: vm.isOnline,
+          match: null,
+          isOnline: next.isOnline,
           canPlay: true,
         ),
       ),
     );
   }
 
+
   Future<void> _removePlayer(LobbyPlayerVm player) async {
-    final orderCtrl = ref.read(playerOrderControllerProvider.notifier);
-    await orderCtrl.removePlayerById(player.id);
+    final lobbyCtrl = ref.read(lobbyControllerProvider.notifier);
+    await lobbyCtrl.removePlayer(player.id);
   }
 
   Future<void> _closeRoomAndGoHome() async {
     final ctrl = ref.read(lobbyControllerProvider.notifier);
 
-    if (_isCurrentAuthHost()) {
+    final vm = ref.read(lobbyControllerProvider);
+    if (_canControlAsAdmin(vm)) {
       await ctrl.closeRoom();
     } else {
       await ctrl.leaveRoom();
@@ -348,20 +372,17 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     if (next.roomState != RoomState.inMatch) return;
 
     _openingMatch = true;
-    final liveMatch = await ref.read(lobbyControllerProvider.notifier).loadCurrentMatch();
 
-    if (mounted && liveMatch != null) {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => MatchShellPage(
-            match: liveMatch,
-            isOnline: next.isOnline,
-            canPlay: canPlayCurrentMatch,
-          ),
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MatchShellPage(
+          match: null,
+          isOnline: next.isOnline,
+          canPlay: canPlayCurrentMatch,
         ),
-      );
-    }
+      ),
+    );
 
     _openingMatch = false;
   }
@@ -443,6 +464,10 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
                         _InfoRow(label: 'Ruolo attuale', value: isSpectator ? 'Watcher (Sola lettura)' : (isPlayer ? 'Giocatore' : 'Visitatore')),
                         _InfoRow(label: 'Posti occupati', value: '${vm.players.length} / 8'),
                         _InfoRow(label: 'Modalità test', value: '501'),
+                        _InfoRow(
+                          label: 'Room ID',
+                          value: vm.roomId ?? '-',
+                        ),
                       ],
                     ),
                   ),
@@ -454,7 +479,9 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
                       runSpacing: 8,
                       children: [
                         FilledButton.icon(
-                          onPressed: authUid == null || isPlayer || isFull ? null : _participate,
+                          onPressed: (authUid != null && !isPlayer && !isFull)
+                              ? _participate
+                              : null,
                           icon: const Icon(Icons.login),
                           label: Text(isFull ? 'Stanza Piena' : 'Partecipa'),
                         ),
@@ -469,8 +496,7 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
                           label: const Text('Invita a guardare'),
                         ),
                         FilledButton.icon(
-                          onPressed: vm.canStart && isHost ? () => _startMatch(vm) : null,
-                          icon: const Icon(Icons.play_arrow),
+                          onPressed: vm.canStart && _canControlAsAdmin(vm) ? () => _startMatch(vm) : null,                          icon: const Icon(Icons.play_arrow),
                           label: const Text('Inizia'),
                         ),
                       ],
@@ -607,10 +633,8 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
                                   onChanged: (value) async {
                                     if (value == null) return;
 
-                                    final isHost =
-                                        ref.read(lobbyControllerProvider.notifier).isCurrentUserHost;
-
-                                    if (!isHost) return;
+                                    final vm = ref.read(lobbyControllerProvider);
+                                    if (!_canControlAsAdmin(vm)) return;
 
                                     await orderCtrl.setTeamMode(value);
                                   },
@@ -621,15 +645,18 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
                               onReorder: (oldIndex, newIndex) async {
-                                final isHost =
-                                    ref.read(lobbyControllerProvider.notifier).isCurrentUserHost;
+                                final vm = ref.read(lobbyControllerProvider);
+                                if (!_canControlAsAdmin(vm)) return;
 
-                                if (!isHost) return;
+                                final orderCtrl = ref.read(playerOrderControllerProvider.notifier);
 
-                                final orderCtrl =
-                                ref.read(playerOrderControllerProvider.notifier);
-
+                                // Applichiamo il reorder
                                 await orderCtrl.reorderLocal(oldIndex, newIndex);
+
+                                // Se siamo offline, aggiorniamo manualmente il controller della lobby
+                                if (vm.roomId == null) {
+                                  ref.read(lobbyControllerProvider.notifier).updateConfig();
+                                }
                               },
                               children: [
                                 for (final player in flat)
@@ -755,6 +782,20 @@ class _PlayerTile extends ConsumerWidget {
   final bool canRemove;
   final Future<void> Function() onRemove;
 
+  bool _canControlAsAdminLocal(WidgetRef ref) {
+    final vm = ref.read(lobbyControllerProvider);
+    final authUid = FirebaseAuth.instance.currentUser?.uid;
+
+    if (authUid == null) return false;
+    if (vm.players.isEmpty) return false;
+
+    final hostId = ref.read(lobbyControllerProvider.notifier).hostId ?? '';
+
+    return vm.players.any((p) =>
+    (p.id == authUid || p.id == 'guest_ext_$authUid') &&
+        (p.id == hostId || p.ownerUid == hostId));
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isAdmin = player.id == hostId;
@@ -785,8 +826,15 @@ class _PlayerTile extends ConsumerWidget {
             final isHost = lobbyCtrl.isCurrentUserHost;
             final authUid = lobbyCtrl.authUid;
 
-            if (!isHost && player.ownerUid != authUid) return;
+            final vm = ref.read(lobbyControllerProvider);
 
+            final canRemovePlayer =
+                _canControlAsAdminLocal(ref) ||
+                    player.ownerUid == authUid ||
+                    player.id == authUid ||
+                    player.id == 'guest_ext_$authUid';
+
+            if (!canRemovePlayer) return;
             await onRemove();
           }
               : null,

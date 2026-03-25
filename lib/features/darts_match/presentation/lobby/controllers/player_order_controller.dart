@@ -49,11 +49,23 @@ class PlayerOrderController extends StateNotifier<PlayerOrderState> {
   Future<void> removePlayerById(String playerId) async {
     final list = state.ordered.where((p) => p.id != playerId).toList();
 
-    await _applyLayoutChange(
-      teamSize: state.teamSize,
-      reorderList: list,
-    );
+// SOLO aggiornamento locale, NO DB
+    final updated = [
+      for (int i = 0; i < list.length; i++)
+        LobbyPlayerVm(
+          id: list[i].id,
+          name: list[i].name,
+          isGuest: list[i].isGuest,
+          connection: list[i].connection,
+          ownerUid: list[i].ownerUid,
+          order: i,
+          teamId: state.teamSize == 1 ? null : 'team_${i ~/ state.teamSize}',
+        )
+    ];
+
+    state = state.copyWith(ordered: updated);
   }
+
   Future<void> _applyLayoutChange({
     required int teamSize,
     required List<LobbyPlayerVm> reorderList,
@@ -71,15 +83,9 @@ class PlayerOrderController extends StateNotifier<PlayerOrderState> {
       }
       if (same && teamSize == state.teamSize) return;
     }
-    final lobbyCtrl =
-    _ref.read(lobbyControllerProvider.notifier);
 
     final roomId = _ref.read(lobbyControllerProvider).roomId;
 
-    if (roomId != null && !lobbyCtrl.isCurrentUserHost) {
-      _isReordering = false;
-      return;
-    }
     _isReordering = true;
 
     final updated = [
@@ -144,38 +150,59 @@ class PlayerOrderController extends StateNotifier<PlayerOrderState> {
 
   // 🔴 FLAG BLOCCO SNAPSHOT
   bool _isReordering = false;
+  void beginRemoteMutation() {
+    _isReordering = true;
+  }
 
+  void endRemoteMutation() {
+    _isReordering = false;
+  }
   // -----------------------
   // INIT FROM LOBBY
   // -----------------------
 
   void syncFromLobby(List<LobbyPlayerVm> players) {
+// Se stiamo facendo un drag&drop manuale, non interrompiamo l'animazione
     if (_isReordering) return;
 
-    final sorted = [...players]
-      ..sort((a, b) => a.order.compareTo(b.order));
+// Ordiniamo in base al campo 'order' del DB
+    final incomingList = [...players]..sort((a, b) => a.order.compareTo(b.order));
 
-    final allHaveTeam = sorted.every((p) => p.teamId != null);
+// Controllo di Integrità: Se la lista è identica per ID e Ordine, non facciamo nulla
+    if (state.ordered.length == incomingList.length) {
+      bool isExactlySame = true;
+      for (int i = 0; i < incomingList.length; i++) {
+        if (state.ordered[i].id != incomingList[i].id ||
+            state.ordered[i].teamId != incomingList[i].teamId ||
+            state.ordered[i].order != incomingList[i].order) {
+          isExactlySame = false;
+          break;
+        }
+      }
+      if (isExactlySame) return;
+    }
+
+// Se arriviamo qui, il DB è cambiato (es. un giocatore è stato eliminato)
+// Forziamo l'aggiornamento dello stato per far sparire il giocatore rimosso
+    final allHaveTeam = incomingList.every((p) => p.teamId != null);
 
     if (!allHaveTeam && state.teamsEnabled && state.teamSize > 1) {
       final size = state.teamSize;
-
       final rebuilt = [
-        for (int i = 0; i < sorted.length; i++)
+        for (int i = 0; i < incomingList.length; i++)
           LobbyPlayerVm(
-            id: sorted[i].id,
-            name: sorted[i].name,
-            isGuest: sorted[i].isGuest,
-            connection: sorted[i].connection,
-            ownerUid: sorted[i].ownerUid,
+            id: incomingList[i].id,
+            name: incomingList[i].name,
+            isGuest: incomingList[i].isGuest,
+            connection: incomingList[i].connection,
+            ownerUid: incomingList[i].ownerUid,
             order: i,
             teamId: 'team_${i ~/ size}',
           )
       ];
-
       state = state.copyWith(ordered: rebuilt);
     } else {
-      state = state.copyWith(ordered: sorted);
+      state = state.copyWith(ordered: incomingList);
     }
   }
 
@@ -184,19 +211,59 @@ class PlayerOrderController extends StateNotifier<PlayerOrderState> {
   // -----------------------
 
   Future<void> reorderLocal(int oldIndex, int newIndex) async {
-    final list = [...state.ordered];
+    if (_isReordering) return;
+    _isReordering = true;
 
-    if (newIndex > oldIndex) newIndex--;
+    try {
+      final list = [...state.ordered];
+      if (newIndex > oldIndex) newIndex--;
 
-    final item = list.removeAt(oldIndex);
-    list.insert(newIndex, item);
+      final item = list.removeAt(oldIndex);
+      list.insert(newIndex, item);
 
-    await _applyLayoutChange(
-      teamSize: state.teamSize,
-      reorderList: list,
-    );
+      // Ricalcoliamo gli ordini localmente per la UI immediata
+      final updatedList = List<LobbyPlayerVm>.generate(list.length, (i) {
+        return LobbyPlayerVm(
+          id: list[i].id,
+          name: list[i].name,
+          isGuest: list[i].isGuest,
+          connection: list[i].connection,
+          ownerUid: list[i].ownerUid,
+          order: i,
+          teamId: state.teamsEnabled ? 'team_${i ~/ state.teamSize}' : null,
+        );
+      });
+
+      state = state.copyWith(ordered: updatedList);
+
+      // Sincronizzazione remota transazionale
+      final lobbyCtrl = _ref.read(lobbyControllerProvider.notifier);
+      final roomId = _ref.read(lobbyControllerProvider).roomId;
+
+      if (roomId != null) {
+        final roomRef = FirebaseFirestore.instance.collection('rooms').doc(roomId);
+
+        await FirebaseFirestore.instance.runTransaction((transaction) async {
+          final snapshot = await transaction.get(roomRef);
+          if (!snapshot.exists) return;
+
+          Map<String, dynamic> remotePlayers = Map<String, dynamic>.from(snapshot.data()?['players'] ?? {});
+
+          // Applichiamo i nuovi ordini solo ai player ancora esistenti nel DB
+          for (var updatedPlayer in updatedList) {
+            if (remotePlayers.containsKey(updatedPlayer.id)) {
+              remotePlayers[updatedPlayer.id]['order'] = updatedPlayer.order;
+              remotePlayers[updatedPlayer.id]['teamId'] = updatedPlayer.teamId;
+            }
+          }
+
+          transaction.update(roomRef, {'players': remotePlayers});
+        });
+      }
+    } finally {
+      _isReordering = false;
+    }
   }
-
 
 }
 

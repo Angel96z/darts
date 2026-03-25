@@ -66,38 +66,43 @@ class AppLinkCoordinator extends StateNotifier<AppLinkState> {
   }
 
   Future<void> _handleUri(Uri uri) async {
-
-    final raw = uri.queryParameters['roomId'];
-    final rawWatch = uri.queryParameters['watchRoomId'];
-
-    if (raw == null && rawWatch == null) return;
-
-    if (raw != null) {
-      final roomId = raw.trim();
-      if (roomId.isNotEmpty) {
-        state = AppLinkState(
-          pendingRoomId: roomId,
-          pendingWatchRoomId: null,
-        );
-      }
-    }
-
-    if (rawWatch != null) {
-      final watchId = rawWatch.trim();
-      if (watchId.isNotEmpty) {
-        state = AppLinkState(
-          pendingWatchRoomId: watchId,
-          pendingRoomId: null,
-        );
-      }
-    }
-
     final prefs = await SharedPreferences.getInstance();
-    if (raw != null) {
+
+    // 🔥 NORMALIZZAZIONE UNICA
+    // funziona per:
+    // - produzione web
+    // - localhost
+    // - mobile deep link
+
+    final params = uri.queryParameters;
+
+    final raw = params['roomId'];
+    final rawWatch = params['watchRoomId'];
+
+    if ((raw == null || raw.isEmpty) &&
+        (rawWatch == null || rawWatch.isEmpty)) {
+      return;
+    }
+
+    if (raw != null && raw.trim().isNotEmpty) {
       final roomId = raw.trim();
-      if (roomId.isNotEmpty) {
-        await prefs.setString(_pendingRoomIdKey, roomId);
-      }
+
+      state = AppLinkState(
+        pendingRoomId: roomId,
+        pendingWatchRoomId: null,
+      );
+
+      await prefs.setString(_pendingRoomIdKey, roomId);
+      return;
+    }
+
+    if (rawWatch != null && rawWatch.trim().isNotEmpty) {
+      final watchId = rawWatch.trim();
+
+      state = AppLinkState(
+        pendingWatchRoomId: watchId,
+        pendingRoomId: null,
+      );
     }
   }
 

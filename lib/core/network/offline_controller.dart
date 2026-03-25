@@ -20,7 +20,7 @@ class OfflineController extends StateNotifier<bool> {
     _check();
 
     _timer = Timer.periodic(
-      const Duration(seconds: 3),
+      const Duration(seconds: 8),
           (_) => _check(),
     );
   }
