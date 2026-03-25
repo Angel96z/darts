@@ -40,7 +40,7 @@ class _ResultShellPageState extends ConsumerState<ResultShellPage> {
     final result = ref.watch(resultControllerProvider);
     final lobbyVm = ref.watch(lobbyControllerProvider);
     final lobby = ref.read(lobbyControllerProvider.notifier);
-    final isHost = lobby.isCurrentUserHost;
+    final canControlAdmin = lobby.canCurrentAuthControlAsAdmin;
 
     ref.listen<LobbyViewModel>(lobbyControllerProvider, (prev, next) {
       _handleRoomState(next);
@@ -64,7 +64,7 @@ class _ResultShellPageState extends ConsumerState<ResultShellPage> {
                     Text('Highest score: ${result.highestScore}'),
                     Text('Average: ${result.average}'),
                     const Spacer(),
-                    if (isHost)
+                    if (canControlAdmin)
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(
@@ -72,8 +72,8 @@ class _ResultShellPageState extends ConsumerState<ResultShellPage> {
                           child: const Text('Riapri lobby'),
                         ),
                       ),
-                    if (isHost) const SizedBox(height: 8),
-                    if (isHost)
+                    if (canControlAdmin) const SizedBox(height: 8),
+                    if (canControlAdmin)
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton(
@@ -81,7 +81,7 @@ class _ResultShellPageState extends ConsumerState<ResultShellPage> {
                           child: const Text('Chiudi room'),
                         ),
                       ),
-                    if (!isHost)
+                    if (!canControlAdmin)
                       const Text('Attendi la scelta dell\'host'),
                   ],
                 ),

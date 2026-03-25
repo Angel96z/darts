@@ -259,13 +259,21 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
   String? _hostId;
   String? get hostId => _hostId;
 
-  bool get isCurrentUserHost {
-    final uid = authUid;
-    return uid != null && uid == _hostId;
-  }
-
   bool get isSpectator => _isSpectator;
+  bool get canCurrentAuthControlAsAdmin {
+    final uid = authUid;
+    final hostId = _hostId;
 
+    if (uid == null || hostId == null || state.players.isEmpty) {
+      return false;
+    }
+
+    return state.players.any((p) {
+      final isCurrentAuthPlayer = p.id == uid || p.id == 'guest_ext_$uid';
+      final hasAdminControl = p.id == hostId || p.ownerUid == hostId;
+      return isCurrentAuthPlayer && hasAdminControl;
+    });
+  }
   Future<void> initAsHost() async {
     final uid = authUid;
     if (uid == null) return;
@@ -492,6 +500,9 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
   }
 
   Future<void> closeRoom() async {
+    _roomSub?.cancel();
+    _heartbeatTimer?.cancel();
+
     final roomId = state.roomId;
 
     // 🔥 cleanup user_rooms per tutti i player
@@ -604,50 +615,115 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     }, SetOptions(merge: true));
   }
 
+  Future<void> resetForNewRoom() async {
+    _roomSub?.cancel();
+    _heartbeatTimer?.cancel();
+
+    _hostId = null;
+    _isSpectator = false;
+
+    state = _initial();
+  }
+
 
   Future<Match?> startMatch() async {
+    if (state.players.isEmpty) return null;
+    if (!canCurrentAuthControlAsAdmin) return null;
+
     final roomId = state.roomId;
-    if (roomId == null || state.players.isEmpty) return null;
-    if (!isCurrentUserHost) return null;
-    if (state.roomState == RoomState.closed || state.roomState == RoomState.inMatch) {
-      return null;
+    final matchId = FirebaseFirestore.instance.collection('matches').doc().id;
+
+    final match = _buildInitialMatch(
+      roomId: roomId ?? 'local_room',
+      matchId: matchId,
+    );
+
+    // =========================
+    // 🔥 CASO LOCALE
+    // =========================
+    if (roomId == null) {
+      state = state.copyWith(
+        roomState: RoomState.inMatch,
+        currentMatchId: null,
+        clearLoading: true,
+      );
+
+      return match;
     }
 
+    // =========================
+    // 🔥 CASO ONLINE
+    // =========================
     final roomRef = FirebaseFirestore.instance.collection('rooms').doc(roomId);
-    final matchId = FirebaseFirestore.instance.collection('matches').doc().id;
-    final match = _buildInitialMatch(roomId: roomId, matchId: matchId);
 
     await FirebaseFirestore.instance.runTransaction((tx) async {
       final snap = await tx.get(roomRef);
+
       if (!snap.exists) {
-        throw StateError('ROOM_NOT_FOUND');
+        throw Exception('ROOM_NOT_FOUND');
       }
-      final status = (snap.data()?['status'] as String?) ?? 'waiting';
-      if (status == 'inMatch') {
-        throw StateError('MATCH_ALREADY_RUNNING');
-      }
-      if (status == 'closed' || status == 'terminated') {
-        throw StateError('ROOM_CLOSED');
-      }
+
       tx.set(
         roomRef,
         {
           'status': 'inMatch',
           'currentMatchId': matchId,
           'startedAt': FieldValue.serverTimestamp(),
-          'finishedAt': FieldValue.delete(),
         },
         SetOptions(merge: true),
       );
     });
 
     await _ref.read(matchRepositoryProvider).saveMatch(match);
+
     state = state.copyWith(
       roomState: RoomState.inMatch,
       currentMatchId: matchId,
       clearLoading: true,
     );
+
     return match;
+  }
+
+  Future<void> reloadRoomFromDb() async {
+    final roomId = state.roomId;
+
+    // =========================
+    // CASO LOCALE
+    // =========================
+    if (roomId == null || roomId.isEmpty) {
+      // 🔥 IMPORTANTE: recupera i player dal PlayerOrderController
+      final orderState = _ref.read(playerOrderControllerProvider);
+      final players = orderState.ordered;
+
+      state = state.copyWith(
+        players: players,
+        roomState: RoomState.waiting,
+        currentMatchId: null,
+      );
+
+      return;
+    }
+
+    final roomRef = FirebaseFirestore.instance.collection('rooms').doc(roomId);
+
+    // =========================
+    // 🔥 STEP 1: FORZA DB -> WAITING
+    // =========================
+    await roomRef.set({
+      'status': 'waiting',
+      'currentMatchId': FieldValue.delete(),
+    }, SetOptions(merge: true));
+
+    // =========================
+    // 🔥 STEP 2: NON leggere manualmente
+    // lascia fare tutto a _watchRoom
+    // =========================
+
+    state = state.copyWith(
+      roomState: RoomState.waiting,
+      currentMatchId: null,
+    );
   }
 
 

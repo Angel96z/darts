@@ -13,6 +13,7 @@ import '../../../../../app/router/home_shell_screen.dart';
 import '../../../../../core/widgets/blocking_overlay.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/entities/room.dart';
+import '../../match/controllers/match_controller.dart';
 import '../../match/pages/match_shell_page.dart';
 import '../../result/pages/result_shell_page.dart';
 import '../../shared/view_models/connection_badge_vm.dart';
@@ -21,7 +22,12 @@ import '../controllers/lobby_controller.dart';
 import '../controllers/player_order_controller.dart';
 
 class RoomLobbyShellPage extends ConsumerStatefulWidget {
-  const RoomLobbyShellPage({super.key});
+  const RoomLobbyShellPage({
+    super.key,
+    this.forceNewRoom = false,
+  });
+
+  final bool forceNewRoom;
 
   @override
   ConsumerState<RoomLobbyShellPage> createState() => _RoomLobbyShellPageState();
@@ -60,7 +66,7 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
 
     final ctrl = ref.read(lobbyControllerProvider.notifier);
 
-    // 1. DEEP LINK PRIORITARIO
+    // 1. DEEP LINK (priorità assoluta)
     final linkCoordinator = ref.read(appLinkCoordinatorProvider.notifier);
     final pendingWatchRoomId = await linkCoordinator.consumeWatchRoomId();
     final pendingRoomId = await linkCoordinator.consumeRoomId();
@@ -69,27 +75,27 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
       await ctrl.joinAsSpectator(pendingWatchRoomId);
     } else if (pendingRoomId != null && pendingRoomId.isNotEmpty) {
       await ctrl.joinFromLink(pendingRoomId);
+    } else if (widget.forceNewRoom) {
+      // 2. NUOVA ROOM FORZATA
+      await ctrl.resetForNewRoom();
+      await ctrl.initAsHost();
     } else {
-      // 2. PROVA REJOIN
+      // 3. REJOIN (solo se NON nuova room)
       await ctrl.autoRejoinRoomIfNeeded();
 
       final currentRoomId = ref.read(lobbyControllerProvider).roomId;
 
       if (currentRoomId != null && currentRoomId.isNotEmpty) {
-        // già collegato → assicura watcher
         await ctrl.joinFromLink(currentRoomId);
       } else {
-        // 3. NUOVA SESSIONE LOCALE
+        // 4. fallback
         await ctrl.initAsHost();
       }
     }
 
     final players = ref.read(lobbyControllerProvider).players;
-
-    ref.read(playerOrderControllerProvider.notifier)
-        .syncFromLobby(players);
+    ref.read(playerOrderControllerProvider.notifier).syncFromLobby(players);
   }
-
 
   String? _currentAuthUid() {
     return FirebaseAuth.instance.currentUser?.uid;
@@ -141,12 +147,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     if (player.ownerUid == hostId) return 'proxy admin';
 
     return 'nessun accesso';
-  }
-  
-  bool _isCurrentAuthHost() {
-    final authUid = _currentAuthUid();
-    final hostId = _hostId();
-    return authUid != null && authUid == hostId;
   }
 
   bool _isCurrentAuthAlreadyPlayer(LobbyViewModel vm) {
@@ -324,9 +324,29 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
 
   Future<void> _startMatch(LobbyViewModel vm) async {
     final ctrl = ref.read(lobbyControllerProvider.notifier);
-    await ctrl.startMatch();
-  }
+    final match = await ctrl.startMatch();
 
+    if (match == null) {
+      _showMessage('Impossibile avviare la partita');
+      return;
+    }
+
+    if (!mounted) return;
+
+    // 🔥 LOCALE → NAVIGAZIONE DIRETTA
+    if (vm.roomId == null) {
+      await Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MatchShellPage(
+            match: match,
+            isOnline: false,
+            canPlay: true,
+          ),
+        ),
+      );
+    }
+  }
 
   Future<void> _removePlayer(LobbyPlayerVm player) async {
     final lobbyCtrl = ref.read(lobbyControllerProvider.notifier);
@@ -334,10 +354,12 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
   }
 
   Future<void> _closeRoomAndGoHome() async {
+    if (_isLeavingLobby) return;
     _isLeavingLobby = true;
-    final ctrl = ref.read(lobbyControllerProvider.notifier);
 
+    final ctrl = ref.read(lobbyControllerProvider.notifier);
     final vm = ref.read(lobbyControllerProvider);
+
     if (_canControlAsAdmin(vm)) {
       await ctrl.closeRoom();
     } else {
@@ -345,8 +367,9 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     }
 
     if (!mounted) return;
-
-    Navigator.of(context).pushAndRemoveUntil(
+    _openingMatch = false;
+    _openingResult = false;
+    await Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
         builder: (_) => const HomeScreen(
           initialSection: AppSection.gioca,
@@ -356,13 +379,33 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     );
   }
 
+
   Future<void> _openLiveMatchIfNeeded(LobbyViewModel next, bool canPlayCurrentMatch) async {
-    if (!mounted || _openingMatch) return;
+    if (!mounted || _openingMatch || _isLeavingLobby) return;
     if (next.roomState != RoomState.inMatch) return;
     if (next.loading == OverlayState.error) return;
+    if (next.currentMatchId == null || next.currentMatchId!.isEmpty) return;
 
     _openingMatch = true;
-    final match = await ref.read(lobbyControllerProvider.notifier).loadCurrentMatch();
+    Match? match;
+
+    if (next.roomId == null) {
+      // locale → match già in memoria
+      match = ref.read(matchControllerProvider)?.match;
+    } else {
+      match = await ref.read(lobbyControllerProvider.notifier).loadCurrentMatch();
+    }
+
+    if (!mounted) {
+      _openingMatch = false;
+      return;
+    }
+
+    if (match == null) {
+      _showMessage('Partita non disponibile');
+      _openingMatch = false;
+      return;
+    }
 
     await Navigator.pushReplacement(
       context,
@@ -391,11 +434,20 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
 
   Future<void> _exitIfRoomClosed(LobbyViewModel next) async {
     if (!mounted || _isLeavingLobby) return;
-    if (next.roomState != RoomState.closed || next.loading != OverlayState.error) return;
+    if (next.roomState != RoomState.closed) return;
+
     _isLeavingLobby = true;
-    await Future<void>.delayed(const Duration(milliseconds: 300));
+
     if (!mounted) return;
-    await _closeRoomAndGoHome();
+
+    await Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => const HomeScreen(
+          initialSection: AppSection.gioca,
+        ),
+      ),
+          (route) => false,
+    );
   }
 
   void _showMessage(String text) {
@@ -426,7 +478,7 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     final authEmail = _currentAuthEmail();
     final authName = _currentAuthName();
     final hostId = _hostId();
-    final isHost = _isCurrentAuthHost();
+    final hasAdminControl = ctrl.canCurrentAuthControlAsAdmin;
     final isPlayer = _isCurrentAuthAlreadyPlayer(vm);
     final isSpectator = ctrl.isSpectator;
     final isFull = vm.players.length >= 8;
@@ -436,6 +488,8 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
       _openResultIfNeeded(next);
       _exitIfRoomClosed(next);
     });
+
+    final canStartMatch = vm.canStart && hasAdminControl;
 
     return WillPopScope(
       onWillPop: () async {
@@ -471,7 +525,7 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
                         _InfoRow(label: 'Auth email app', value: authEmail ?? '-'),
                         _InfoRow(label: 'Auth nome app', value: authName ?? '-'),
                         _InfoRow(label: 'Admin room', value: hostId.isEmpty ? '-' : hostId),
-                        _InfoRow(label: 'Auth è admin', value: isHost ? 'si' : 'no'),
+                        _InfoRow(label: 'Auth controlla admin', value: hasAdminControl ? 'si' : 'no'),
                         _InfoRow(label: 'Room state', value: vm.roomState.name),
                         _InfoRow(label: 'Online', value: vm.isOnline ? 'online' : 'offline'),
                         _InfoRow(label: 'Ruolo attuale', value: isSpectator ? 'Watcher (Sola lettura)' : (isPlayer ? 'Giocatore' : 'Visitatore')),
@@ -509,7 +563,8 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
                           label: const Text('Invita a guardare'),
                         ),
                         FilledButton.icon(
-                          onPressed: vm.canStart && _canControlAsAdmin(vm) ? () => _startMatch(vm) : null,                          icon: const Icon(Icons.play_arrow),
+                          onPressed: canStartMatch ? () => _startMatch(vm) : null,
+                          icon: const Icon(Icons.play_arrow),
                           label: const Text('Inizia'),
                         ),
                       ],
@@ -836,7 +891,6 @@ class _PlayerTile extends ConsumerWidget {
             final lobbyCtrl =
             ref.read(lobbyControllerProvider.notifier);
 
-            final isHost = lobbyCtrl.isCurrentUserHost;
             final authUid = lobbyCtrl.authUid;
 
             final vm = ref.read(lobbyControllerProvider);

@@ -55,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => const RoomLobbyShellPage(),
+            builder: (_) => const RoomLobbyShellPage(forceNewRoom: true),
           ),
         );
       }
