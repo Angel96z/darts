@@ -14,6 +14,7 @@ import '../../../../../core/widgets/blocking_overlay.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/entities/room.dart';
 import '../../match/pages/match_shell_page.dart';
+import '../../result/pages/result_shell_page.dart';
 import '../../shared/view_models/connection_badge_vm.dart';
 import '../../shared/widgets/connection_badge.dart';
 import '../controllers/lobby_controller.dart';
@@ -32,6 +33,8 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
   final TextEditingController _firebaseGuestPasswordCtrl = TextEditingController();
 
   bool _openingMatch = false;
+  bool _openingResult = false;
+  bool _isLeavingLobby = false;
   bool _bootstrapped = false;
   bool _authLoading = false;
 
@@ -59,9 +62,12 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
 
     // 1. DEEP LINK PRIORITARIO
     final linkCoordinator = ref.read(appLinkCoordinatorProvider.notifier);
+    final pendingWatchRoomId = await linkCoordinator.consumeWatchRoomId();
     final pendingRoomId = await linkCoordinator.consumeRoomId();
 
-    if (pendingRoomId != null && pendingRoomId.isNotEmpty) {
+    if (pendingWatchRoomId != null && pendingWatchRoomId.isNotEmpty) {
+      await ctrl.joinAsSpectator(pendingWatchRoomId);
+    } else if (pendingRoomId != null && pendingRoomId.isNotEmpty) {
       await ctrl.joinFromLink(pendingRoomId);
     } else {
       // 2. PROVA REJOIN
@@ -318,22 +324,7 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
 
   Future<void> _startMatch(LobbyViewModel vm) async {
     final ctrl = ref.read(lobbyControllerProvider.notifier);
-
     await ctrl.startMatch();
-
-    final next = ref.read(lobbyControllerProvider);
-    if (!mounted || next.roomState != RoomState.inMatch) return;
-
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => MatchShellPage(
-          match: null,
-          isOnline: next.isOnline,
-          canPlay: true,
-        ),
-      ),
-    );
   }
 
 
@@ -343,6 +334,7 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
   }
 
   Future<void> _closeRoomAndGoHome() async {
+    _isLeavingLobby = true;
     final ctrl = ref.read(lobbyControllerProvider.notifier);
 
     final vm = ref.read(lobbyControllerProvider);
@@ -364,20 +356,19 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     );
   }
 
-  Future<void> _openLiveMatchIfNeeded(
-      LobbyViewModel next,
-      bool canPlayCurrentMatch,
-      ) async {
+  Future<void> _openLiveMatchIfNeeded(LobbyViewModel next, bool canPlayCurrentMatch) async {
     if (!mounted || _openingMatch) return;
     if (next.roomState != RoomState.inMatch) return;
+    if (next.loading == OverlayState.error) return;
 
     _openingMatch = true;
+    final match = await ref.read(lobbyControllerProvider.notifier).loadCurrentMatch();
 
-    await Navigator.push(
+    await Navigator.pushReplacement(
       context,
       MaterialPageRoute(
         builder: (_) => MatchShellPage(
-          match: null,
+          match: match,
           isOnline: next.isOnline,
           canPlay: canPlayCurrentMatch,
         ),
@@ -385,6 +376,26 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     );
 
     _openingMatch = false;
+  }
+
+  Future<void> _openResultIfNeeded(LobbyViewModel next) async {
+    if (!mounted || _openingResult) return;
+    if (next.roomState != RoomState.finished) return;
+    _openingResult = true;
+    await Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const ResultShellPage()),
+    );
+    _openingResult = false;
+  }
+
+  Future<void> _exitIfRoomClosed(LobbyViewModel next) async {
+    if (!mounted || _isLeavingLobby) return;
+    if (next.roomState != RoomState.closed || next.loading != OverlayState.error) return;
+    _isLeavingLobby = true;
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+    await _closeRoomAndGoHome();
   }
 
   void _showMessage(String text) {
@@ -422,6 +433,8 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     final canPlayCurrentMatch = isPlayer && !ctrl.isSpectator;
     ref.listen<LobbyViewModel>(lobbyControllerProvider, (prev, next) {
       _openLiveMatchIfNeeded(next, canPlayCurrentMatch);
+      _openResultIfNeeded(next);
+      _exitIfRoomClosed(next);
     });
 
     return WillPopScope(
