@@ -4,6 +4,7 @@ import 'package:app_links/app_links.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _pendingRoomIdKey = 'pending_room_id';
+const _pendingWatchRoomIdKey = 'pending_watch_room_id';
 
 class AppLinkState {
   final String? pendingRoomId;
@@ -14,10 +15,12 @@ class AppLinkState {
   AppLinkState copyWith({
     String? pendingRoomId,
     String? pendingWatchRoomId,
+    bool clearRoomId = false,
+    bool clearWatchRoomId = false,
   }) {
     return AppLinkState(
-      pendingRoomId: pendingRoomId ?? this.pendingRoomId,
-      pendingWatchRoomId: pendingWatchRoomId ?? this.pendingWatchRoomId,
+      pendingRoomId: clearRoomId ? null : (pendingRoomId ?? this.pendingRoomId),
+      pendingWatchRoomId: clearWatchRoomId ? null : (pendingWatchRoomId ?? this.pendingWatchRoomId),
     );
   }
 }
@@ -56,6 +59,13 @@ class AppLinkCoordinator extends StateNotifier<AppLinkState> {
       final saved = prefs.getString(_pendingRoomIdKey);
       if (saved != null && saved.isNotEmpty) {
         state = AppLinkState(pendingRoomId: saved.trim());
+      }
+    }
+
+    if (state.pendingWatchRoomId == null || state.pendingWatchRoomId!.isEmpty) {
+      final savedWatch = prefs.getString(_pendingWatchRoomIdKey);
+      if (savedWatch != null && savedWatch.isNotEmpty) {
+        state = state.copyWith(pendingWatchRoomId: savedWatch.trim());
       }
     }
 
@@ -103,6 +113,7 @@ class AppLinkCoordinator extends StateNotifier<AppLinkState> {
         pendingWatchRoomId: watchId,
         pendingRoomId: null,
       );
+      await prefs.setString(_pendingWatchRoomIdKey, watchId);
     }
   }
 
@@ -119,6 +130,16 @@ class AppLinkCoordinator extends StateNotifier<AppLinkState> {
 
     return id;
 
+  }
+
+  Future<String?> consumeWatchRoomId() async {
+    final id = state.pendingWatchRoomId;
+    if (id == null || id.isEmpty) return null;
+
+    state = state.copyWith(clearWatchRoomId: true);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_pendingWatchRoomIdKey);
+    return id;
   }
 
   @override

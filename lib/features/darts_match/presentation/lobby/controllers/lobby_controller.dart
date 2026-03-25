@@ -6,7 +6,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../core/widgets/blocking_overlay.dart';
 import '../../../application/usecases/providers.dart';
-import '../../../application/usecases/start_match_usecase.dart';
 import '../../../domain/entities/identity.dart';
 import '../../../domain/entities/match.dart';
 import '../../../domain/entities/room.dart';
@@ -84,6 +83,7 @@ class LobbyViewModel {
     required this.inviteLink,
     required this.watchLink,
     required this.loading,
+    required this.currentMatchId,
   });
 
   final RoomState roomState;
@@ -95,6 +95,7 @@ class LobbyViewModel {
   final String? inviteLink;
   final String? watchLink;
   final OverlayState? loading;
+  final String? currentMatchId;
 
   bool get canStart => players.isNotEmpty;
 
@@ -108,6 +109,7 @@ class LobbyViewModel {
     String? inviteLink,
     String? watchLink,
     OverlayState? loading,
+    String? currentMatchId,
     bool clearLoading = false,
   }) {
     return LobbyViewModel(
@@ -120,6 +122,7 @@ class LobbyViewModel {
       inviteLink: inviteLink ?? this.inviteLink,
       watchLink: watchLink ?? this.watchLink,
       loading: clearLoading ? null : (loading ?? this.loading),
+      currentMatchId: currentMatchId ?? this.currentMatchId,
     );
   }
 }
@@ -195,6 +198,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
   }
 
   Timer? _connectionTimer;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _roomSub;
   LobbyController(this._ref) : super(_initial()) {
     _startConnectionMonitoring();
   }
@@ -218,6 +222,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       inviteLink: null,
       watchLink: null,
       loading: null,
+      currentMatchId: null,
     );
   }
 
@@ -459,7 +464,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
         'players': _playersToMap(playersForDb),
         'teamSize': orderState.teamSize,
         'teamsEnabled': orderState.teamsEnabled,
-        'status': 'inRoom',
+        'status': 'waiting',
         'config': {
           'variant': state.config.variant.name,
           'inMode': state.config.inMode.name,
@@ -601,25 +606,48 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
 
   Future<Match?> startMatch() async {
-    if (!state.canStart) return null;
-
     final roomId = state.roomId;
-
-    state = state.copyWith(roomState: RoomState.inMatch);
-
-    if (roomId == null) {
+    if (roomId == null || state.players.isEmpty) return null;
+    if (!isCurrentUserHost) return null;
+    if (state.roomState == RoomState.closed || state.roomState == RoomState.inMatch) {
       return null;
     }
 
+    final roomRef = FirebaseFirestore.instance.collection('rooms').doc(roomId);
     final matchId = FirebaseFirestore.instance.collection('matches').doc().id;
+    final match = _buildInitialMatch(roomId: roomId, matchId: matchId);
 
-    await FirebaseFirestore.instance.collection('rooms').doc(roomId).set({
-      'status': 'inGame',
-      'currentMatchId': matchId,
-      'startedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      final snap = await tx.get(roomRef);
+      if (!snap.exists) {
+        throw StateError('ROOM_NOT_FOUND');
+      }
+      final status = (snap.data()?['status'] as String?) ?? 'waiting';
+      if (status == 'inMatch') {
+        throw StateError('MATCH_ALREADY_RUNNING');
+      }
+      if (status == 'closed' || status == 'terminated') {
+        throw StateError('ROOM_CLOSED');
+      }
+      tx.set(
+        roomRef,
+        {
+          'status': 'inMatch',
+          'currentMatchId': matchId,
+          'startedAt': FieldValue.serverTimestamp(),
+          'finishedAt': FieldValue.delete(),
+        },
+        SetOptions(merge: true),
+      );
+    });
 
-    return null;
+    await _ref.read(matchRepositoryProvider).saveMatch(match);
+    state = state.copyWith(
+      roomState: RoomState.inMatch,
+      currentMatchId: matchId,
+      clearLoading: true,
+    );
+    return match;
   }
 
 
@@ -627,11 +655,13 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
   void dispose() {
     _connectionTimer?.cancel();
     _heartbeatTimer?.cancel();
+    _roomSub?.cancel();
     super.dispose();
   }
 
   void _watchRoom(String roomId) {
-    FirebaseFirestore.instance
+    _roomSub?.cancel();
+    _roomSub = FirebaseFirestore.instance
         .collection('rooms')
         .doc(roomId)
         .snapshots()
@@ -669,16 +699,15 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       final host = data['hostId'] as String?;
       final teamSize = data['teamSize'] as int? ?? 1;
       final teamsEnabled = data['teamsEnabled'] as bool? ?? false;
-      final status = data['status'] as String? ?? 'inRoom';
+      final status = data['status'] as String? ?? 'waiting';
+      final currentMatchId = data['currentMatchId'] as String?;
 
       state = state.copyWith(
         players: players,
         isOnline: true,
-        roomState: status == 'inGame'
-            ? RoomState.inMatch
-            : status == 'terminated'
-            ? RoomState.closed
-            : RoomState.waiting,
+        currentMatchId: currentMatchId,
+        loading: null,
+        roomState: _mapRemoteStatus(status),
       );
 
       final orderCtrl = _ref.read(playerOrderControllerProvider.notifier);
@@ -695,6 +724,29 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       _hostId = host;
 
     });
+  }
+
+  RoomState _mapRemoteStatus(String status) {
+    switch (status) {
+      case 'ready':
+        return RoomState.ready;
+      case 'inMatch':
+      case 'inGame':
+        return RoomState.inMatch;
+      case 'finished':
+        return RoomState.finished;
+      case 'closed':
+      case 'terminated':
+        return RoomState.closed;
+      case 'draft':
+        return RoomState.draft;
+      case 'locked':
+        return RoomState.locked;
+      case 'waiting':
+      case 'inRoom':
+      default:
+        return RoomState.waiting;
+    }
   }
 
   String? _extractAuthenticatedUidFromPlayer(LobbyPlayerVm player) {
@@ -825,7 +877,14 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     } catch (_) {}
   }
   Future<Match?> loadCurrentMatch() async {
-    return null;
+    final roomId = state.roomId;
+    final currentMatchId = state.currentMatchId;
+    if (roomId == null || currentMatchId == null || currentMatchId.isEmpty) {
+      return null;
+    }
+    return _ref
+        .read(matchRepositoryProvider)
+        .getMatch(RoomId(roomId), MatchId(currentMatchId));
   }
 
   Future<void> reopenRoomFromResult() async {
@@ -836,11 +895,12 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     }
 
     await FirebaseFirestore.instance.collection('rooms').doc(roomId).set({
-      'status': 'inRoom',
+      'status': 'waiting',
       'currentMatchId': FieldValue.delete(),
+      'finishedAt': FieldValue.delete(),
     }, SetOptions(merge: true));
 
-    state = state.copyWith(roomState: RoomState.waiting);
+    state = state.copyWith(roomState: RoomState.waiting, currentMatchId: null);
   }
 
   Future<void> markRoomTerminated() async {
@@ -851,10 +911,89 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     }
 
     await FirebaseFirestore.instance.collection('rooms').doc(roomId).set({
-      'status': 'terminated',
+      'status': 'closed',
+      'closedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
     state = state.copyWith(roomState: RoomState.closed);
+  }
+
+  Future<void> markRoomFinished() async {
+    final roomId = state.roomId;
+    if (roomId == null) return;
+    await FirebaseFirestore.instance.collection('rooms').doc(roomId).set({
+      'status': 'finished',
+      'finishedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    state = state.copyWith(roomState: RoomState.finished);
+  }
+
+  Match _buildInitialMatch({required String roomId, required String matchId}) {
+    final sortedPlayers = [...state.players]..sort((a, b) => a.order.compareTo(b.order));
+    final slots = <PlayerSlot>[];
+    final scores = <PlayerId, int>{};
+    for (final p in sortedPlayers) {
+      final pid = PlayerId(p.id);
+      slots.add(PlayerSlot(playerId: pid, order: p.order));
+      scores[pid] = _variantScore(state.config.variant);
+    }
+    final currentPlayer = slots.isNotEmpty ? slots.first.playerId : const PlayerId('');
+
+    return Match(
+      id: MatchId(matchId),
+      roomId: RoomId(roomId),
+      config: MatchConfig(
+        gameType: GameType.x01,
+        variant: state.config.variant,
+        inMode: state.config.inMode,
+        outMode: state.config.outMode,
+        matchMode: MatchMode.legsOnly,
+        legsTargetType: MatchTargetType.firstTo,
+        legsTargetValue: state.config.legs,
+        setsTargetType: null,
+        setsTargetValue: null,
+        teamMode: TeamMode.solo,
+        teamSharedScore: false,
+        finishConstraintEnabled: false,
+        undoRequiresHost: true,
+        inputSnapshot: const {},
+      ),
+      roster: MatchRoster(players: slots, teams: const []),
+      snapshot: MatchStateSnapshot(
+        matchState: MatchState.turnActive,
+        status: MatchStatus.active,
+        currentSet: 1,
+        currentLeg: 1,
+        currentTurn: 1,
+        scoreboard: Scoreboard(
+          playerScores: scores,
+          teamScores: const {},
+          currentTurnPlayerId: currentPlayer,
+        ),
+        lastTurns: const [],
+      ),
+      legs: const [],
+      sets: const [],
+      result: null,
+      createdAt: DateTime.now(),
+    );
+  }
+
+  int _variantScore(X01Variant variant) {
+    switch (variant) {
+      case X01Variant.x101:
+        return 101;
+      case X01Variant.x180:
+        return 180;
+      case X01Variant.x301:
+        return 301;
+      case X01Variant.x501:
+        return 501;
+      case X01Variant.x701:
+        return 701;
+      case X01Variant.x1001:
+        return 1001;
+    }
   }
 
 
