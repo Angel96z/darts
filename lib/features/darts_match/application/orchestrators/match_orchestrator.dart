@@ -8,14 +8,6 @@ import '../reducers/match_reducer.dart';
 import '../validators/command_validator.dart';
 
 class MatchOrchestrator {
-  InputMode matchInputMode(PlayerId playerId) {
-    final match = _currentMatchCache;
-    if (match == null) return InputMode.totalTurnInput;
-    return match.config.inputSnapshot[playerId]?.mode ?? InputMode.totalTurnInput;
-  }
-
-  Match? _currentMatchCache;
-
   MatchOrchestrator({
     required RoomRepository roomRepository,
     required MatchRepository matchRepository,
@@ -37,17 +29,31 @@ class MatchOrchestrator {
   final MatchReducer _reducer;
   final GameEngine _engine;
 
+  Match? _currentMatchCache;
+
+  InputMode matchInputMode(PlayerId playerId) {
+    final match = _currentMatchCache;
+    if (match == null) return InputMode.totalTurnInput;
+    return match.config.inputSnapshot[playerId]?.mode ?? InputMode.totalTurnInput;
+  }
+
   Future<void> handleCommand(MatchCommand command) async {
     final room = await _roomRepository.getRoom(command.roomId);
     if (room == null) return;
 
-    final match = command.matchId == null ? null : await _matchRepository.getMatch(command.roomId, command.matchId!);
+    final match =
+    command.matchId == null ? null : await _matchRepository.getMatch(command.roomId, command.matchId!);
+
     _currentMatchCache = match;
-    if (!_validator.validate(command: command, room: room, match: match)) return;
+
+    if (!_validator.validate(command: command, room: room, match: match)) {
+      return;
+    }
 
     if (command is SubmitTurnCommand && match != null) {
       final draft = _extractDraft(command.payload['draft']);
       final playerScore = match.snapshot.scoreboard.playerScores[draft.playerId] ?? match.config.startScore;
+
       final resolution = _engine.resolveTurn(
         match: match,
         draft: draft,
@@ -56,24 +62,51 @@ class MatchOrchestrator {
         inActivated: true,
       );
 
-      final MatchEvent event;
-      if (resolution.isBust) {
-        event = TurnBustEvent(
-          eventId: EventId(command.commandId.value),
-          roomId: command.roomId,
-          matchId: command.matchId!,
-          createdAt: DateTime.now(),
-          payload: {'nextScore': playerScore, 'reason': resolution.reason},
-        );
-      } else {
-        event = TurnCommittedEvent(
-          eventId: EventId(command.commandId.value),
-          roomId: command.roomId,
-          matchId: command.matchId!,
-          createdAt: DateTime.now(),
-          payload: {'nextScore': resolution.nextScore, 'reason': resolution.reason},
-        );
-      }
+      final payload = <String, dynamic>{
+        'playerId': draft.playerId.value,
+        'previousScore': playerScore,
+        'nextScore': resolution.nextScore,
+        'reason': resolution.reason,
+        'isBust': resolution.isBust,
+        'isCheckout': resolution.isCheckout,
+        'draft': {
+          'playerId': draft.playerId.value,
+          'legNumber': draft.legNumber,
+          'turnNumber': draft.turnNumber,
+          'inputMode': draft.inputMode.name,
+          'inputs': [
+            for (final input in draft.inputs)
+              {
+                'rawValue': input.rawValue,
+                'multiplier': input.multiplier,
+              },
+          ],
+        },
+      };
+
+      final MatchEvent event = resolution.isCheckout
+          ? MatchWonEvent(
+        eventId: EventId(command.commandId.value),
+        roomId: command.roomId,
+        matchId: command.matchId!,
+        createdAt: DateTime.now(),
+        payload: payload,
+      )
+          : resolution.isBust
+          ? TurnBustEvent(
+        eventId: EventId(command.commandId.value),
+        roomId: command.roomId,
+        matchId: command.matchId!,
+        createdAt: DateTime.now(),
+        payload: payload,
+      )
+          : TurnCommittedEvent(
+        eventId: EventId(command.commandId.value),
+        roomId: command.roomId,
+        matchId: command.matchId!,
+        createdAt: DateTime.now(),
+        payload: payload,
+      );
 
       await _matchRepository.appendEvent(event);
       final updated = _reducer.apply(match, event);
@@ -86,13 +119,16 @@ class MatchOrchestrator {
 
   TurnDraft _extractDraft(Object? rawDraft) {
     if (rawDraft is TurnDraft) return rawDraft;
+
     if (rawDraft is Map) {
       final draftMap = Map<String, dynamic>.from(rawDraft);
       final inputs = List<Map<String, dynamic>>.from((draftMap['inputs'] as List?) ?? const [])
-          .map((it) => DartInput(
-                rawValue: (it['rawValue'] as num?)?.toInt() ?? 0,
-                multiplier: (it['multiplier'] as num?)?.toInt() ?? 1,
-              ))
+          .map(
+            (it) => DartInput(
+          rawValue: (it['rawValue'] as num?)?.toInt() ?? 0,
+          multiplier: (it['multiplier'] as num?)?.toInt() ?? 1,
+        ),
+      )
           .toList();
 
       return TurnDraft(
@@ -107,4 +143,19 @@ class MatchOrchestrator {
     throw StateError('Invalid turn draft payload');
   }
 
+  Map<String, dynamic> _serializeDraft(TurnDraft draft) {
+    return {
+      'playerId': draft.playerId.value,
+      'legNumber': draft.legNumber,
+      'turnNumber': draft.turnNumber,
+      'inputMode': draft.inputMode.name,
+      'inputs': [
+        for (final input in draft.inputs)
+          {
+            'rawValue': input.rawValue,
+            'multiplier': input.multiplier,
+          },
+      ],
+    };
+  }
 }

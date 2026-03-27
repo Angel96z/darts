@@ -1006,13 +1006,46 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
   Match _buildInitialMatch({required String roomId, required String matchId}) {
     final sortedPlayers = [...state.players]..sort((a, b) => a.order.compareTo(b.order));
+    final orderState = _ref.read(playerOrderControllerProvider);
+
     final slots = <PlayerSlot>[];
     final scores = <PlayerId, int>{};
+
     for (final p in sortedPlayers) {
       final pid = PlayerId(p.id);
-      slots.add(PlayerSlot(playerId: pid, order: p.order));
+      final teamId = p.teamId == null ? null : TeamId(p.teamId!);
+
+      slots.add(
+        PlayerSlot(
+          playerId: pid,
+          order: p.order,
+          teamId: teamId,
+          deviceId: p.ownerUid,
+        ),
+      );
+
       scores[pid] = _variantScore(state.config.variant);
     }
+
+    final teamsMap = <String, List<PlayerId>>{};
+    if (orderState.teamsEnabled) {
+      for (final p in sortedPlayers) {
+        if (p.teamId == null) continue;
+        teamsMap.putIfAbsent(p.teamId!, () => <PlayerId>[]).add(PlayerId(p.id));
+      }
+    }
+
+    final teams = teamsMap.entries
+        .map(
+          (entry) => Team(
+        id: TeamId(entry.key),
+        name: entry.key,
+        memberIds: entry.value,
+        sharedScore: false,
+      ),
+    )
+        .toList();
+
     final currentPlayer = slots.isNotEmpty ? slots.first.playerId : const PlayerId('');
 
     return Match(
@@ -1023,18 +1056,24 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
         variant: state.config.variant,
         inMode: state.config.inMode,
         outMode: state.config.outMode,
-        matchMode: MatchMode.legsOnly,
+        matchMode: state.config.sets > 1 ? MatchMode.setsAndLegs : MatchMode.legsOnly,
         legsTargetType: MatchTargetType.firstTo,
         legsTargetValue: state.config.legs,
-        setsTargetType: null,
-        setsTargetValue: null,
-        teamMode: TeamMode.solo,
+        setsTargetType: state.config.sets > 1 ? MatchTargetType.firstTo : null,
+        setsTargetValue: state.config.sets > 1 ? state.config.sets : null,
+        teamMode: orderState.teamsEnabled ? TeamMode.teams : TeamMode.solo,
         teamSharedScore: false,
         finishConstraintEnabled: false,
         undoRequiresHost: true,
-        inputSnapshot: const {},
+        inputSnapshot: {
+          for (final slot in slots)
+            slot.playerId: const InputModeSnapshot(mode: InputMode.totalTurnInput),
+        },
       ),
-      roster: MatchRoster(players: slots, teams: const []),
+      roster: MatchRoster(
+        players: slots,
+        teams: teams,
+      ),
       snapshot: MatchStateSnapshot(
         matchState: MatchState.turnActive,
         status: MatchStatus.active,
@@ -1043,7 +1082,9 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
         currentTurn: 1,
         scoreboard: Scoreboard(
           playerScores: scores,
-          teamScores: const {},
+          teamScores: {
+            for (final team in teams) team.id: _variantScore(state.config.variant),
+          },
           currentTurnPlayerId: currentPlayer,
         ),
         lastTurns: const [],

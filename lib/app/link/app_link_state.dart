@@ -74,7 +74,12 @@ class AppLinkCoordinator extends StateNotifier<AppLinkState> {
       await _handleUri(uri);
     });
   }
+  Future<void> clearAll() async {
+    state = const AppLinkState();
 
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_pendingRoomIdKey);
+  }
   Future<void> _handleUri(Uri uri) async {
     final prefs = await SharedPreferences.getInstance();
 

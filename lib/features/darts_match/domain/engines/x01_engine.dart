@@ -30,22 +30,81 @@ class X01Engine extends GameEngine {
   }) {
     final started = _inRule.allowsStart(draft.inputs, inActivated);
     if (!started) {
-      return TurnResolution(isBust: false, isCheckout: false, nextScore: currentPlayerScore, reason: 'in_not_activated');
+      return TurnResolution(
+        isBust: false,
+        isCheckout: false,
+        nextScore: currentPlayerScore,
+        reason: 'in_not_activated',
+      );
     }
 
     final total = draft.total;
     final projected = currentPlayerScore - total;
-    final lastDart = draft.inputs.isNotEmpty ? draft.inputs.last : const DartInput(rawValue: 0, multiplier: 1);
-    final checkoutAttempt = projected == 0;
-    final validCheckout = !checkoutAttempt || _outRule.isValidCheckout(lastDart);
-    final bust = _bustRule.isBust(currentScore: currentPlayerScore, turnScore: total, validCheckout: validCheckout);
+    final lastDart = draft.inputs.isNotEmpty
+        ? draft.inputs.last
+        : const DartInput(rawValue: 0, multiplier: 1);
 
-    if (bust) {
-      return TurnResolution(isBust: true, isCheckout: false, nextScore: currentPlayerScore, reason: 'bust');
+    if (projected < 0) {
+      return TurnResolution(
+        isBust: true,
+        isCheckout: false,
+        nextScore: currentPlayerScore,
+        reason: 'bust_over_score',
+      );
     }
 
-    if (checkoutAttempt && match.config.teamMode == TeamMode.teams && draft.playerId != match.snapshot.scoreboard.currentTurnPlayerId) {
-      return TurnResolution(isBust: true, isCheckout: false, nextScore: currentPlayerScore, reason: 'invalid_turn_owner');
+    if (match.config.outMode == OutMode.doubleOut && projected == 1) {
+      return TurnResolution(
+        isBust: true,
+        isCheckout: false,
+        nextScore: currentPlayerScore,
+        reason: 'bust_on_one',
+      );
+    }
+
+// 🔥 DIFFERENZA CHIAVE: separiamo PER DART vs PER TURN
+
+    final isPerTurn = draft.inputMode == InputMode.totalTurnInput;
+
+// checkout attempt
+    final checkoutAttempt = projected == 0;
+
+// validazione checkout
+    final validCheckout = isPerTurn
+    // 👉 PER TURN: NON usare lastDart (non è affidabile)
+        ? checkoutAttempt
+    // 👉 PER DART: validazione reale
+        : (!checkoutAttempt || _outRule.isValidCheckout(lastDart));
+
+    final bust = isPerTurn
+    // 👉 PER TURN: bust solo se score sotto 0 o regole base
+        ? (projected < 0 ||
+        (match.config.outMode == OutMode.doubleOut && projected == 1))
+    // 👉 PER DART: logica completa
+        : _bustRule.isBust(
+      currentScore: currentPlayerScore,
+      turnScore: total,
+      validCheckout: validCheckout,
+    );
+
+    if (bust) {
+      return TurnResolution(
+        isBust: true,
+        isCheckout: false,
+        nextScore: currentPlayerScore,
+        reason: validCheckout ? 'bust' : 'invalid_checkout',
+      );
+    }
+
+    if (checkoutAttempt &&
+        match.config.teamMode == TeamMode.teams &&
+        draft.playerId != match.snapshot.scoreboard.currentTurnPlayerId) {
+      return TurnResolution(
+        isBust: true,
+        isCheckout: false,
+        nextScore: currentPlayerScore,
+        reason: 'invalid_turn_owner',
+      );
     }
 
     return TurnResolution(

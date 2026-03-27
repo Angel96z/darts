@@ -95,7 +95,16 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
 
     final players = ref.read(lobbyControllerProvider).players;
     ref.read(playerOrderControllerProvider.notifier).syncFromLobby(players);
+
+    final currentVm = ref.read(lobbyControllerProvider);
+    final canPlayCurrentMatch =
+        _isCurrentAuthAlreadyPlayer(currentVm) && !ctrl.isSpectator;
+
+    await _openLiveMatchIfNeeded(currentVm, canPlayCurrentMatch);
+    await _openResultIfNeeded(currentVm);
+    await _exitIfRoomClosed(currentVm);
   }
+
 
   String? _currentAuthUid() {
     return FirebaseAuth.instance.currentUser?.uid;
@@ -333,20 +342,20 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
 
     if (!mounted) return;
 
-    // 🔥 LOCALE → NAVIGAZIONE DIRETTA
-    if (vm.roomId == null) {
-      await Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => MatchShellPage(
-            match: match,
-            isOnline: false,
-            canPlay: true,
-          ),
+    final isOnlineMatch = vm.roomId != null;
+
+    await Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MatchShellPage(
+          match: match,
+          isOnline: isOnlineMatch,
+          canPlay: true,
         ),
-      );
-    }
+      ),
+    );
   }
+
 
   Future<void> _removePlayer(LobbyPlayerVm player) async {
     final lobbyCtrl = ref.read(lobbyControllerProvider.notifier);
@@ -754,7 +763,7 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
                       ? 'Room chiusa o non disponibile'
                       : 'Caricamento...',
                   primaryActionLabel: vm.loading == OverlayState.error ? 'OK' : null,
-                  onPrimaryAction: vm.loading == OverlayState.error ? _closeRoomAndGoHome : null,
+                  onPrimaryAction: vm.loading == OverlayState.error ? _hardResetAndRestart : null,
                 ),
               ),
             if (_authLoading)
@@ -769,8 +778,37 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
       ),
     );
   }
-}
+  Future<void> _hardResetAndRestart() async {
+    if (_isLeavingLobby) return;
+    _isLeavingLobby = true;
 
+    final lobbyCtrl = ref.read(lobbyControllerProvider.notifier);
+    final linkCtrl = ref.read(appLinkCoordinatorProvider.notifier);
+
+    try {
+      // 1. lascia qualsiasi room
+      await lobbyCtrl.leaveRoom().catchError((_) {});
+
+      // 2. reset stato lobby
+      await lobbyCtrl.resetForNewRoom();
+
+      // 3. pulisci deep link pendenti
+      await linkCtrl.clearAll();
+
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    // 4. riparti pulito
+    await Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => const RoomLobbyShellPage(forceNewRoom: true),
+      ),
+          (route) => false,
+    );
+  }
+
+}
 class _SectionCard extends StatelessWidget {
   const _SectionCard({
     required this.title,
