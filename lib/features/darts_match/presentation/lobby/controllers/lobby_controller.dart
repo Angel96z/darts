@@ -523,6 +523,14 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
         await FirebaseFirestore.instance
             .collection('rooms')
             .doc(roomId)
+            .set({
+          'status': 'closed',
+          'closedAt': FieldValue.serverTimestamp(),
+          'currentMatchId': FieldValue.delete(),
+        }, SetOptions(merge: true));
+        await FirebaseFirestore.instance
+            .collection('rooms')
+            .doc(roomId)
             .delete();
       } catch (_) {}
     }
@@ -534,28 +542,49 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
   Future<void> leaveRoom() async {
     final uid = authUid;
     if (uid == null) return;
+    final roomId = state.roomId;
+    final isHostLeaving = _hostId == uid;
 
     final idsToRemove = state.players
         .where((p) => p.ownerUid == uid || p.id == uid)
         .map((p) => p.id)
         .toList();
 
+    if (roomId == null) {
+      for (final id in idsToRemove) {
+        await _ref.read(playerOrderControllerProvider.notifier).removePlayerById(id);
+      }
+      state = state.copyWith(players: _ref.read(playerOrderControllerProvider).ordered);
+      return;
+    }
+
+    final roomRef = FirebaseFirestore.instance.collection('rooms').doc(roomId);
+    final batch = FirebaseFirestore.instance.batch();
+
     for (final id in idsToRemove) {
       final player = state.players.firstWhere((p) => p.id == id);
-
       final playerUid = _extractAuthenticatedUidFromPlayer(player);
       if (playerUid != null && playerUid.isNotEmpty) {
-        try {
-          await FirebaseFirestore.instance
-              .collection('user_rooms')
-              .doc(playerUid)
-              .delete();
-        } catch (_) {}
+        batch.delete(FirebaseFirestore.instance.collection('user_rooms').doc(playerUid));
       }
+      batch.update(roomRef, {'players.$id': FieldValue.delete()});
+    }
 
-      await _ref
-          .read(playerOrderControllerProvider.notifier)
-          .removePlayerById(id);
+    if (isHostLeaving) {
+      batch.set(roomRef, {
+        'status': 'closed',
+        'closedAt': FieldValue.serverTimestamp(),
+        'currentMatchId': FieldValue.delete(),
+      }, SetOptions(merge: true));
+    }
+
+    await batch.commit();
+
+    if (isHostLeaving) {
+      _roomSub?.cancel();
+      _heartbeatTimer?.cancel();
+      _hostId = null;
+      state = _initial();
     }
   }
 
@@ -889,6 +918,11 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
   Future<void> joinFromLink(String roomId) async {
     if (roomId.isEmpty) return;
+    final roomSnap = await FirebaseFirestore.instance.collection('rooms').doc(roomId).get();
+    if (!roomSnap.exists) {
+      state = state.copyWith(loading: OverlayState.error);
+      return;
+    }
     _hostId = null;
     _isSpectator = false;
     state = state.copyWith(roomId: roomId, isOnline: true);
@@ -898,6 +932,11 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
   Future<void> joinAsSpectator(String roomId) async {
     if (roomId.isEmpty) return;
+    final roomSnap = await FirebaseFirestore.instance.collection('rooms').doc(roomId).get();
+    if (!roomSnap.exists) {
+      state = state.copyWith(loading: OverlayState.error);
+      return;
+    }
     _hostId = null;
     _isSpectator = true;
     state = state.copyWith(roomId: roomId, isOnline: true);
@@ -939,6 +978,12 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
       final roomId = data['roomId'] as String?;
       if (roomId == null || roomId.isEmpty) return;
+
+      final roomDoc = await FirebaseFirestore.instance.collection('rooms').doc(roomId).get();
+      if (!roomDoc.exists) {
+        await FirebaseFirestore.instance.collection('user_rooms').doc(uid).delete();
+        return;
+      }
 
       _hostId = null;
       _isSpectator = false;
