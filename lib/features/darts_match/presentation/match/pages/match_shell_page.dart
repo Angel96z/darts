@@ -10,6 +10,7 @@ import '../../../domain/entities/room.dart';
 import '../../lobby/controllers/lobby_controller.dart';
 import '../../lobby/pages/room_lobby_shell_page.dart';
 import '../../result/pages/result_shell_page.dart';
+import '../../result/controllers/result_controller.dart';
 import '../../shared/view_models/connection_badge_vm.dart';
 import '../../shared/widgets/connection_badge.dart';
 import '../controllers/match_controller.dart';
@@ -34,6 +35,7 @@ class MatchShellPage extends ConsumerStatefulWidget {
 class _MatchShellPageState extends ConsumerState<MatchShellPage> {
   bool _moving = false;
   bool _finishingSent = false;
+  bool _resultSynced = false;
 
   @override
   void initState() {
@@ -113,7 +115,7 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
 
         // pulisci riferimento nella room
         await roomRef.update({
-          'matchId': FieldValue.delete(),
+          'currentMatchId': FieldValue.delete(),
           'status': 'waiting',
         }).catchError((_) {});
       }
@@ -204,6 +206,15 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
         lobbyCtrl.canCurrentAuthControlAsAdmin) {
       _finishingSent = true;
       Future.microtask(() => lobbyCtrl.markRoomFinished());
+    }
+
+    if (!_resultSynced &&
+        matchVm != null &&
+        matchVm.match.snapshot.status == MatchStatus.completed) {
+      _resultSynced = true;
+      Future.microtask(() {
+        ref.read(resultControllerProvider.notifier).setFromMatch(matchVm.match);
+      });
     }
 
     return WillPopScope(
