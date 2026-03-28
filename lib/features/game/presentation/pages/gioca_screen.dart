@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../darts_match/presentation/lobby/pages/room_lobby_shell_page.dart';
+import '../../../room_v2/room_lobby_v2_page.dart';
 
 class GiocaScreen extends StatelessWidget {
   /// Funzione: descrive in modo semplice questo blocco di logica.
@@ -40,7 +41,7 @@ class GiocaScreen extends StatelessWidget {
                 context,
                 /// Funzione: descrive in modo semplice questo blocco di logica.
                 MaterialPageRoute(
-                  builder: (_) => const RoomLobbyShellPage(),
+                  builder: (_) => const RoomLobbyV2Page(),
                 ),
               );
             },
