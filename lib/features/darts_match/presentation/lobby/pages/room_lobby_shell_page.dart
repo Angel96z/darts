@@ -1,5 +1,3 @@
-/// File: room_lobby_shell_page.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
-
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -25,7 +23,6 @@ import '../controllers/lobby_controller.dart';
 import '../controllers/player_order_controller.dart';
 
 class RoomLobbyShellPage extends ConsumerStatefulWidget {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const RoomLobbyShellPage({
     super.key,
     this.forceNewRoom = false,
@@ -34,7 +31,6 @@ class RoomLobbyShellPage extends ConsumerStatefulWidget {
   final bool forceNewRoom;
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   ConsumerState<RoomLobbyShellPage> createState() => _RoomLobbyShellPageState();
 }
 
@@ -50,7 +46,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
   bool _authLoading = false;
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -59,7 +54,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void dispose() {
     _localGuestNameCtrl.dispose();
     _firebaseGuestEmailCtrl.dispose();
@@ -67,7 +61,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     super.dispose();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _bootstrapEntryPoint() async {
     if (_bootstrapped || !mounted) return;
     _bootstrapped = true;
@@ -157,28 +150,23 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
   }
 
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   String? _currentAuthUid() {
     return FirebaseAuth.instance.currentUser?.uid;
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   String? _currentAuthEmail() {
     return FirebaseAuth.instance.currentUser?.email;
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   String? _currentAuthName() {
     return FirebaseAuth.instance.currentUser?.displayName;
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   String _hostId() {
     final hostId = ref.read(lobbyControllerProvider.notifier).hostId;
     return hostId ?? '';
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   bool _canControlAsAdmin(LobbyViewModel vm) {
     final authUid = _currentAuthUid();
     if (authUid == null) return false;
@@ -192,7 +180,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
         (p.id == hostId || p.ownerUid == hostId));
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   String _adminControlLabel(LobbyViewModel vm) {
     final authUid = _currentAuthUid();
     if (authUid == null) return 'nessun accesso';
@@ -215,7 +202,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     return 'nessun accesso';
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   bool _isCurrentAuthAlreadyPlayer(LobbyViewModel vm) {
     final authUid = _currentAuthUid();
     if (authUid == null) return false;
@@ -228,7 +214,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
         p.id == 'guest_ext_$authUid'
     );
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   String _playerTypeLabel(LobbyPlayerVm player, String hostId) {
     if (player.id == hostId) {
       return 'admin room';
@@ -242,13 +227,11 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     return 'utente registrato';
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _participate() async {
     final ctrl = ref.read(lobbyControllerProvider.notifier);
     await ctrl.participateInRoom();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _addLocalGuest() async {
     final ctrl = ref.read(lobbyControllerProvider.notifier);
     final orderCtrl = ref.read(playerOrderControllerProvider.notifier);
@@ -266,7 +249,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     _localGuestNameCtrl.clear();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _addFirebaseGuest({required bool createAccount}) async {
     final email = _firebaseGuestEmailCtrl.text.trim();
     final password = _firebaseGuestPasswordCtrl.text.trim();
@@ -276,7 +258,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
       return;
     }
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     setState(() {
       _authLoading = true;
     });
@@ -312,7 +293,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
       _showMessage(_mapFirebaseRestError('$e'));
     } finally {
       if (mounted) {
-        /// Funzione: descrive in modo semplice questo blocco di logica.
         setState(() {
           _authLoading = false;
         });
@@ -351,7 +331,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     return json;
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   String _buildGuestNameFromEmail(String email) {
     final normalized = email.trim();
     if (normalized.isEmpty) return 'Utente registrato';
@@ -360,7 +339,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     return name;
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   String _mapFirebaseRestError(String raw) {
     if (raw.contains('EMAIL_EXISTS')) return 'Email già registrata';
     if (raw.contains('EMAIL_NOT_FOUND')) return 'Email non trovata';
@@ -371,7 +349,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     return 'Operazione Firebase fallita';
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _copyInviteLink() async {
     final ctrl = ref.read(lobbyControllerProvider.notifier);
     await ctrl.invite();
@@ -385,7 +362,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     _showMessage('Link invito copiato');
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _copyWatchLink() async {
     final ctrl = ref.read(lobbyControllerProvider.notifier);
     await ctrl.invite();
@@ -399,7 +375,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     _showMessage('Link watch copiato');
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _startMatch(LobbyViewModel vm) async {
     final ctrl = ref.read(lobbyControllerProvider.notifier);
     final match = await ctrl.startMatch();
@@ -415,7 +390,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
 
     await Navigator.pushReplacement(
       context,
-      /// Funzione: descrive in modo semplice questo blocco di logica.
       MaterialPageRoute(
         builder: (_) => MatchShellPage(
           match: match,
@@ -427,13 +401,11 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
   }
 
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _removePlayer(LobbyPlayerVm player) async {
     final lobbyCtrl = ref.read(lobbyControllerProvider.notifier);
     await lobbyCtrl.removePlayer(player.id);
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _closeRoomAndGoHome() async {
     if (_isLeavingLobby) return;
     _isLeavingLobby = true;
@@ -452,7 +424,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     _openingMatch = false;
     _openingResult = false;
     await Navigator.of(context).pushAndRemoveUntil(
-      /// Funzione: descrive in modo semplice questo blocco di logica.
       MaterialPageRoute(
         builder: (_) => const HomeScreen(
           initialSection: AppSection.gioca,
@@ -463,7 +434,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
   }
 
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _openLiveMatchIfNeeded(LobbyViewModel next, bool canPlayCurrentMatch) async {
     if (!mounted || _openingMatch || _isLeavingLobby) return;
     if (next.roomState != RoomState.inMatch) return;
@@ -493,7 +463,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
 
     await Navigator.pushReplacement(
       context,
-      /// Funzione: descrive in modo semplice questo blocco di logica.
       MaterialPageRoute(
         builder: (_) => MatchShellPage(
           match: match,
@@ -506,7 +475,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     _openingMatch = false;
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _openResultIfNeeded(LobbyViewModel next) async {
     if (!mounted || _openingResult) return;
     if (next.roomState != RoomState.finished) return;
@@ -527,14 +495,12 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
 
     await Navigator.pushReplacement(
       context,
-      /// Funzione: descrive in modo semplice questo blocco di logica.
       MaterialPageRoute(builder: (_) => const ResultShellPage()),
     );
 
     _openingResult = false;
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _exitIfRoomClosed(LobbyViewModel next) async {
     if (!mounted || _isLeavingLobby) return;
     if (next.roomState != RoomState.closed) return;
@@ -544,7 +510,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     if (!mounted) return;
 
     await Navigator.of(context).pushAndRemoveUntil(
-      /// Funzione: descrive in modo semplice questo blocco di logica.
       MaterialPageRoute(
         builder: (_) => const HomeScreen(
           initialSection: AppSection.gioca,
@@ -554,7 +519,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     );
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _showMessage(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -563,7 +527,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     final vm = ref.watch(lobbyControllerProvider);
 
@@ -597,7 +560,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
 
     final canStartMatch = vm.canStart && hasAdminControl;
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return WillPopScope(
       onWillPop: () async {
         await _closeRoomAndGoHome();
@@ -677,9 +639,7 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
                       ],
                     ),
                   ),
-                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   const SizedBox(height: 12),
-                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   _SectionCard(
                     title: 'Admin Test',
                     child: Builder(
@@ -687,11 +647,9 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
                         final canControl = _canControlAsAdmin(vm);
                         final label = _adminControlLabel(vm);
 
-                        /// Funzione: descrive in modo semplice questo blocco di logica.
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            /// Funzione: descrive in modo semplice questo blocco di logica.
                             FilledButton(
                               onPressed: canControl
                                   ? () {
@@ -752,21 +710,17 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
                             border: OutlineInputBorder(),
                           ),
                         ),
-                        /// Funzione: descrive in modo semplice questo blocco di logica.
                         const SizedBox(height: 12),
-                        /// Funzione: descrive in modo semplice questo blocco di logica.
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            /// Funzione: descrive in modo semplice questo blocco di logica.
                             FilledButton(
                               onPressed: isPlayer && !isFull && !_authLoading
                                   ? () => _addFirebaseGuest(createAccount: false)
                                   : null,
                               child: const Text('Login e aggiungi'),
                             ),
-                            /// Funzione: descrive in modo semplice questo blocco di logica.
                             OutlinedButton(
                               onPressed: isPlayer && !isFull && !_authLoading
                                   ? () => _addFirebaseGuest(createAccount: true)
@@ -784,33 +738,24 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        /// Funzione: descrive in modo semplice questo blocco di logica.
                         SelectableText('JOIN: ${vm.inviteLink ?? '-'}'),
-                        /// Funzione: descrive in modo semplice questo blocco di logica.
                         const SizedBox(height: 8),
-                        /// Funzione: descrive in modo semplice questo blocco di logica.
                         SelectableText('WATCH: ${vm.watchLink ?? '-'}'),
                       ],
                     ),
                   ),
-                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   const SizedBox(height: 12),
-                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   _SectionCard(
                     title: 'Giocatori room',
                     child: Builder(
                       builder: (context) {
                         final flat = ref.watch(playerOrderControllerProvider).ordered;
 
-                        /// Funzione: descrive in modo semplice questo blocco di logica.
                         return Column(
                           children: [
-                            /// Funzione: descrive in modo semplice questo blocco di logica.
                             Row(
                               children: [
-                                /// Funzione: descrive in modo semplice questo blocco di logica.
                                 const Text("Gioca a team"),
-                                /// Funzione: descrive in modo semplice questo blocco di logica.
                                 const SizedBox(width: 12),
                                 DropdownButton<int>(
                                   value: selectedTeamSize,
@@ -833,7 +778,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
                                 ),
                               ],
                             ),
-                            /// Funzione: descrive in modo semplice questo blocco di logica.
                             ReorderableListView(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
@@ -853,7 +797,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
                               },
                               children: [
                                 for (final player in flat)
-                                  /// Funzione: descrive in modo semplice questo blocco di logica.
                                   _PlayerTile(
                                     key: ValueKey(player.id),
                                     player: player,
@@ -895,7 +838,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
       ),
     );
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _hardResetAndRestart() async {
     if (_isLeavingLobby) return;
     _isLeavingLobby = true;
@@ -919,7 +861,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
 
     // 4. riparti pulito
     await Navigator.of(context).pushAndRemoveUntil(
-      /// Funzione: descrive in modo semplice questo blocco di logica.
       MaterialPageRoute(
         builder: (_) => const RoomLobbyShellPage(forceNewRoom: true),
       ),
@@ -929,7 +870,6 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
 
 }
 class _SectionCard extends StatelessWidget {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _SectionCard({
     required this.title,
     required this.child,
@@ -939,7 +879,6 @@ class _SectionCard extends StatelessWidget {
   final Widget child;
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
@@ -964,7 +903,6 @@ class _SectionCard extends StatelessWidget {
 }
 
 class _InfoRow extends StatelessWidget {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _InfoRow({
     required this.label,
     required this.value,
@@ -974,7 +912,6 @@ class _InfoRow extends StatelessWidget {
   final String value;
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -996,7 +933,6 @@ class _InfoRow extends StatelessWidget {
 }
 
 class _PlayerTile extends ConsumerWidget {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _PlayerTile({
     Key? key,
     required this.player,
@@ -1012,7 +948,6 @@ class _PlayerTile extends ConsumerWidget {
   final bool canRemove;
   final Future<void> Function() onRemove;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   bool _canControlAsAdminLocal(WidgetRef ref) {
     final vm = ref.read(lobbyControllerProvider);
     final authUid = FirebaseAuth.instance.currentUser?.uid;
@@ -1028,7 +963,6 @@ class _PlayerTile extends ConsumerWidget {
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context, WidgetRef ref) {
     final isAdmin = player.id == hostId;
 
@@ -1039,15 +973,10 @@ class _PlayerTile extends ConsumerWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            /// Funzione: descrive in modo semplice questo blocco di logica.
             Text('ID: ${player.id}'),
-            /// Funzione: descrive in modo semplice questo blocco di logica.
             Text('Tipo: $typeLabel'),
-            /// Funzione: descrive in modo semplice questo blocco di logica.
             Text('Creatore: ${player.ownerUid ?? '-'}'),
-            /// Funzione: descrive in modo semplice questo blocco di logica.
             Text('Connessione: ${player.connection.name}'),
-            /// Funzione: descrive in modo semplice questo blocco di logica.
             Text('Team: ${player.teamId ?? "Solo"}'),
           ],
         ),

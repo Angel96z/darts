@@ -1,15 +1,11 @@
-/// File: login_screen.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const LoginScreen({super.key});
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
@@ -26,19 +22,16 @@ class _LoginScreenState extends State<LoginScreen> {
   String error = "";
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void dispose() {
     emailController.dispose();
     passwordController.dispose();
     super.dispose();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> login() async {
 
     if (!_formKey.currentState!.validate()) return;
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     setState(() {
       loading = true;
       error = "";
@@ -85,14 +78,12 @@ class _LoginScreenState extends State<LoginScreen> {
           message = e.message ?? "Errore login";
       }
 
-      /// Funzione: descrive in modo semplice questo blocco di logica.
       setState(() {
         error = message;
       });
 
     } catch (e) {
 
-      /// Funzione: descrive in modo semplice questo blocco di logica.
       setState(() {
         error = "Errore inatteso";
       });
@@ -100,7 +91,6 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
 
       if (mounted) {
-        /// Funzione: descrive in modo semplice questo blocco di logica.
         setState(() {
           loading = false;
         });
@@ -110,7 +100,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
 
     return Scaffold(
@@ -143,10 +132,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                   ),
 
-                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   const SizedBox(height: 30),
 
-                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   TextFormField(
                     controller: emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -188,7 +175,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
 
                         onPressed: () {
-                          /// Funzione: descrive in modo semplice questo blocco di logica.
                           setState(() {
                             showPassword = !showPassword;
                           });
@@ -231,15 +217,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   const SizedBox(height: 16),
 
-                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   TextButton(
                     onPressed: () {
                       Navigator.push(
                         context,
-                        /// Funzione: descrive in modo semplice questo blocco di logica.
                         MaterialPageRoute(
                           builder: (_) => const RegisterScreen(),
                         ),

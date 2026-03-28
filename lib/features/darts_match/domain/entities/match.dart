@@ -1,5 +1,3 @@
-/// File: match.dart. Contiene regole di dominio, entità o casi d'uso per questa funzionalità.
-
 import 'package:equatable/equatable.dart';
 
 import '../policies/input_fidelity_policy.dart';
@@ -28,7 +26,6 @@ enum MatchStatus { active, paused, completed }
 enum InputMode { perDartPad, totalTurnInput }
 
 class MatchConfig extends Equatable {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const MatchConfig({
     required this.gameType,
     required this.variant,
@@ -136,7 +133,6 @@ class DartInput extends Equatable {
 }
 
 class TurnDraft extends Equatable {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TurnDraft({
     required this.playerId,
     required this.legNumber,
@@ -158,7 +154,6 @@ class TurnDraft extends Equatable {
 }
 
 class TurnResolution extends Equatable {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TurnResolution({
     required this.isBust,
     required this.isCheckout,
@@ -199,7 +194,6 @@ class Scoreboard extends Equatable {
 }
 
 class MatchStateSnapshot extends Equatable {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const MatchStateSnapshot({
     required this.matchState,
     required this.status,
@@ -223,7 +217,6 @@ class MatchStateSnapshot extends Equatable {
 }
 
 class PlayerMatchStats extends Equatable {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const PlayerMatchStats({
     required this.playerId,
     required this.average,
@@ -253,7 +246,6 @@ class TeamMatchStats extends Equatable {
 }
 
 class MatchResult extends Equatable {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const MatchResult({
     required this.winnerPlayerId,
     required this.winnerTeamId,
@@ -277,7 +269,6 @@ class MatchResult extends Equatable {
 }
 
 class Match extends Equatable {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const Match({
     required this.id,
     required this.roomId,

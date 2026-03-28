@@ -1,5 +1,3 @@
-/// File: room.dart. Contiene regole di dominio, entità o casi d'uso per questa funzionalità.
-
 import 'package:equatable/equatable.dart';
 
 import '../value_objects/identifiers.dart';
@@ -20,7 +18,6 @@ class InviteInfo extends Equatable {
 }
 
 class RoomMember extends Equatable {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const RoomMember({
     required this.playerId,
     required this.displayName,
@@ -40,7 +37,6 @@ class RoomMember extends Equatable {
 }
 
 class RoomGuest extends Equatable {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const RoomGuest({
     required this.guestId,
     required this.name,
@@ -56,7 +52,6 @@ class RoomGuest extends Equatable {
 }
 
 class RoomPresenceSummary extends Equatable {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const RoomPresenceSummary({
     required this.connected,
     required this.reconnecting,
@@ -72,7 +67,6 @@ class RoomPresenceSummary extends Equatable {
 }
 
 class Room extends Equatable {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const Room({
     required this.id,
     required this.state,

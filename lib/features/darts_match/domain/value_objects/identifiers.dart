@@ -1,5 +1,3 @@
-/// File: identifiers.dart. Contiene regole di dominio, entità o casi d'uso per questa funzionalità.
-
 import 'package:equatable/equatable.dart';
 
 class RoomId extends Equatable {

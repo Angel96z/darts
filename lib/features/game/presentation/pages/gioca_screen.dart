@@ -1,21 +1,15 @@
-/// File: gioca_screen.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
-
 import 'package:flutter/material.dart';
 
 import '../../../darts_match/presentation/lobby/pages/room_lobby_shell_page.dart';
 
 class GiocaScreen extends StatelessWidget {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const GiocaScreen({super.key});
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        /// Funzione: descrive in modo semplice questo blocco di logica.
         Card(
           child: ListTile(
             leading: const Icon(Icons.meeting_room),
@@ -38,7 +32,6 @@ class GiocaScreen extends StatelessWidget {
 
               Navigator.push(
                 context,
-                /// Funzione: descrive in modo semplice questo blocco di logica.
                 MaterialPageRoute(
                   builder: (_) => const RoomLobbyShellPage(),
                 ),

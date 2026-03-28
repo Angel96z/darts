@@ -1,13 +1,9 @@
-/// File: profile_screen.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class ProfileScreen extends StatelessWidget {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const ProfileScreen({super.key});
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _sendPasswordReset(BuildContext context, String email) async {
     try {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
@@ -32,7 +28,6 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _deleteAccount(BuildContext context) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -66,24 +61,20 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _confirmDelete(BuildContext context) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) {
-        /// Funzione: descrive in modo semplice questo blocco di logica.
         return AlertDialog(
           title: const Text("Elimina account"),
           content: const Text(
             "Vuoi eliminare definitivamente il tuo account?",
           ),
           actions: [
-            /// Funzione: descrive in modo semplice questo blocco di logica.
             TextButton(
               onPressed: () => Navigator.pop(context, false),
               child: const Text("Annulla"),
             ),
-            /// Funzione: descrive in modo semplice questo blocco di logica.
             TextButton(
               onPressed: () => Navigator.pop(context, true),
               child: const Text("Elimina"),
@@ -99,7 +90,6 @@ class ProfileScreen extends StatelessWidget {
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     final email = user?.email ?? "Nessuna email";
@@ -139,19 +129,15 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          /// Funzione: descrive in modo semplice questo blocco di logica.
           Card(
             child: Column(
               children: [
-                /// Funzione: descrive in modo semplice questo blocco di logica.
                 ListTile(
                   leading: const Icon(Icons.email),
                   title: const Text("Email"),
                   subtitle: Text(email),
                 ),
-                /// Funzione: descrive in modo semplice questo blocco di logica.
                 const Divider(height: 1),
-                /// Funzione: descrive in modo semplice questo blocco di logica.
                 ListTile(
                   leading: const Icon(Icons.lock_reset),
                   title: const Text("Cambia password"),
@@ -161,9 +147,7 @@ class ProfileScreen extends StatelessWidget {
                     }
                   },
                 ),
-                /// Funzione: descrive in modo semplice questo blocco di logica.
                 const Divider(height: 1),
-                /// Funzione: descrive in modo semplice questo blocco di logica.
                 ListTile(
                   leading: const Icon(Icons.delete_forever),
                   title: const Text("Elimina account"),

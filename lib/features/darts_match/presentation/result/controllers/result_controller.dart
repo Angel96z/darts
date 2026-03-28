@@ -1,11 +1,8 @@
-/// File: result_controller.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../domain/entities/match.dart';
 
 class ResultVm {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const ResultVm({
     required this.winnerId,
     required this.highestScore,
@@ -20,7 +17,6 @@ class ResultVm {
 class ResultController extends StateNotifier<ResultVm?> {
   ResultController() : super(null);
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void setFromMatch(Match match) {
     final winner = _winnerId(match);
     final turns = match.snapshot.lastTurns;
@@ -39,7 +35,6 @@ class ResultController extends StateNotifier<ResultVm?> {
     );
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   String _winnerId(Match match) {
     final winner = match.result?.winnerPlayerId;
     if (winner != null) {

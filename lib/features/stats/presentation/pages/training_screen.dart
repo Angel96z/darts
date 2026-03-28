@@ -1,5 +1,3 @@
-/// File: training_screen.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
-
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -28,7 +26,6 @@ class TrainingScreen extends StatefulWidget {
   final String title;
   final TrainingMode mode;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TrainingScreen({
     super.key,
     required this.title,
@@ -36,7 +33,6 @@ class TrainingScreen extends StatefulWidget {
   });
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   State<TrainingScreen> createState() => _TrainingScreenState();
 }
 
@@ -59,7 +55,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
   TrainingStats get stats => TrainingStats(throwController.throws);
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void initState() {
     super.initState();
 
@@ -85,7 +80,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
         return;
       }
 
-      /// Funzione: descrive in modo semplice questo blocco di logica.
       setState(() {
         _elapsed = _stopwatch.elapsed;
       });
@@ -93,7 +87,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void dispose() {
     _elapsedTimer?.cancel();
     _stopwatch.stop();
@@ -102,9 +95,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
     super.dispose();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildBoard() {
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return DartboardManager(
       controller: throwController,
       target: scoreController.target,
@@ -115,7 +106,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
     );
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildStatsPanel() {
     final isMobile = MediaQuery.of(context).size.width <= 900;
 
@@ -205,26 +195,21 @@ class _TrainingScreenState extends State<TrainingScreen> {
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return WillPopScope(
       onWillPop: () async {
         final leave = await showDialog<bool>(
           context: context,
           builder: (context) {
-            /// Funzione: descrive in modo semplice questo blocco di logica.
             return AlertDialog(
               title: const Text("Uscire dall'allenamento"),
               content: const Text(
                   "Se esci ora i progressi non verranno salvati."),
               actions: [
-                /// Funzione: descrive in modo semplice questo blocco di logica.
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
                   child: const Text("Resta"),
                 ),
-                /// Funzione: descrive in modo semplice questo blocco di logica.
                 TextButton(
                   onPressed: () => Navigator.pop(context, true),
                   child: const Text("Esci"),
@@ -239,7 +224,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
         appBar: AppBar(
           title: Text(widget.title),
           actions: [
-            /// Funzione: descrive in modo semplice questo blocco di logica.
             IconButton(
                 icon: const Icon(Icons.save),
                 onPressed: () async {
@@ -255,7 +239,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
                   try {
                     final feedbackResult = await Navigator.push<TrainingFeedbackResult>(
                       context,
-                      /// Funzione: descrive in modo semplice questo blocco di logica.
                       MaterialPageRoute(
                         builder: (_) => TrainingFeedbackScreen(
                           onSave: (feedback) {
@@ -281,7 +264,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
                     if (feedbackResult.action == TrainingFeedbackAction.goToStats) {
                       Navigator.pushReplacement(
                         context,
-                        /// Funzione: descrive in modo semplice questo blocco di logica.
                         MaterialPageRoute(
                           builder: (_) => TrainingStatsScreen(
                             title: 'Statistiche allenamento',
@@ -306,7 +288,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
         ),
         body: Stack(
           children: [
-            /// Funzione: descrive in modo semplice questo blocco di logica.
             LayoutBuilder(
               builder: (context, constraints) {
                 final desktop = constraints.maxWidth > 900;
@@ -324,26 +305,20 @@ class _TrainingScreenState extends State<TrainingScreen> {
                                 mainAxisAlignment:
                                 MainAxisAlignment.spaceBetween,
                                 children: [
-                                  /// Funzione: descrive in modo semplice questo blocco di logica.
                                   TrainingThrowsTurns(
                                     throwsCount: stats.totalThrows,
                                     turns: stats.totalTurns,
                                   ),
-                                  /// Funzione: descrive in modo semplice questo blocco di logica.
                                   Row(
                                     children: [
-                                      /// Funzione: descrive in modo semplice questo blocco di logica.
                                       IconButton(
                                         icon: const Icon(Icons.undo),
                                         onPressed: () {
                                           throwController.undoLastThrow();
-                                          /// Funzione: descrive in modo semplice questo blocco di logica.
                                           setState(() {});
                                         },
                                       ),
-                                      /// Funzione: descrive in modo semplice questo blocco di logica.
                                       const SizedBox(width: 6),
-                                      /// Funzione: descrive in modo semplice questo blocco di logica.
                                       TargetSectorSelector(
                                         currentTarget:
                                         scoreController.target,
@@ -392,26 +367,20 @@ class _TrainingScreenState extends State<TrainingScreen> {
                               mainAxisAlignment:
                               MainAxisAlignment.spaceBetween,
                               children: [
-                                /// Funzione: descrive in modo semplice questo blocco di logica.
                                 TrainingThrowsTurns(
                                   throwsCount: stats.totalThrows,
                                   turns: stats.totalTurns,
                                 ),
-                                /// Funzione: descrive in modo semplice questo blocco di logica.
                                 Row(
                                   children: [
-                                    /// Funzione: descrive in modo semplice questo blocco di logica.
                                     IconButton(
                                       icon: const Icon(Icons.undo),
                                       onPressed: () {
                                         throwController.undoLastThrow();
-                                        /// Funzione: descrive in modo semplice questo blocco di logica.
                                         setState(() {});
                                       },
                                     ),
-                                    /// Funzione: descrive in modo semplice questo blocco di logica.
                                     const SizedBox(width: 6),
-                                    /// Funzione: descrive in modo semplice questo blocco di logica.
                                     TargetSectorSelector(
                                       currentTarget:
                                       scoreController.target,

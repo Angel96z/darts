@@ -1,5 +1,3 @@
-/// File: dartboard_widget.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
-
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/gestures.dart';
@@ -29,7 +27,6 @@ class DartboardWidget extends StatefulWidget {
 
   final Set<DartboardOverlayType> overlays;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const DartboardWidget({
     super.key,
     this.onHit,
@@ -41,7 +38,6 @@ class DartboardWidget extends StatefulWidget {
   });
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   State<DartboardWidget> createState() => _DartboardWidgetState();
 }
 
@@ -49,20 +45,17 @@ class _DartboardWidgetState extends State<DartboardWidget> {
   late final TransformationController _controller;
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void initState() {
     super.initState();
     _controller = TransformationController();
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _handleTap(TapDownDetails details, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final pos = details.localPosition;
@@ -88,15 +81,12 @@ class _DartboardWidgetState extends State<DartboardWidget> {
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return LayoutBuilder(
       builder: (context, constraints) {
 
         final side = min(constraints.maxWidth, constraints.maxHeight);
 
-        /// Funzione: descrive in modo semplice questo blocco di logica.
         return Center(
           child: SizedBox(
             width: side,
@@ -141,7 +131,6 @@ class _DartboardWidgetState extends State<DartboardWidget> {
                     _controller.value = Matrix4.identity();
                   }
 
-                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   setState(() {}); // aggiorna panEnabled
                 },
 
@@ -176,7 +165,6 @@ class _NoScrollBehavior extends ScrollBehavior {
   };
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget buildViewportChrome(BuildContext context, Widget child, AxisDirection axisDirection) {
     return child;
   }
@@ -186,7 +174,6 @@ class _DartboardPainter extends CustomPainter {
   final Set<DartboardOverlayType> overlays;
   final String? target;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   _DartboardPainter({
     required this.throws,
     required this.overlays,
@@ -201,7 +188,6 @@ class _DartboardPainter extends CustomPainter {
   ];
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final r = size.width / 2;
@@ -238,7 +224,6 @@ class _DartboardPainter extends CustomPainter {
     }
 
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _drawTargetZone(Canvas canvas, Offset center, double r) {
     if (target == null) return;
 
@@ -295,7 +280,6 @@ class _DartboardPainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _drawRadialError(Canvas canvas, Size size, double r) {
     if (throws.isEmpty) return;
 
@@ -332,7 +316,6 @@ class _DartboardPainter extends CustomPainter {
 
     canvas.drawCircle(targetCenter, radiusPx, border);
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Offset _getTargetCenter(Offset center, double r) {
     if (target == null) return center;
 
@@ -377,7 +360,6 @@ class _DartboardPainter extends CustomPainter {
 
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _drawTargetCenter(Canvas canvas, Offset center, double r) {
     final targetCenter = _getTargetCenter(center, r);
 
@@ -390,7 +372,6 @@ class _DartboardPainter extends CustomPainter {
 
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _drawBias(Canvas canvas, Size size, double r) {
     if (throws.isEmpty) return;
 
@@ -416,7 +397,6 @@ class _DartboardPainter extends CustomPainter {
     canvas.drawCircle(mean, r * 0.02, paint);
 
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _drawDirectionalBias(Canvas canvas, Size size, double r) {
     if (throws.length < 2) return;
 
@@ -485,7 +465,6 @@ class _DartboardPainter extends CustomPainter {
     canvas.drawLine(Offset(centerX, 0), Offset(centerX, size.height), line);
     canvas.drawLine(Offset(0, centerY), Offset(size.width, centerY), line);
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _drawErrorVector(Canvas canvas, Size size, double r) {
     if (throws.isEmpty) return;
 
@@ -543,7 +522,6 @@ class _DartboardPainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _drawDispersion(Canvas canvas, Size size, double r) {
     if (throws.length < 2) return;
 
@@ -591,7 +569,6 @@ class _DartboardPainter extends CustomPainter {
 
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _drawThrows(Canvas canvas, Size size, double r) {
     final fill = Paint()..color = const Color(0xFF1976D2);
     final stroke = Paint()
@@ -614,7 +591,6 @@ class _DartboardPainter extends CustomPainter {
     }
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _drawHeatmap(Canvas canvas, Size size, double r) {
 
     const gridSize = 80; // risoluzione heatmap
@@ -704,7 +680,6 @@ class _DartboardPainter extends CustomPainter {
       }
     }
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Color _heatColor(double t) {
     t = t.clamp(0.0, 1.0);
 
@@ -721,7 +696,6 @@ class _DartboardPainter extends CustomPainter {
           .withOpacity(0.7);
     }
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _drawQuadrants(Canvas canvas, Size size, Offset c) {
     final p = Paint()..color = Colors.blue.withOpacity(0.05);
     canvas.drawRect(Rect.fromLTWH(0, 0, c.dx, c.dy), p);
@@ -730,7 +704,6 @@ class _DartboardPainter extends CustomPainter {
     canvas.drawRect(Rect.fromLTWH(c.dx, c.dy, c.dx, c.dy), p);
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _drawBoard(Canvas canvas, Offset center, double boardRadius) {
 
     final bullInner = boardRadius * (6.35 / 225.5);
@@ -831,7 +804,6 @@ class _DartboardPainter extends CustomPainter {
     }
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _drawRing(
       Canvas canvas,
       Offset center,
@@ -852,7 +824,6 @@ class _DartboardPainter extends CustomPainter {
     canvas.drawPath(path, paint);
   }
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   bool shouldRepaint(covariant _DartboardPainter old) {
     return old.throws != throws || old.overlays != overlays;
   }

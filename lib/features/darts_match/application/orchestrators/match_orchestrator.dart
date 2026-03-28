@@ -1,5 +1,3 @@
-/// File: match_orchestrator.dart. Contiene codice Dart del progetto.
-
 import '../../domain/commands/match_command.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/engines/game_engine.dart';
@@ -10,7 +8,6 @@ import '../reducers/match_reducer.dart';
 import '../validators/command_validator.dart';
 
 class MatchOrchestrator {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   MatchOrchestrator({
     required RoomRepository roomRepository,
     required MatchRepository matchRepository,
@@ -34,14 +31,12 @@ class MatchOrchestrator {
 
   Match? _currentMatchCache;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   InputMode matchInputMode(PlayerId playerId) {
     final match = _currentMatchCache;
     if (match == null) return InputMode.totalTurnInput;
     return match.config.inputSnapshot[playerId]?.mode ?? InputMode.totalTurnInput;
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> handleCommand(MatchCommand command) async {
     final room = await _roomRepository.getRoom(command.roomId);
     if (room == null) return;
@@ -122,7 +117,6 @@ class MatchOrchestrator {
     await _commandRepository.enqueue(command);
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   TurnDraft _extractDraft(Object? rawDraft) {
     if (rawDraft is TurnDraft) return rawDraft;
 

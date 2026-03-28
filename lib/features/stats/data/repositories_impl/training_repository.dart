@@ -1,5 +1,3 @@
-/// File: training_repository.dart. Contiene accesso e trasformazione dati (datasource, dto, repository o mapper).
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -13,7 +11,6 @@ class TrainingRepository {
   static const int _batchLimit = 400;
   static const Duration _timeout = Duration(seconds: 12);
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<String> saveTraining({
     required String mode,
     required String target,
@@ -170,7 +167,6 @@ class TrainingRepository {
     return trainingRef.id;
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<bool> _markAggregatesApplied(DocumentReference<Map<String, dynamic>> trainingRef) async {
     return _db.runTransaction<bool>((tx) async {
       final snap = await tx.get(trainingRef);
@@ -189,7 +185,6 @@ class TrainingRepository {
     }).timeout(_timeout);
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _updateTargetSessionAggregate({
     required String uid,
     required String trainingId,
@@ -240,7 +235,6 @@ class TrainingRepository {
     }, SetOptions(merge: true)).timeout(_timeout);
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _updateTargetDailyAggregate({
     required String uid,
     required DateTime date,
@@ -261,7 +255,6 @@ class TrainingRepository {
     final total = throwsList.length;
     final avgDistance = _averageDistance(throwsList);
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     await _db.runTransaction((tx) async {
       final snap = await tx.get(ref);
 
@@ -295,7 +288,6 @@ class TrainingRepository {
     }).timeout(_timeout);
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _updateTargetGlobalAggregate({
     required String uid,
     required String target,
@@ -310,7 +302,6 @@ class TrainingRepository {
     final hits = throwsList.where((t) => t.sector == target).length;
     final total = throwsList.length;
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     await _db.runTransaction((tx) async {
       final snap = await tx.get(ref);
 
@@ -344,7 +335,6 @@ class TrainingRepository {
     }).timeout(_timeout);
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _updateDailyAggregate({
     required String uid,
     required DateTime date,
@@ -365,7 +355,6 @@ class TrainingRepository {
     final total = throwsList.length;
     final avgDistance = _averageDistance(throwsList);
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     await _db.runTransaction((tx) async {
       final snap = await tx.get(ref);
 
@@ -398,7 +387,6 @@ class TrainingRepository {
     }).timeout(_timeout);
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   String _dayKey(DateTime date) {
     final y = date.year.toString().padLeft(4, '0');
     final m = date.month.toString().padLeft(2, '0');
@@ -406,7 +394,6 @@ class TrainingRepository {
     return '$y-$m-$d';
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   double _averageDistance(List<DartThrow> throwsList) {
     if (throwsList.isEmpty) return 0;
     final sum = throwsList
@@ -414,7 +401,6 @@ class TrainingRepository {
         .fold<double>(0, (a, b) => a + b);
     return sum / throwsList.length;
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<bool> existsTraining(String trainingId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return false;

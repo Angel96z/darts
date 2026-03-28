@@ -1,11 +1,8 @@
-/// File: match_event.dart. Contiene regole di dominio, entità o casi d'uso per questa funzionalità.
-
 import 'package:equatable/equatable.dart';
 
 import '../value_objects/identifiers.dart';
 
 sealed class MatchEvent extends Equatable {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const MatchEvent({
     required this.eventId,
     required this.roomId,

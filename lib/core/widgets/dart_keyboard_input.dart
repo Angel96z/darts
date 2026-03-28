@@ -1,5 +1,3 @@
-/// File: dart_keyboard_input.dart. Contiene componenti condivisi usati in più parti dell'app.
-
 import 'package:flutter/material.dart';
 import '../../features/score/presentation/state/score_controller.dart';
 
@@ -7,14 +5,12 @@ class DartKeyboardInput extends StatelessWidget {
 
   final ScoreController controller;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const DartKeyboardInput({
     super.key,
     required this.controller,
   });
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
 
     List<int> numbers = List.generate(20, (i) => i + 1);
@@ -39,9 +35,7 @@ class DartKeyboardInput extends StatelessWidget {
     );
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _btn(String label, int score) {
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return Padding(
       padding: const EdgeInsets.all(6),
       child: ElevatedButton(

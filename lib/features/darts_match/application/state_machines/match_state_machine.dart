@@ -1,11 +1,8 @@
-/// File: match_state_machine.dart. Contiene codice Dart del progetto.
-
 import '../../domain/entities/match.dart';
 
 class MatchStateMachine {
   const MatchStateMachine();
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   bool canTransition(MatchState from, MatchState to) {
     final map = <MatchState, Set<MatchState>>{
       MatchState.created: {MatchState.legStarting, MatchState.aborted},

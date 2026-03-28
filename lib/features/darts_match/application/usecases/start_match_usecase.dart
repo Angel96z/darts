@@ -1,5 +1,3 @@
-/// File: start_match_usecase.dart. Contiene codice Dart del progetto.
-
 import '../../domain/entities/match.dart';
 import '../../domain/repositories/repositories.dart';
 import '../../domain/value_objects/identifiers.dart';
@@ -9,7 +7,6 @@ class StartMatchUseCase {
 
   final MatchRepository _matchRepository;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> call(Match match) => _matchRepository.saveMatch(match);
 }
 
@@ -18,7 +15,6 @@ class ReplayMatchUseCase {
 
   final MatchRepository _matchRepository;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> call({required RoomId roomId, required MatchId newMatchId, required Match previousMatch}) async {
     final replay = Match(
       id: newMatchId,

@@ -1,7 +1,4 @@
-/// File: room_dto.dart. Contiene accesso e trasformazione dati (datasource, dto, repository o mapper).
-
 class RoomDto {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const RoomDto({
     required this.roomId,
     required this.state,
@@ -43,7 +40,6 @@ class RoomDto {
         'invite': invite,
       };
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   factory RoomDto.fromMap(Map<String, dynamic> map) {
     final rawPlayers = Map<String, dynamic>.from((map['players'] as Map?) ?? const {});
     final members = <Map<String, dynamic>>[];
@@ -60,7 +56,6 @@ class RoomDto {
       });
     }
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return RoomDto(
       roomId: (map['roomId'] ?? map['id'] ?? '') as String,
       state: (map['state'] ?? map['status'] ?? 'waiting') as String,

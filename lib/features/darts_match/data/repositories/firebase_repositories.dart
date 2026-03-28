@@ -1,5 +1,3 @@
-/// File: firebase_repositories.dart. Contiene accesso e trasformazione dati (datasource, dto, repository o mapper).
-
 import '../../domain/commands/match_command.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/room.dart';
@@ -21,18 +19,15 @@ class FirebaseRoomRepository implements RoomRepository {
   final RoomMapper _mapper;
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<Room?> getRoom(RoomId roomId) async {
     final dto = await _dataSource.getRoom(roomId.value);
     return dto == null ? null : _mapper.toDomain(dto);
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> saveRoom(Room room) => _dataSource.saveRoom(_mapper.toDto(room));
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Stream<Room> watchRoom(RoomId roomId) => _dataSource.watchRoom(roomId.value).map(_mapper.toDomain);
 }
 
@@ -43,7 +38,6 @@ class FirebaseMatchRepository implements MatchRepository {
   final MatchMapper _mapper;
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> appendEvent(MatchEvent event) {
     return _dataSource.appendEvent(
       roomId: event.roomId.value,
@@ -54,23 +48,19 @@ class FirebaseMatchRepository implements MatchRepository {
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<Match?> getMatch(RoomId roomId, MatchId matchId) async {
     final dto = await _dataSource.getMatch(roomId.value, matchId.value);
     return dto == null ? null : _mapper.toDomain(dto);
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> saveMatch(Match match) => _dataSource.saveMatch(_mapper.toDto(match));
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Stream<Match> watchMatch(RoomId roomId, MatchId matchId) =>
       _dataSource.watchMatch(roomId.value, matchId.value).map(_mapper.toDomain);
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Stream<List<MatchEvent>> watchEvents(RoomId roomId, MatchId matchId) {
     return const Stream<List<MatchEvent>>.empty();
   }
@@ -82,7 +72,6 @@ class FirebaseCommandRepository implements CommandRepository {
   final FirestoreCommandDataSource _dataSource;
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> enqueue(MatchCommand command) {
     return _dataSource.enqueue(
       CommandDto(
@@ -100,7 +89,6 @@ class FirebaseCommandRepository implements CommandRepository {
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Stream<List<MatchCommand>> watchPending(RoomId roomId) => const Stream<List<MatchCommand>>.empty();
 }
 
@@ -110,13 +98,11 @@ class FirebasePresenceRepository implements PresenceRepository {
   final RtdbPresenceDataSource _dataSource;
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> updateHeartbeat({required RoomId roomId, required PlayerId playerId}) {
     return _dataSource.heartbeat(roomId: roomId.value, playerId: playerId.value);
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Stream<RoomPresenceSummary> watchPresence(RoomId roomId) {
     return Stream.value(const RoomPresenceSummary(connected: 0, reconnecting: 0, disconnected: 0));
   }

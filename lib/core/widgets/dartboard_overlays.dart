@@ -1,12 +1,9 @@
-/// File: dartboard_overlays.dart. Contiene componenti condivisi usati in più parti dell'app.
-
 import 'package:flutter/material.dart';
 
 class HitFeedbackOverlay extends StatefulWidget {
   final String sector;
   final int score;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const HitFeedbackOverlay({
     super.key,
     required this.sector,
@@ -14,7 +11,6 @@ class HitFeedbackOverlay extends StatefulWidget {
   });
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   State<HitFeedbackOverlay> createState() => _HitFeedbackOverlayState();
 }
 
@@ -22,13 +18,10 @@ class _HitFeedbackOverlayState extends State<HitFeedbackOverlay> {
   bool _visible = false;
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void initState() {
     super.initState();
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     Future.microtask(() {
       if (!mounted) return;
-      /// Funzione: descrive in modo semplice questo blocco di logica.
       setState(() {
         _visible = true;
       });
@@ -36,7 +29,6 @@ class _HitFeedbackOverlayState extends State<HitFeedbackOverlay> {
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     return Center(
       child: AnimatedOpacity(

@@ -1,5 +1,3 @@
-/// File: identity.dart. Contiene regole di dominio, entità o casi d'uso per questa funzionalità.
-
 import 'package:equatable/equatable.dart';
 
 import '../value_objects/identifiers.dart';
@@ -38,7 +36,6 @@ class AnonymousIdentity extends AppIdentity {
 }
 
 class RoomGuestIdentity extends AppIdentity {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const RoomGuestIdentity({
     required super.id,
     required super.displayName,
@@ -52,7 +49,6 @@ class RoomGuestIdentity extends AppIdentity {
 }
 
 class PlayerSlot extends Equatable {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const PlayerSlot({
     required this.playerId,
     required this.order,
@@ -70,7 +66,6 @@ class PlayerSlot extends Equatable {
 }
 
 class Team extends Equatable {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const Team({
     required this.id,
     required this.name,

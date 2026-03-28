@@ -1,5 +1,3 @@
-/// File: input_mode_button.dart. Contiene componenti condivisi usati in più parti dell'app.
-
 import 'package:flutter/material.dart';
 import '../../features/game/domain/entities/input_mode.dart';
 
@@ -8,7 +6,6 @@ class InputModeButton extends StatelessWidget {
   final InputMode mode;
   final ValueChanged<InputMode> onChanged;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const InputModeButton({
     super.key,
     required this.mode,
@@ -16,7 +13,6 @@ class InputModeButton extends StatelessWidget {
   });
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
 
     IconData icon;
@@ -33,7 +29,6 @@ class InputModeButton extends StatelessWidget {
         break;
     }
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return FloatingActionButton(
       mini: true,
       onPressed: () {

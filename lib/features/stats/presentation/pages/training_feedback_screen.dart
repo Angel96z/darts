@@ -1,5 +1,3 @@
-/// File: training_feedback_screen.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
-
 import 'package:flutter/material.dart' hide OverlayState;
 
 import '../../../../core/widgets/blocking_overlay.dart';
@@ -13,7 +11,6 @@ class TrainingFeedbackData {
   final int? distrazioni;
   final String? commento;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TrainingFeedbackData({
     this.focus,
     this.stress,
@@ -30,7 +27,6 @@ class TrainingFeedbackResult {
   final TrainingFeedbackAction action;
   final String? savedSessionId;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TrainingFeedbackResult({
     required this.action,
     required this.savedSessionId,
@@ -41,14 +37,12 @@ class TrainingFeedbackScreen extends StatefulWidget {
   final Future<LocalTrainingSaveResult> Function(TrainingFeedbackData feedback)
   onSave;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TrainingFeedbackScreen({
     super.key,
     required this.onSave,
   });
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   State<TrainingFeedbackScreen> createState() => _TrainingFeedbackScreenState();
 }
 
@@ -64,13 +58,11 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
   String? _savedSessionId;
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void dispose() {
     _commentoController.dispose();
     super.dispose();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _scoreField(String label, int? value, ValueChanged<int?> onChanged) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -95,7 +87,6 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
     );
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _submit() async {
     if (_overlayState == OverlayState.loading) return;
 
@@ -110,7 +101,6 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
           : _commentoController.text.trim(),
     );
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     setState(() {
       _overlayState = OverlayState.loading;
       _overlayMessage = 'Salvataggio in corso...';
@@ -120,7 +110,6 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
       final saveResult = await widget.onSave(feedback);
       if (!mounted) return;
 
-      /// Funzione: descrive in modo semplice questo blocco di logica.
       setState(() {
         _savedSessionId = saveResult.localId;
         switch (saveResult.status) {
@@ -142,7 +131,6 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
       });
     } catch (_) {
       if (!mounted) return;
-      /// Funzione: descrive in modo semplice questo blocco di logica.
       setState(() {
         _overlayState = OverlayState.error;
         _overlayMessage = 'Salvata. Sync non riuscita';
@@ -151,36 +139,26 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     final showOverlay = _overlayState != null;
     final loading = _overlayState == OverlayState.loading;
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return Scaffold(
       appBar: AppBar(title: const Text('Feedback sessione')),
       body: Stack(
         children: [
-          /// Funzione: descrive in modo semplice questo blocco di logica.
           ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              /// Funzione: descrive in modo semplice questo blocco di logica.
               const Text(
                 'Valutazioni (opzionale)',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              /// Funzione: descrive in modo semplice questo blocco di logica.
               const SizedBox(height: 12),
-              /// Funzione: descrive in modo semplice questo blocco di logica.
               _scoreField('Focus', _focus, (v) => setState(() => _focus = v)),
-              /// Funzione: descrive in modo semplice questo blocco di logica.
               _scoreField('Stress', _stress, (v) => setState(() => _stress = v)),
-              /// Funzione: descrive in modo semplice questo blocco di logica.
               _scoreField('Energia fisica', _energia, (v) => setState(() => _energia = v)),
-              /// Funzione: descrive in modo semplice questo blocco di logica.
               _scoreField('Fiducia', _fiducia, (v) => setState(() => _fiducia = v)),
-              /// Funzione: descrive in modo semplice questo blocco di logica.
               _scoreField('Distrazioni', _distrazioni, (v) => setState(() => _distrazioni = v)),
               const SizedBox(height: 8),
               TextField(

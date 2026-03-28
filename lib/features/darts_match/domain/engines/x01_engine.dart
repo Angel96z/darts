@@ -1,5 +1,3 @@
-/// File: x01_engine.dart. Contiene regole di dominio, entità o casi d'uso per questa funzionalità.
-
 import '../entities/match.dart';
 import '../policies/team_finish_constraint.dart';
 import '../rules/x01_rules.dart';
@@ -7,7 +5,6 @@ import '../value_objects/identifiers.dart';
 import 'game_engine.dart';
 
 class X01Engine extends GameEngine {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   X01Engine({
     required InRule inRule,
     required OutRule outRule,
@@ -24,7 +21,6 @@ class X01Engine extends GameEngine {
   final TeamFinishConstraint _finishConstraint;
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   TurnResolution resolveTurn({
     required Match match,
     required TurnDraft draft,
@@ -119,7 +115,6 @@ class X01Engine extends GameEngine {
     );
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   bool validateTeamCheckout({required Match match, required TeamId teamId, required Map<TeamId, int> projectedScores}) {
     return _finishConstraint.allow(teamId: teamId, teamScoresAfterCheckout: projectedScores);
   }

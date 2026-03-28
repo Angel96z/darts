@@ -1,5 +1,3 @@
-/// File: training_sector_hits.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
-
 import 'package:flutter/material.dart';
 
 class TrainingSectorHits extends StatelessWidget {
@@ -7,7 +5,6 @@ class TrainingSectorHits extends StatelessWidget {
   final String target;
   final int totalThrows;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TrainingSectorHits({
     super.key,
     required this.stats,
@@ -41,7 +38,6 @@ class TrainingSectorHits extends StatelessWidget {
     return value.toString();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   List<String> _orderedSectors() {
     if (_targetNumber == '25') {
       return ['25', ...boardOrder.map((e) => e.toString())];
@@ -69,7 +65,6 @@ class TrainingSectorHits extends StatelessWidget {
     return result.take(boardOrder.length).toList();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _bar(double value, Color color) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(3),
@@ -90,7 +85,6 @@ class TrainingSectorHits extends StatelessWidget {
     );
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _line({
     required String label,
     required double value,
@@ -146,7 +140,6 @@ class TrainingSectorHits extends StatelessWidget {
     );
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _sectorCard(String number, Map<String, int> data) {
     if (number == "MISS") {
       final miss = data.values.fold(0, (a, b) => a + b);
@@ -319,7 +312,6 @@ class TrainingSectorHits extends StatelessWidget {
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     final ordered = <String>[
       if (stats.containsKey("MISS")) "MISS",

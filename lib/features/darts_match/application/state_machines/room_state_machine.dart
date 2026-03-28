@@ -1,11 +1,8 @@
-/// File: room_state_machine.dart. Contiene codice Dart del progetto.
-
 import '../../domain/entities/room.dart';
 
 class RoomStateMachine {
   const RoomStateMachine();
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   bool canTransition(RoomState from, RoomState to) {
     final map = <RoomState, Set<RoomState>>{
       RoomState.draft: {RoomState.waiting, RoomState.closed},

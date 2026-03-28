@@ -1,5 +1,3 @@
-/// File: repositories.dart. Contiene regole di dominio, entità o casi d'uso per questa funzionalità.
-
 import '../commands/match_command.dart';
 import '../entities/match.dart';
 import '../entities/room.dart';
@@ -27,7 +25,6 @@ abstract class CommandRepository {
 
 abstract class PresenceRepository {
   Stream<RoomPresenceSummary> watchPresence(RoomId roomId);
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> updateHeartbeat({required RoomId roomId, required PlayerId playerId});
 }
 

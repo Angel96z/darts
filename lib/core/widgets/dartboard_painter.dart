@@ -1,5 +1,3 @@
-/// File: dartboard_painter.dart. Contiene componenti condivisi usati in più parti dell'app.
-
 import 'dart:math';
 import 'package:flutter/material.dart';
 
@@ -13,7 +11,6 @@ class DartboardPainter extends CustomPainter {
   static const Color throwColor = Color(0xFF1976D2);
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final boardRadius = size.width / 2;
@@ -35,7 +32,6 @@ class DartboardPainter extends CustomPainter {
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   bool shouldRepaint(covariant DartboardPainter oldDelegate) {
     return oldDelegate.throws != throws;
   }

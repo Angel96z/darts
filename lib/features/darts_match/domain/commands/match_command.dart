@@ -1,5 +1,3 @@
-/// File: match_command.dart. Contiene regole di dominio, entità o casi d'uso per questa funzionalità.
-
 import 'package:equatable/equatable.dart';
 
 import '../value_objects/identifiers.dart';
@@ -7,7 +5,6 @@ import '../value_objects/identifiers.dart';
 enum CommandStatus { pending, accepted, rejected }
 
 sealed class MatchCommand extends Equatable {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const MatchCommand({
     required this.commandId,
     required this.authorId,

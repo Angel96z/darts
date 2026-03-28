@@ -1,5 +1,3 @@
-/// File: throw_model_firestore.dart. Contiene accesso e trasformazione dati (datasource, dto, repository o mapper).
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../game/domain/entities/dart_models.dart';

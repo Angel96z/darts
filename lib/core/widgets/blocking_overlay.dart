@@ -1,5 +1,3 @@
-/// File: blocking_overlay.dart. Contiene componenti condivisi usati in più parti dell'app.
-
 import 'package:flutter/material.dart';
 
 enum OverlayState { loading, success, error, pending }
@@ -12,7 +10,6 @@ class BlockingOverlay extends StatelessWidget {
   final VoidCallback? onPrimaryAction;
   final VoidCallback? onSecondaryAction;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const BlockingOverlay({
     super.key,
     required this.state,
@@ -24,7 +21,6 @@ class BlockingOverlay extends StatelessWidget {
   });
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     IconData icon;
     Color color;

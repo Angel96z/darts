@@ -1,5 +1,3 @@
-/// File: local_training_sync_service.dart. Contiene accesso e trasformazione dati (datasource, dto, repository o mapper).
-
 import 'dart:convert';
 import 'dart:ui';
 
@@ -23,7 +21,6 @@ class LocalTrainingSaveResult {
   final String localId;
   final LocalTrainingSyncStatus status;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const LocalTrainingSaveResult({
     required this.localId,
     required this.status,
@@ -48,7 +45,6 @@ class LocalTrainingRecord {
   final int? distrazioni;
   final String? commento;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const LocalTrainingRecord({
     required this.localId,
     required this.remoteId,
@@ -68,7 +64,6 @@ class LocalTrainingRecord {
     this.commento,
   });
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   LocalTrainingRecord copyWith({
     String? remoteId,
     LocalTrainingSyncStatus? syncStatus,
@@ -138,9 +133,7 @@ class LocalTrainingRecord {
     };
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   static LocalTrainingRecord fromMap(Map<String, dynamic> map) {
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return LocalTrainingRecord(
       localId: map['localId'],
       remoteId: map['remoteId'],
@@ -196,7 +189,6 @@ class LocalTrainingSyncService {
   bool _running = false;
 
 // Factory per inizializzare il singleton
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Future<void> initialize(TrainingRepository repo) async {
     instance = LocalTrainingSyncService._internal(repo);
     await instance.start();
@@ -205,7 +197,6 @@ class LocalTrainingSyncService {
 // Costruttore privato
   LocalTrainingSyncService._internal(this._repo);
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<LocalTrainingSaveResult> saveSession({
     required String mode,
     required String target,
@@ -250,7 +241,6 @@ class LocalTrainingSyncService {
   }
 
   // SAVE LOCALE
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<String> saveLocal({
     required String mode,
     required String target,
@@ -290,13 +280,11 @@ class LocalTrainingSyncService {
   }
 
   // START
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> start() async {
     await syncAll();
   }
 
   // SYNC BIDIREZIONALE
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> syncAll() async {
     if (_running) return;
     if (!await _checkBackendConnection()) return;
@@ -308,7 +296,6 @@ class LocalTrainingSyncService {
     _running = false;
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<bool> _checkBackendConnection() async {
     try {
       await FirebaseFirestore.instance
@@ -323,7 +310,6 @@ class LocalTrainingSyncService {
   }
 
   // LOCALE → DB
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _pushLocalToRemote() async {
     final all = await _getAll();
 
@@ -382,7 +368,6 @@ class LocalTrainingSyncService {
   }
 
   // DB → LOCALE
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _pullRemoteToLocal() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -427,7 +412,6 @@ class LocalTrainingSyncService {
     await _saveAll(local);
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<LocalTrainingRecord?> getById(String id) async {
     final all = await _getAll();
     for (final r in all) {
@@ -436,12 +420,10 @@ class LocalTrainingSyncService {
     return null;
   }
 // Ottieni tutti i record locali
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<List<LocalTrainingRecord>> getAllRecords() async {
     return await _getAll();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> updateSessionReview({
     required String id,
     int? focus,
@@ -487,10 +469,8 @@ class LocalTrainingSyncService {
     }
   }
   // Metodo di debug per vedere tutti i record
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> debugPrintAllRecords() async {
     final all = await _getAll();
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     debugPrint('=== RECORD LOCALI (${all.length}) ===');
     for (var i = 0; i < all.length; i++) {
       final r = all[i];
@@ -500,7 +480,6 @@ class LocalTrainingSyncService {
   }
 
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<List<LocalTrainingRecord>> _getAll() async {
     final p = await SharedPreferences.getInstance();
     final raw = p.getString(_key);
@@ -511,7 +490,6 @@ class LocalTrainingSyncService {
         .toList();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _saveAll(List<LocalTrainingRecord> list) async {
     final p = await SharedPreferences.getInstance();
     await p.setString(_key, jsonEncode(list.map((e) => e.toMap()).toList()));

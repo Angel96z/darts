@@ -1,12 +1,9 @@
-/// File: target_sector_selector.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
-
 import 'package:flutter/material.dart';
 
 class TargetSectorSelector extends StatelessWidget {
   final String currentTarget;
   final ValueChanged<String> onSelected;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TargetSectorSelector({
     super.key,
     required this.currentTarget,
@@ -17,7 +14,6 @@ class TargetSectorSelector extends StatelessWidget {
   static const _colorD = Color(0xFF4CAF82);
   static const _colorS = Color(0xFF5B8FE8);
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _openSelector(BuildContext context) async {
 
     final result = await showModalBottomSheet<String>(
@@ -33,14 +29,11 @@ class TargetSectorSelector extends StatelessWidget {
           9,8,7,6,5,4,3,2,1
         ];
 
-        /// Funzione: descrive in modo semplice questo blocco di logica.
         return StatefulBuilder(
           builder: (context, setState) {
 
-            /// Funzione: descrive in modo semplice questo blocco di logica.
             String label(int n, String type) => "$type$n";
 
-            /// Funzione: descrive in modo semplice questo blocco di logica.
             Widget sectorButton(
                 int n,
                 String type,
@@ -51,10 +44,8 @@ class TargetSectorSelector extends StatelessWidget {
               final value = label(n, type);
               final active = selected == value;
 
-              /// Funzione: descrive in modo semplice questo blocco di logica.
               return InkWell(
                 onTap: () {
-                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   setState(() {
                     selected = value;
                   });
@@ -81,7 +72,6 @@ class TargetSectorSelector extends StatelessWidget {
               );
             }
 
-            /// Funzione: descrive in modo semplice questo blocco di logica.
             Widget card(int n) {
 
               final bull = n == 25;
@@ -141,12 +131,10 @@ class TargetSectorSelector extends StatelessWidget {
 
                   const SizedBox(height: 12),
 
-                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   Expanded(
                     child: GridView.builder(
                       padding: const EdgeInsets.all(16),
                       gridDelegate:
-                      /// Funzione: descrive in modo semplice questo blocco di logica.
                       const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 3,
                         crossAxisSpacing: 12,
@@ -160,7 +148,6 @@ class TargetSectorSelector extends StatelessWidget {
                     ),
                   ),
 
-                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16,8,16,20),
                     child: SizedBox(
@@ -188,12 +175,10 @@ class TargetSectorSelector extends StatelessWidget {
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
 
     final color = Theme.of(context).colorScheme.primary;
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return InkWell(
       borderRadius: BorderRadius.circular(10),
       onTap: () => _openSelector(context),

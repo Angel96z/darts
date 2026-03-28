@@ -1,5 +1,3 @@
-/// File: training_hit_stats.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
-
 import 'package:flutter/material.dart';
 
 class TrainingHitStats extends StatelessWidget {
@@ -8,7 +6,6 @@ class TrainingHitStats extends StatelessWidget {
   final int streak;
   final int best;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TrainingHitStats({
     super.key,
     required this.hit,
@@ -17,7 +14,6 @@ class TrainingHitStats extends StatelessWidget {
     required this.best,
   });
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _item(
       BuildContext context,
       IconData icon,
@@ -45,7 +41,6 @@ class TrainingHitStats extends StatelessWidget {
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
 
     return Align(

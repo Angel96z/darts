@@ -1,5 +1,3 @@
-/// File: match_reducer.dart. Contiene codice Dart del progetto.
-
 import '../../domain/entities/match.dart';
 import '../../domain/events/match_event.dart';
 import '../../domain/value_objects/identifiers.dart';
@@ -7,7 +5,6 @@ import '../../domain/value_objects/identifiers.dart';
 class MatchReducer {
   const MatchReducer();
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Match apply(Match match, MatchEvent event) {
     if (event is TurnCommittedEvent || event is TurnBustEvent) {
       final payload = event.payload;
@@ -156,7 +153,6 @@ class MatchReducer {
     return match;
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   TurnDraft _draftFromPayload(Object? rawDraft, PlayerId playerId, Match match) {
     if (rawDraft is Map) {
       final draftMap = Map<String, dynamic>.from(rawDraft);
@@ -170,7 +166,6 @@ class MatchReducer {
         );
       }).toList();
 
-      /// Funzione: descrive in modo semplice questo blocco di logica.
       return TurnDraft(
         playerId: PlayerId((draftMap['playerId'] ?? playerId.value) as String),
         legNumber: (draftMap['legNumber'] as num?)?.toInt() ?? match.snapshot.currentLeg,
