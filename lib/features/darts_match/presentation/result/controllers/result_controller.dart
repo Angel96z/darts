@@ -36,14 +36,29 @@ class ResultController extends StateNotifier<ResultVm?> {
   }
 
   String _winnerId(Match match) {
-    if (match.result?.winnerPlayerId != null) {
-      return match.result!.winnerPlayerId!.value;
+    final winner = match.result?.winnerPlayerId;
+    if (winner != null) {
+      return winner.value;
     }
 
-    final ordered = match.snapshot.scoreboard.playerScores.entries.toList()
+    // fallback robusto: usa ultimo checkout reale
+    final turns = match.snapshot.lastTurns;
+
+    for (final turn in turns.reversed) {
+      if (turn.resolution.isCheckout) {
+        return turn.draft.playerId.value;
+      }
+    }
+
+    // fallback finale: miglior score
+    final scores = match.snapshot.scoreboard.playerScores.entries.toList()
       ..sort((a, b) => a.value.compareTo(b.value));
 
-    return ordered.isEmpty ? '-' : ordered.first.key.value;
+    if (scores.isNotEmpty) {
+      return scores.first.key.value;
+    }
+
+    return '-';
   }
 }
 

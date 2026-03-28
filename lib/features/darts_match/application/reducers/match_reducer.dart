@@ -55,6 +55,21 @@ class MatchReducer {
       final updatedTurns = [...match.snapshot.lastTurns, committed];
 
       if (isCheckout) {
+        final winnerId = playerId;
+
+        final playerScores = updatedScores;
+
+        final rankingEntries = playerScores.entries.toList()
+          ..sort((a, b) => a.value.compareTo(b.value));
+
+        final ranking = rankingEntries.map((e) => e.key).toList();
+
+        final highestScore = updatedTurns.isEmpty
+            ? 0
+            : updatedTurns
+            .map((t) => t.draft.total)
+            .reduce((a, b) => a > b ? a : b);
+
         return Match(
           id: match.id,
           roomId: match.roomId,
@@ -62,7 +77,15 @@ class MatchReducer {
           roster: match.roster,
           legs: match.legs,
           sets: match.sets,
-          result: match.result,
+          result: MatchResult(
+            winnerPlayerId: winnerId,
+            winnerTeamId: null,
+            ranking: ranking,
+            playerStats: const <PlayerMatchStats>[],
+            teamStats: const <TeamMatchStats>[],
+            mvpPlayerId: winnerId,
+            highestScore: highestScore,
+          ),
           createdAt: match.createdAt,
           snapshot: MatchStateSnapshot(
             matchState: MatchState.matchFinished,

@@ -15,6 +15,7 @@ import '../../../domain/entities/match.dart';
 import '../../../domain/entities/room.dart';
 import '../../match/controllers/match_controller.dart';
 import '../../match/pages/match_shell_page.dart';
+import '../../result/controllers/result_controller.dart';
 import '../../result/pages/result_shell_page.dart';
 import '../../shared/view_models/connection_badge_vm.dart';
 import '../../shared/widgets/connection_badge.dart';
@@ -70,23 +71,66 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
     final linkCoordinator = ref.read(appLinkCoordinatorProvider.notifier);
     final pendingWatchRoomId = await linkCoordinator.consumeWatchRoomId();
     final pendingRoomId = await linkCoordinator.consumeRoomId();
+    final lastRoomId = await linkCoordinator.getLastRoomId();
 
     if (pendingWatchRoomId != null && pendingWatchRoomId.isNotEmpty) {
       await ctrl.joinAsSpectator(pendingWatchRoomId);
     } else if (pendingRoomId != null && pendingRoomId.isNotEmpty) {
       await ctrl.joinFromLink(pendingRoomId);
+      await linkCoordinator.saveLastRoomId(pendingRoomId);
     } else if (widget.forceNewRoom) {
       // 2. NUOVA ROOM FORZATA
       await ctrl.resetForNewRoom();
       await ctrl.initAsHost();
     } else {
-      // 3. REJOIN (solo se NON nuova room)
+      // 3. REJOIN (recovery robusto)
       await ctrl.autoRejoinRoomIfNeeded();
 
       final currentRoomId = ref.read(lobbyControllerProvider).roomId;
 
       if (currentRoomId != null && currentRoomId.isNotEmpty) {
         await ctrl.joinFromLink(currentRoomId);
+
+        final vmAfterJoin = ref.read(lobbyControllerProvider);
+
+// 🔥 evita recovery su room finita
+        if (vmAfterJoin.roomState == RoomState.finished ||
+            vmAfterJoin.roomState == RoomState.closed) {
+          await ref.read(appLinkCoordinatorProvider.notifier).clearLastRoomId();
+          await ctrl.resetForNewRoom();
+          await ctrl.initAsHost();
+          return;
+        }
+
+// routing normale
+        final canPlayCurrentMatch =
+            _isCurrentAuthAlreadyPlayer(vmAfterJoin) && !ctrl.isSpectator;
+
+        await _openLiveMatchIfNeeded(vmAfterJoin, canPlayCurrentMatch);
+        await _openResultIfNeeded(vmAfterJoin);
+        await _exitIfRoomClosed(vmAfterJoin);
+        await linkCoordinator.saveLastRoomId(currentRoomId);
+      } else if (lastRoomId != null && lastRoomId.isNotEmpty) {
+        await ctrl.joinFromLink(lastRoomId);
+
+        final vmAfterJoin = ref.read(lobbyControllerProvider);
+
+// 🔥 se room finita → NON riusare
+        if (vmAfterJoin.roomState == RoomState.finished ||
+            vmAfterJoin.roomState == RoomState.closed) {
+          await ref.read(appLinkCoordinatorProvider.notifier).clearLastRoomId();
+          await ctrl.resetForNewRoom();
+          await ctrl.initAsHost();
+          return;
+        }
+
+// routing normale
+        final canPlayCurrentMatch =
+            _isCurrentAuthAlreadyPlayer(vmAfterJoin) && !ctrl.isSpectator;
+
+        await _openLiveMatchIfNeeded(vmAfterJoin, canPlayCurrentMatch);
+        await _openResultIfNeeded(vmAfterJoin);
+        await _exitIfRoomClosed(vmAfterJoin);
       } else {
         // 4. fallback
         await ctrl.initAsHost();
@@ -371,6 +415,7 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
 
     if (_canControlAsAdmin(vm)) {
       await ctrl.closeRoom();
+      await ref.read(appLinkCoordinatorProvider.notifier).clearLastRoomId();
     } else {
       await ctrl.leaveRoom();
     }
@@ -433,11 +478,26 @@ class _RoomLobbyShellPageState extends ConsumerState<RoomLobbyShellPage> {
   Future<void> _openResultIfNeeded(LobbyViewModel next) async {
     if (!mounted || _openingResult) return;
     if (next.roomState != RoomState.finished) return;
+
     _openingResult = true;
+
+    Match? match;
+
+    if (next.roomId == null) {
+      match = ref.read(matchControllerProvider)?.match;
+    } else {
+      match = await ref.read(lobbyControllerProvider.notifier).loadCurrentMatch();
+    }
+
+    if (match != null) {
+      ref.read(resultControllerProvider.notifier).setFromMatch(match);
+    }
+
     await Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const ResultShellPage()),
     );
+
     _openingResult = false;
   }
 

@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const _pendingRoomIdKey = 'pending_room_id';
 const _pendingWatchRoomIdKey = 'pending_watch_room_id';
+const _lastRoomIdKey = 'last_room_id';
 
 class AppLinkState {
   final String? pendingRoomId;
@@ -31,6 +32,26 @@ StateNotifierProvider<AppLinkCoordinator, AppLinkState>(
 );
 
 class AppLinkCoordinator extends StateNotifier<AppLinkState> {
+
+  Future<void> saveLastRoomId(String roomId) async {
+    if (roomId.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_lastRoomIdKey, roomId);
+  }
+
+  Future<String?> getLastRoomId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final id = prefs.getString(_lastRoomIdKey);
+    if (id == null || id.isEmpty) return null;
+    return id.trim();
+  }
+
+  Future<void> clearLastRoomId() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_lastRoomIdKey);
+  }
+
+
   bool _initialized = false;
   AppLinkCoordinator() : super(const AppLinkState());
 

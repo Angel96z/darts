@@ -830,7 +830,16 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
     });
   }
-
+  bool _isTerminalRemoteStatus(String? status) {
+    switch ((status ?? '').trim()) {
+      case 'finished':
+      case 'closed':
+      case 'terminated':
+        return true;
+      default:
+        return false;
+    }
+  }
   RoomState _mapRemoteStatus(String status) {
     switch (status) {
       case 'ready':
@@ -918,14 +927,44 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
   Future<void> joinFromLink(String roomId) async {
     if (roomId.isEmpty) return;
-    final roomSnap = await FirebaseFirestore.instance.collection('rooms').doc(roomId).get();
+
+    final roomSnap =
+    await FirebaseFirestore.instance.collection('rooms').doc(roomId).get();
+
     if (!roomSnap.exists) {
       state = state.copyWith(loading: OverlayState.error);
       return;
     }
+
+    final data = roomSnap.data();
+    final status = data?['status'] as String?;
+
+    if (_isTerminalRemoteStatus(status)) {
+      final uid = authUid;
+      if (uid != null && uid.isNotEmpty) {
+        try {
+          await FirebaseFirestore.instance
+              .collection('user_rooms')
+              .doc(uid)
+              .delete();
+        } catch (_) {}
+      }
+
+      _roomSub?.cancel();
+      _heartbeatTimer?.cancel();
+      _hostId = null;
+      _isSpectator = false;
+      state = _initial();
+      return;
+    }
+
     _hostId = null;
     _isSpectator = false;
-    state = state.copyWith(roomId: roomId, isOnline: true);
+    state = state.copyWith(
+      roomId: roomId,
+      isOnline: true,
+      loading: null,
+    );
     _watchRoom(roomId);
     _startHeartbeat();
   }
@@ -966,10 +1005,9 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     if (uid == null) return;
 
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('user_rooms')
-          .doc(uid)
-          .get();
+      final userRoomRef =
+      FirebaseFirestore.instance.collection('user_rooms').doc(uid);
+      final doc = await userRoomRef.get();
 
       if (!doc.exists) return;
 
@@ -977,11 +1015,29 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       if (data == null) return;
 
       final roomId = data['roomId'] as String?;
-      if (roomId == null || roomId.isEmpty) return;
+      if (roomId == null || roomId.isEmpty) {
+        await userRoomRef.delete().catchError((_) {});
+        return;
+      }
 
-      final roomDoc = await FirebaseFirestore.instance.collection('rooms').doc(roomId).get();
+      final roomDoc =
+      await FirebaseFirestore.instance.collection('rooms').doc(roomId).get();
+
       if (!roomDoc.exists) {
-        await FirebaseFirestore.instance.collection('user_rooms').doc(uid).delete();
+        await userRoomRef.delete().catchError((_) {});
+        return;
+      }
+
+      final roomData = roomDoc.data();
+      final status = roomData?['status'] as String?;
+
+      if (_isTerminalRemoteStatus(status)) {
+        await userRoomRef.delete().catchError((_) {});
+        _roomSub?.cancel();
+        _heartbeatTimer?.cancel();
+        _hostId = null;
+        _isSpectator = false;
+        state = _initial();
         return;
       }
 
@@ -991,6 +1047,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       state = state.copyWith(
         roomId: roomId,
         isOnline: true,
+        loading: null,
       );
 
       _watchRoom(roomId);
@@ -1031,12 +1088,27 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       return;
     }
 
-    await FirebaseFirestore.instance.collection('rooms').doc(roomId).set({
+    final batch = FirebaseFirestore.instance.batch();
+    final roomRef = FirebaseFirestore.instance.collection('rooms').doc(roomId);
+
+    batch.set(roomRef, {
       'status': 'closed',
       'closedAt': FieldValue.serverTimestamp(),
+      'currentMatchId': FieldValue.delete(),
     }, SetOptions(merge: true));
 
-    state = state.copyWith(roomState: RoomState.closed);
+    for (final player in state.players) {
+      final uid = _extractAuthenticatedUidFromPlayer(player);
+      if (uid == null || uid.isEmpty) continue;
+      batch.delete(FirebaseFirestore.instance.collection('user_rooms').doc(uid));
+    }
+
+    await batch.commit();
+
+    state = state.copyWith(
+      roomState: RoomState.closed,
+      currentMatchId: null,
+    );
   }
 
   Future<void> markRoomFinished() async {
