@@ -1,3 +1,5 @@
+/// File: match_controller.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
+
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -18,6 +20,7 @@ import '../../../domain/value_objects/identifiers.dart';
 import '../match_vm/match_vm.dart';
 
 class MatchViewModel {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const MatchViewModel({
     required this.match,
     required this.isOnline,
@@ -28,6 +31,7 @@ class MatchViewModel {
   final bool isOnline;
   final bool loading;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   MatchViewModel copyWith({
     Match? match,
     bool? isOnline,
@@ -87,6 +91,7 @@ class MatchController extends StateNotifier<MatchViewModel?> {
   MatchInputMode get inputMode => _inputMode;
   DartMultiplierMode get selectedMultiplier => _selectedMultiplier;
   List<DartInput> get currentTurnInputs => List.unmodifiable(_currentTurnInputs);
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<bool> _checkBackendConnection() async {
     final ok = await _ref.read(backendConnectionServiceProvider).checkBackendConnection();
     final current = state;
@@ -96,6 +101,7 @@ class MatchController extends StateNotifier<MatchViewModel?> {
     return ok;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> bindMatch({
     required Match match,
     required bool isOnline,
@@ -129,6 +135,7 @@ class MatchController extends StateNotifier<MatchViewModel?> {
     });
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void setInputMode(MatchInputMode mode) {
     final current = state;
     if (current == null) return;
@@ -146,17 +153,20 @@ class MatchController extends StateNotifier<MatchViewModel?> {
     _refreshVm();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void setSelectedMultiplier(DartMultiplierMode mode) {
     _selectedMultiplier = mode;
     _refreshVm();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void clearBufferedTurn() {
     _currentTurnInputs.clear();
     _selectedMultiplier = DartMultiplierMode.single;
     _refreshVm();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> registerDartValue(int rawValue) async {
     final current = state;
     if (current == null) return;
@@ -201,6 +211,7 @@ class MatchController extends StateNotifier<MatchViewModel?> {
     }
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> removeLastBufferedDart() async {
     if (_currentTurnInputs.isEmpty) return;
     _currentTurnInputs.removeLast();
@@ -208,6 +219,7 @@ class MatchController extends StateNotifier<MatchViewModel?> {
     _refreshVm();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> submitBufferedTurn() async {
     if (_currentTurnInputs.isEmpty) return;
 
@@ -224,6 +236,7 @@ class MatchController extends StateNotifier<MatchViewModel?> {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> submitBust() async {
     await submitTurn(
       0,
@@ -232,6 +245,7 @@ class MatchController extends StateNotifier<MatchViewModel?> {
       forceBustLabel: true,
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> submitCheckout() async {
     final current = state;
     if (current == null) return;
@@ -275,6 +289,7 @@ class MatchController extends StateNotifier<MatchViewModel?> {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   String formatInputLabel(DartInput input) {
     final prefix = input.multiplier == 3
         ? 'T'
@@ -284,11 +299,13 @@ class MatchController extends StateNotifier<MatchViewModel?> {
     return '$prefix${input.rawValue}';
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _refreshVm() {
     final current = state;
     if (current == null) return;
     state = current.copyWith(match: current.match);
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _syncInputModeWithCurrentPlayer() {
     final current = state;
     if (current == null) return;
@@ -308,6 +325,7 @@ class MatchController extends StateNotifier<MatchViewModel?> {
 
 
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> submitTurn(
       int points, {
         InputMode? inputMode,
@@ -350,6 +368,7 @@ class MatchController extends StateNotifier<MatchViewModel?> {
   }
 
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> undoLastTurn() async {
     final current = state;
     if (current == null) return;
@@ -376,6 +395,7 @@ class MatchController extends StateNotifier<MatchViewModel?> {
   }
 
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _applyLocalTurn(
       int points, {
         required List<DartInput> inputs,
@@ -463,6 +483,7 @@ class MatchController extends StateNotifier<MatchViewModel?> {
     state = current.copyWith(match: updated);
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _applyLocalUndo() async {
     final current = state;
     if (current == null) return;
@@ -666,6 +687,7 @@ class MatchController extends StateNotifier<MatchViewModel?> {
     state = current.copyWith(match: updatedMatch);
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   GameEngine _buildEngine(MatchConfig config) {
     return X01Engine(
       inRule: InRule(config.inMode),
@@ -676,11 +698,13 @@ class MatchController extends StateNotifier<MatchViewModel?> {
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void dispose() {
     _sub?.cancel();
     super.dispose();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   TeamFinishConstraint _resolveFinishConstraint(MatchConfig config) {
     if (!config.finishConstraintEnabled || config.teamMode != TeamMode.teams) {
       return const NoTeamFinishConstraint();
@@ -688,6 +712,7 @@ class MatchController extends StateNotifier<MatchViewModel?> {
     return const LowestTeamTotalConstraint();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   MatchVm toVm(String _) {
     _syncInputModeWithCurrentPlayer();
     final currentState = state;
@@ -713,6 +738,7 @@ class MatchController extends StateNotifier<MatchViewModel?> {
     final playerPreferred =
         _playerInputPreferences[current] ?? _inputMode;
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return MatchVm(
       players: match.roster.players.map((p) {
         final score =

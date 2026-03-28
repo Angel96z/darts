@@ -1,3 +1,5 @@
+/// File: home_shell_screen.dart. Contiene configurazione e avvio dell'applicazione.
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,6 +20,7 @@ enum AppSection {
 }
 
 class HomeScreen extends StatefulWidget {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const HomeScreen({
     super.key,
     this.initialSection = AppSection.allenamento,
@@ -26,6 +29,7 @@ class HomeScreen extends StatefulWidget {
   final AppSection initialSection;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
@@ -33,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late AppSection current;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void initState() {
     super.initState();
     current = widget.initialSection;
@@ -44,6 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final roomId = await linkCoordinator.consumeRoomId();
 
       if (roomId != null && roomId.isNotEmpty) {
+        /// Funzione: descrive in modo semplice questo blocco di logica.
         setState(() {
           current = AppSection.gioca;
         });
@@ -54,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         Navigator.push(
           context,
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           MaterialPageRoute(
             builder: (_) => const RoomLobbyShellPage(forceNewRoom: true),
           ),
@@ -92,6 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _menuItem(
       AppSection section,
       String text,
@@ -99,12 +107,14 @@ class _HomeScreenState extends State<HomeScreen> {
       ) {
     final selected = current == section;
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return ListTile(
       leading: Icon(icon),
       title: Text(text),
       selected: selected,
       onTap: () {
         Navigator.pop(context);
+        /// Funzione: descrive in modo semplice questo blocco di logica.
         setState(() {
           current = section;
         });
@@ -113,6 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     return Scaffold(
       drawer: Drawer(
@@ -131,7 +142,9 @@ class _HomeScreenState extends State<HomeScreen> {
               _menuItem(AppSection.allenamento, "Allenamento", Icons.fitness_center),
               _menuItem(AppSection.gioca, "Gioca", Icons.sports_esports),
               _menuItem(AppSection.campionati, "Campionati", Icons.emoji_events),
+              /// Funzione: descrive in modo semplice questo blocco di logica.
               _menuItem(AppSection.tornei, "Tornei", Icons.emoji_events_outlined),
+              /// Funzione: descrive in modo semplice questo blocco di logica.
               _menuItem(AppSection.classifiche, "Classifiche", Icons.leaderboard),
             ],
           ),
@@ -149,6 +162,7 @@ class _HomeScreenState extends State<HomeScreen> {
               return Row(
                 children: [
                   if (user != null)
+                    /// Funzione: descrive in modo semplice questo blocco di logica.
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: Text(
@@ -157,6 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   IconButton(
                     icon: const Icon(Icons.account_circle),
                     onPressed: () {

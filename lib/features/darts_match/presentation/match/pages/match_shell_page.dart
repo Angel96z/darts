@@ -1,3 +1,5 @@
+/// File: match_shell_page.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +19,7 @@ import '../controllers/match_controller.dart';
 import '../match_vm/match_vm.dart';
 
 class MatchShellPage extends ConsumerStatefulWidget {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const MatchShellPage({
     super.key,
     required this.match,
@@ -29,6 +32,7 @@ class MatchShellPage extends ConsumerStatefulWidget {
   final bool canPlay;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   ConsumerState<MatchShellPage> createState() => _MatchShellPageState();
 }
 
@@ -38,8 +42,10 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
   bool _resultSynced = false;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void initState() {
     super.initState();
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     Future.microtask(() async {
       final liveMatch =
           widget.match ?? await ref.read(lobbyControllerProvider.notifier).loadCurrentMatch();
@@ -51,6 +57,7 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
     });
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _onLobbyState(LobbyViewModel next) async {
     if (!mounted || _moving) return;
 
@@ -58,6 +65,7 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
       _moving = true;
       await Navigator.pushReplacement(
         context,
+        /// Funzione: descrive in modo semplice questo blocco di logica.
         MaterialPageRoute(builder: (_) => const ResultShellPage()),
       );
       return;
@@ -67,6 +75,7 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
       _moving = true;
       await Navigator.pushAndRemoveUntil(
         context,
+        /// Funzione: descrive in modo semplice questo blocco di logica.
         MaterialPageRoute(builder: (_) => const RoomLobbyShellPage()),
             (route) => false,
       );
@@ -77,6 +86,7 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
       _moving = true;
       if (!mounted) return;
       await Navigator.of(context).pushAndRemoveUntil(
+        /// Funzione: descrive in modo semplice questo blocco di logica.
         MaterialPageRoute(
           builder: (_) => const HomeScreen(
             initialSection: AppSection.gioca,
@@ -87,6 +97,7 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
     }
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _exitMatchAndGoRoom() async {
     if (!mounted || _moving) return;
     _moving = true;
@@ -126,12 +137,14 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
     if (!mounted) return;
 
     await Navigator.of(context).pushReplacement(
+      /// Funzione: descrive in modo semplice questo blocco di logica.
       MaterialPageRoute(
         builder: (_) => const RoomLobbyShellPage(),
       ),
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<bool> _confirmExitMatch() async {
     if (_moving) return false;
 
@@ -163,10 +176,12 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
         title: Text(title),
         content: Text(message),
         actions: [
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
             child: const Text('Annulla'),
           ),
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: Text(confirmLabel),
@@ -183,6 +198,7 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     final lobbyVm = ref.watch(lobbyControllerProvider);
     final matchVm = ref.watch(matchControllerProvider);
@@ -212,6 +228,7 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
         matchVm != null &&
         matchVm.match.snapshot.status == MatchStatus.completed) {
       _resultSynced = true;
+      /// Funzione: descrive in modo semplice questo blocco di logica.
       Future.microtask(() {
         ref.read(resultControllerProvider.notifier).setFromMatch(matchVm.match);
       });
@@ -244,6 +261,7 @@ class _MatchShellPageState extends ConsumerState<MatchShellPage> {
 }
 
 class _MatchLayout extends StatelessWidget {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _MatchLayout({
     required this.vm,
     required this.match,
@@ -255,6 +273,7 @@ class _MatchLayout extends StatelessWidget {
   final bool canPlay;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     return Column(
       children: [
@@ -281,6 +300,7 @@ class _TopBarSection extends StatelessWidget {
   final Match match;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     final currentSlot = _currentSlot(match);
     final currentScore =
@@ -304,6 +324,7 @@ class _TopBarSection extends StatelessWidget {
 }
 
 class _PlayersSection extends StatelessWidget {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _PlayersSection({
     required this.vm,
     required this.match,
@@ -313,6 +334,7 @@ class _PlayersSection extends StatelessWidget {
   final Match match;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     final currentPlayer = match.roster.players.firstWhere(
           (p) => p.playerId.value == vm.currentPlayerId,
@@ -357,6 +379,7 @@ class _OtherPlayersList extends StatelessWidget {
   final MatchVm vm;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     return ListView.builder(
       itemCount: vm.players.length,
@@ -375,6 +398,7 @@ class _OtherPlayersList extends StatelessWidget {
   }
 }
 class _CurrentPlayerCard extends StatelessWidget {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _CurrentPlayerCard({
     required this.player,
     required this.score,
@@ -384,6 +408,7 @@ class _CurrentPlayerCard extends StatelessWidget {
   final int score;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.all(8),
@@ -405,6 +430,7 @@ class _CurrentPlayerCard extends StatelessWidget {
 }
 
 class _PlayerRow extends StatelessWidget {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _PlayerRow({
     required this.player,
     required this.score,
@@ -416,6 +442,7 @@ class _PlayerRow extends StatelessWidget {
   final bool isCurrent;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     return Container(
       color: isCurrent ? Colors.green.withOpacity(0.3) : null,
@@ -441,6 +468,7 @@ class _CenterBoardSection extends ConsumerStatefulWidget {
   final Match match;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   ConsumerState<_CenterBoardSection> createState() => _CenterBoardSectionState();
 }
 
@@ -448,7 +476,9 @@ class _CenterBoardSectionState extends ConsumerState<_CenterBoardSection> {
   _HitOverlayEntry? _overlay;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     ref.listen(matchControllerProvider, (prev, next) {
       if (next == null) return;
 
@@ -471,12 +501,15 @@ class _CenterBoardSectionState extends ConsumerState<_CenterBoardSection> {
         label = 'TURN';
       }
 
+      /// Funzione: descrive in modo semplice questo blocco di logica.
       setState(() {
         _overlay = _HitOverlayEntry(label, total);
       });
 
+      /// Funzione: descrive in modo semplice questo blocco di logica.
       Future.delayed(const Duration(milliseconds: 900), () {
         if (!mounted) return;
+        /// Funzione: descrive in modo semplice questo blocco di logica.
         setState(() => _overlay = null);
       });
     });
@@ -539,6 +572,7 @@ class _CenterBoardSectionState extends ConsumerState<_CenterBoardSection> {
   }
 }
 class _DartsRow extends StatelessWidget {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _DartsRow({
     required this.labels,
     required this.isPerTurnMode,
@@ -548,6 +582,7 @@ class _DartsRow extends StatelessWidget {
   final bool isPerTurnMode;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     if (isPerTurnMode) {
       return Row(
@@ -579,6 +614,7 @@ class _DartsRow extends StatelessWidget {
 
 
 class _DartBox extends StatelessWidget {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _DartBox({
     required this.label,
     required this.title,
@@ -590,6 +626,7 @@ class _DartBox extends StatelessWidget {
   final double width;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     return Container(
       width: width,
@@ -617,6 +654,7 @@ class _CheckoutSuggestion extends StatelessWidget {
   final Match match;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     final score =
         match.snapshot.scoreboard.playerScores[match.snapshot.scoreboard.currentTurnPlayerId] ??
@@ -632,6 +670,7 @@ class _StatsSection extends StatelessWidget {
   final Match match;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     return ListView(
       children: [
@@ -657,6 +696,7 @@ class _BottomControlsSection extends ConsumerStatefulWidget {
   final bool canPlay;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   ConsumerState<_BottomControlsSection> createState() => _BottomControlsSectionState();
 }
 
@@ -664,12 +704,14 @@ class _BottomControlsSectionState extends ConsumerState<_BottomControlsSection> 
   final TextEditingController _scoreCtrl = TextEditingController();
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void dispose() {
     _scoreCtrl.dispose();
     super.dispose();
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     final matchVm = ref.watch(matchControllerProvider);
     final lobbyCtrl = ref.read(lobbyControllerProvider.notifier);
@@ -709,10 +751,12 @@ class _BottomControlsSectionState extends ConsumerState<_BottomControlsSection> 
             vm: vm,
           )
         else
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           _PerTurnControls(
             canSubmit: canSubmit,
             scoreCtrl: _scoreCtrl,
           ),
+        /// Funzione: descrive in modo semplice questo blocco di logica.
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: ElevatedButton(
@@ -732,6 +776,7 @@ class _BottomControlsSectionState extends ConsumerState<_BottomControlsSection> 
 
 
 class _PerDartControls extends ConsumerWidget {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _PerDartControls({
     required this.canSubmit,
     required this.vm,
@@ -741,6 +786,7 @@ class _PerDartControls extends ConsumerWidget {
   final MatchVm vm;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.read(matchControllerProvider.notifier);
 
@@ -748,12 +794,14 @@ class _PerDartControls extends ConsumerWidget {
       padding: const EdgeInsets.all(12),
       child: Column(
         children: [
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           Wrap(
             spacing: 8,
             runSpacing: 8,
             alignment: WrapAlignment.center,
             children: [
               for (final mode in DartMultiplierMode.values)
+                /// Funzione: descrive in modo semplice questo blocco di logica.
                 ChoiceChip(
                   label: Text(mode.label),
                   selected: vm.selectedMultiplier == mode,
@@ -773,12 +821,14 @@ class _PerDartControls extends ConsumerWidget {
               childAspectRatio: 1.7,
               children: [
                 for (int value = 1; value <= 20; value++)
+                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   ElevatedButton(
                     onPressed: canSubmit && vm.currentTurnInputs.length < 3
                         ? () => controller.registerDartValue(value)
                         : null,
                     child: Text('$value'),
                   ),
+                /// Funzione: descrive in modo semplice questo blocco di logica.
                 ElevatedButton(
                   onPressed: canSubmit && vm.currentTurnInputs.length < 3
                       ? () => controller.registerDartValue(25)
@@ -788,24 +838,29 @@ class _PerDartControls extends ConsumerWidget {
               ],
             ),
           ),
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           const SizedBox(height: 12),
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           Wrap(
             spacing: 8,
             runSpacing: 8,
             alignment: WrapAlignment.center,
             children: [
+              /// Funzione: descrive in modo semplice questo blocco di logica.
               ElevatedButton(
                 onPressed: canSubmit && vm.currentTurnInputs.isNotEmpty
                     ? () => controller.removeLastBufferedDart()
                     : null,
                 child: const Text('Cancella ultima'),
               ),
+              /// Funzione: descrive in modo semplice questo blocco di logica.
               ElevatedButton(
                 onPressed: canSubmit && vm.currentTurnInputs.isNotEmpty
                     ? () => controller.clearBufferedTurn()
                     : null,
                 child: const Text('Reset turno'),
               ),
+              /// Funzione: descrive in modo semplice questo blocco di logica.
               ElevatedButton(
                 onPressed: canSubmit && vm.currentTurnInputs.isNotEmpty
                     ? () => controller.submitBufferedTurn()
@@ -821,6 +876,7 @@ class _PerDartControls extends ConsumerWidget {
 }
 
 class _PerTurnControls extends ConsumerWidget {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _PerTurnControls({
     required this.canSubmit,
     required this.scoreCtrl,
@@ -830,27 +886,33 @@ class _PerTurnControls extends ConsumerWidget {
   final TextEditingController scoreCtrl;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.read(matchControllerProvider.notifier);
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Column(
         children: [
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           Wrap(
             spacing: 8,
             runSpacing: 8,
             alignment: WrapAlignment.center,
             children: [
               for (final value in const [26, 45, 60, 85, 100, 140, 180])
+                /// Funzione: descrive in modo semplice questo blocco di logica.
                 ElevatedButton(
                   onPressed: canSubmit ? () => controller.submitTurn(value) : null,
                   child: Text('$value'),
                 ),
+              /// Funzione: descrive in modo semplice questo blocco di logica.
               ElevatedButton(
                 onPressed: canSubmit ? () => controller.submitCheckout() : null,
                 child: const Text('Checkout'),
               ),
+              /// Funzione: descrive in modo semplice questo blocco di logica.
               ElevatedButton(
                 onPressed: canSubmit ? () => controller.submitBust() : null,
                 child: const Text('Bust'),
@@ -870,7 +932,9 @@ class _PerTurnControls extends ConsumerWidget {
                   ),
                 ),
               ),
+              /// Funzione: descrive in modo semplice questo blocco di logica.
               const SizedBox(width: 12),
+              /// Funzione: descrive in modo semplice questo blocco di logica.
               ElevatedButton(
                 onPressed: canSubmit
                     ? () {
@@ -891,6 +955,7 @@ class _PerTurnControls extends ConsumerWidget {
 }
 
 
+/// Funzione: descrive in modo semplice questo blocco di logica.
 PlayerSlot _currentSlot(Match match) {
   return match.roster.players.firstWhere(
         (p) => p.playerId == match.snapshot.scoreboard.currentTurnPlayerId,
@@ -898,10 +963,12 @@ PlayerSlot _currentSlot(Match match) {
   );
 }
 
+/// Funzione: descrive in modo semplice questo blocco di logica.
 String _playerLabel(PlayerSlot player) {
   return player.playerId.value;
 }
 
+/// Funzione: descrive in modo semplice questo blocco di logica.
 double _playerAverage(Match match, PlayerSlot player) {
   final turns = match.snapshot.lastTurns.where((t) => t.draft.playerId == player.playerId).toList();
   if (turns.isEmpty) return 0;

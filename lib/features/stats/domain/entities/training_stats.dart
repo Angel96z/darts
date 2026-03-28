@@ -1,3 +1,5 @@
+/// File: training_stats.dart. Contiene regole di dominio, entità o casi d'uso per questa funzionalità.
+
 import 'dart:math';
 
 import '../../../game/domain/entities/dart_models.dart';
@@ -7,11 +9,13 @@ class TrainingStats {
 
   TrainingStats(this.throws);
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   double _mean(List<double> values) {
     if (values.isEmpty) return 0;
     return values.reduce((a, b) => a + b) / values.length;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   double _std(List<double> values) {
     if (values.length < 2) return 0;
     final m = _mean(values);
@@ -31,14 +35,17 @@ class TrainingStats {
     return throws.map((e) => e.distanceMm).reduce((a, b) => a + b) / throws.length;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   int targetHits(String target) {
     return throws.where((t) => t.sector == target).length;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   int targetMiss(String target) {
     return throws.where((t) => t.sector != target).length;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   int currentStreak(String target) {
     int streak = 0;
 
@@ -53,6 +60,7 @@ class TrainingStats {
     return streak;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   int bestStreak(String target) {
     int best = 0;
     int current = 0;
@@ -137,10 +145,12 @@ class TrainingStats {
     return q;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   String _sectorNumber(String sector) {
     return sector.replaceAll(RegExp(r'[TDS]'), '');
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   String _sectorType(String sector) {
     if (sector.startsWith('T')) return 'T';
     if (sector.startsWith('D')) return 'D';

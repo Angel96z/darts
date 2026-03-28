@@ -1,3 +1,5 @@
+/// File: profile_panel.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -6,13 +8,16 @@ import '../pages/profile_screen.dart';
 import '../pages/settings_screen.dart';
 
 class ProfilePanel extends StatelessWidget {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const ProfilePanel({super.key});
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _logout(BuildContext context) async {
     await FirebaseAuth.instance.signOut();
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     final isLogged = user != null;
@@ -36,8 +41,10 @@ class ProfilePanel extends StatelessWidget {
               ),
             ),
 
+            /// Funzione: descrive in modo semplice questo blocco di logica.
             const SizedBox(height: 30),
 
+            /// Funzione: descrive in modo semplice questo blocco di logica.
             ListTile(
               leading: const Icon(Icons.person),
               title: const Text("Profilo"),
@@ -45,12 +52,14 @@ class ProfilePanel extends StatelessWidget {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
+                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   MaterialPageRoute(
                     builder: (_) => const ProfileScreen(),
                   ),
                 );              },
             ),
 
+            /// Funzione: descrive in modo semplice questo blocco di logica.
             ListTile(
               leading: const Icon(Icons.settings),
               title: const Text("Impostazioni"),
@@ -58,14 +67,17 @@ class ProfilePanel extends StatelessWidget {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
+                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   MaterialPageRoute(
                     builder: (_) => const SettingsScreen(),
                   ),
                 );              },
             ),
 
+            /// Funzione: descrive in modo semplice questo blocco di logica.
             const Spacer(),
 
+            /// Funzione: descrive in modo semplice questo blocco di logica.
             ListTile(
               leading: Icon(isLogged ? Icons.logout : Icons.login),
               title: Text(isLogged ? "Logout" : "Login"),
@@ -77,6 +89,7 @@ class ProfilePanel extends StatelessWidget {
                 } else {
                   Navigator.push(
                     context,
+                    /// Funzione: descrive in modo semplice questo blocco di logica.
                     MaterialPageRoute(
                       builder: (_) => const LoginScreen(),
                     ),

@@ -1,3 +1,5 @@
+/// File: dart_models.dart. Contiene regole di dominio, entità o casi d'uso per questa funzionalità.
+
 import 'package:flutter/material.dart';
 
 class DartHitData {
@@ -7,6 +9,7 @@ class DartHitData {
   final double distanceMm;
   final String? targetQuadrant;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const DartHitData({
     required this.boardPosition,
     required this.sector,
@@ -20,6 +23,7 @@ class DartPlayer {
   final String id;
   final String name;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const DartPlayer({
     required this.id,
     required this.name,
@@ -31,6 +35,7 @@ class DartTeam {
   final String name;
   final List<DartPlayer> players;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const DartTeam({
     required this.id,
     required this.name,
@@ -56,6 +61,7 @@ class DartThrow {
   final int dartInTurn;
   final bool isPass;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const DartThrow({
     required this.position,
     required this.sector,
@@ -86,6 +92,7 @@ class DartTurnPlayer {
   final String teamId;
   final String teamName;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const DartTurnPlayer({
     required this.playerId,
     required this.playerName,
@@ -117,10 +124,12 @@ class DartThrowManagerController extends ChangeNotifier {
     return _turnOrder[_currentOrderIndex];
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void setEngine(DartGameEngine engine) {
     _engine = engine;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void configureSingles({
     required List<DartPlayer> players,
   }) {
@@ -138,6 +147,7 @@ class DartThrowManagerController extends ChangeNotifier {
     }
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void registerHit(DartHitData hit) {
     if (_waitingNextTurn) return;
 
@@ -174,6 +184,7 @@ class DartThrowManagerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void finishVisualTurn() {
     if (!_waitingNextTurn) return;
 
@@ -193,6 +204,7 @@ class DartThrowManagerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void undoLastThrow() {
 
     if (_throws.isEmpty) return;
@@ -233,6 +245,7 @@ class DartThrowManagerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void clearAll() {
     _throws.clear();
     _currentTurn.clear();

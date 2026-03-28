@@ -1,3 +1,5 @@
+/// File: training_quadrant_distance.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
+
 import 'package:flutter/material.dart';
 
 class TrainingQuadrantDistance extends StatelessWidget {
@@ -6,6 +8,7 @@ class TrainingQuadrantDistance extends StatelessWidget {
   final double distanceMm;
   final double hitPercent;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TrainingQuadrantDistance({
     super.key,
     required this.quadrants,
@@ -21,6 +24,7 @@ class TrainingQuadrantDistance extends StatelessWidget {
 
   static const double _gridSize = 150;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Color _cellColor(int value, int total) {
     if (total == 0) return _cellBg;
 
@@ -33,6 +37,7 @@ class TrainingQuadrantDistance extends StatelessWidget {
     )!;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _cell(int value, int total) {
 
     final percent = total == 0 ? 0 : ((value / total) * 100).round();
@@ -57,6 +62,7 @@ class TrainingQuadrantDistance extends StatelessWidget {
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
 
     final total = totalMiss == 0 ? 1 : totalMiss;

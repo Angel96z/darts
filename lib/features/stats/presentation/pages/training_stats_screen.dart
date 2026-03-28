@@ -1,3 +1,5 @@
+/// File: training_stats_screen.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -23,6 +25,7 @@ enum StatsViewType {
 
 class StatsFilter {
   final int? dartIndex;
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const StatsFilter({this.dartIndex});
 }
 
@@ -30,16 +33,19 @@ class StatsController extends ChangeNotifier {
   StatsViewType view = StatsViewType.heatmap;
   StatsFilter filter = const StatsFilter();
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void setView(StatsViewType v) {
     view = v;
     notifyListeners();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void setFilter(StatsFilter f) {
     filter = f;
     notifyListeners();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   List<DartThrow> applyFilter(List<DartThrow> input) {
     if (filter.dartIndex == null) return input;
     return input.where((t) => t.dartInTurn == filter.dartIndex).toList();
@@ -61,6 +67,7 @@ class TrainingStatsScreen extends StatefulWidget {
   final String? initialSessionId;
   final String? initialTarget;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TrainingStatsScreen({
     super.key,
     required this.title,
@@ -70,6 +77,7 @@ class TrainingStatsScreen extends StatefulWidget {
   });
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   State<TrainingStatsScreen> createState() => _TrainingStatsScreenState();
 }
 
@@ -86,6 +94,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
   bool _loaded = false;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void initState() {
     super.initState();
     _target = widget.initialTarget ?? _target;
@@ -99,6 +108,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     _initData();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _initData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -124,6 +134,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       }
     }
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     setState(() {
       _cachedRecords = allRecords;
       _loaded = true;
@@ -134,6 +145,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     });
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<List<_CachedThrowRecord>> _loadFromLocalCache() async {
     final allLocal = await LocalTrainingSyncService.instance.getAllRecords();
     final records = <_CachedThrowRecord>[];
@@ -154,6 +166,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     return records;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<List<_CachedThrowRecord>> _loadFromFirestore(List<_CachedThrowRecord> existing) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return [];
@@ -204,6 +217,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
 
     return records;
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   String _buildRightLabel() {
     if (_mode == StatsMode.period) {
       if (_range == null) return 'Range';
@@ -214,6 +228,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     return '${DateFormat('dd/MM').format(_session!.startTime)} • ${_session!.id}';
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _openPeriod() async {
     final now = DateTime.now();
 
@@ -230,6 +245,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
 
     if (result == null) return;
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     setState(() {
       _mode = StatsMode.period;
       _range = result;
@@ -237,14 +253,17 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     });
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _openSessionPicker() {
     Navigator.push(
       context,
+      /// Funzione: descrive in modo semplice questo blocco di logica.
       MaterialPageRoute(
         builder: (_) => _SessionPickerScreen(
           target: _target,
           highlightedSessionId: widget.initialSessionId,
           onSelect: (session) {
+            /// Funzione: descrive in modo semplice questo blocco di logica.
             setState(() {
               _mode = StatsMode.session;
               _session = session;
@@ -255,23 +274,29 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildTopBar() {
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           TargetSectorSelector(
             currentTarget: _target,
             onSelected: (value) {
+              /// Funzione: descrive in modo semplice questo blocco di logica.
               setState(() {
                 _target = value;
                 _session = null;
               });
             },
           ),
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           const SizedBox(width: 8),
           PopupMenuButton<StatsMode>(
             onSelected: (mode) {
+              /// Funzione: descrive in modo semplice questo blocco di logica.
               setState(() {
                 _mode = mode;
               });
@@ -287,6 +312,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
                 value: StatsMode.period,
                 child: Text('Periodo'),
               ),
+              /// Funzione: descrive in modo semplice questo blocco di logica.
               PopupMenuItem(
                 value: StatsMode.session,
                 child: Text('Sessione'),
@@ -294,7 +320,9 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
             ],
             child: _Box(_mode == StatsMode.period ? 'Periodo' : 'Sessione'),
           ),
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           const Spacer(),
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           GestureDetector(
             onTap: () {
               if (_mode == StatsMode.period) {
@@ -311,11 +339,14 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
   }
 
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _viewBtn(String label, StatsViewType type) {
     final selected = _statsController.view == type;
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return GestureDetector(
       onTap: () {
+        /// Funzione: descrive in modo semplice questo blocco di logica.
         setState(() {
           _statsController.setView(type);
           _pageController.jumpToPage(type.index);
@@ -339,13 +370,16 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _filterBtn(String label, int? dart) {
     final selected = _statsController.filter.dartIndex == dart;
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: GestureDetector(
         onTap: () {
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           setState(() {
             _statsController.setFilter(StatsFilter(dartIndex: dart));
           });
@@ -368,6 +402,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<List<TrainingSessionStats>> _loadTrainingsForTarget() async {
     final sessions = <TrainingSessionStats>[];
     final added = <String>{};
@@ -459,6 +494,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     return sessions;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<List<TrainingSessionStats>> _loadSessionsForActivePeriod() async {
     final sessions = await _loadTrainingsForTarget();
     final range = _range;
@@ -477,12 +513,14 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       59,
     );
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return sessions.where((session) {
       final date = session.startTime;
       return !date.isBefore(start) && !date.isAfter(end);
     }).toList();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   PeriodStats _aggregatePeriodStats(List<TrainingSessionStats> filtered) {
     if (filtered.isEmpty) {
       return const PeriodStats.empty();
@@ -529,6 +567,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   List<DartThrow> _getFilteredThrows() {
     Iterable<_CachedThrowRecord> filtered = _cachedRecords;
 
@@ -556,6 +595,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     return _statsController.applyFilter(throws);
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildStats() {
     if (!_loaded) {
       return const Center(child: CircularProgressIndicator());
@@ -570,6 +610,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       ],
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _statsSection() {
     final throws = _getFilteredThrows();
 
@@ -594,12 +635,16 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
             _target,
             showSessionTime: _mode == StatsMode.period,
           ),
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           const SizedBox(height: 4),
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           _clusterTitle('RIEPILOGO'),
           TrainingCharts.performanceScore(throws, _target),
           TrainingCharts.bestWorstAnalysis(throws, _target),
           TrainingCharts.ringDistribution(throws, _target),
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           const SizedBox(height: 4),
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           _clusterTitle('SESSIONI'),
           FutureBuilder<List<TrainingSessionStats>>(
             future: _loadSessionsForActivePeriod(),
@@ -619,6 +664,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   SessionPerformancePoint _toSessionPoint(TrainingSessionStats s) {
     return SessionPerformancePoint(
       id: s.id,
@@ -633,6 +679,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _clusterTitle(String title) {
     return Container(
       width: double.infinity,
@@ -648,6 +695,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       ),
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _statBox(String title) {
     return Container(
       width: double.infinity,
@@ -678,6 +726,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       ),
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildInsight(List<DartThrow> throws) {
     if (throws.isEmpty) {
       return const Padding(
@@ -730,6 +779,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
         );
     }
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _insightBox(String title, String text) {
     return Container(
       width: double.infinity,
@@ -749,7 +799,9 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       ),
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildHeatmapView(List<DartThrow> throws) {
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return DartboardWidget(
       throws: throws,
       target: _target,
@@ -758,7 +810,9 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       },
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildAccuracyView(List<DartThrow> throws) {
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return DartboardWidget(
       throws: throws,
       target: _target,
@@ -769,7 +823,9 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       },
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildPrecisionView(List<DartThrow> throws) {
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return DartboardWidget(
       throws: throws,
       target: _target,
@@ -778,7 +834,9 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       },
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildBiasView(List<DartThrow> throws) {
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return DartboardWidget(
       throws: throws,
       target: _target,
@@ -788,7 +846,9 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       },
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildDirectionalBiasView(List<DartThrow> throws) {
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return DartboardWidget(
       throws: throws,
       target: _target,
@@ -798,6 +858,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       },
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildDistanceView(List<DartThrow> throws) {
     if (throws.isEmpty) {
       return const Center(child: Text('Nessun dato'));
@@ -814,6 +875,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildHitRateView(List<DartThrow> throws) {
     if (throws.isEmpty) {
       return const Center(child: Text('Nessun dato'));
@@ -831,6 +893,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildStatsPager(List<DartThrow> throws) {
     return SizedBox.expand(
       child: PageView(
@@ -850,6 +913,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     );
   }
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void dispose() {
     _pageController.dispose();
     _statsController.dispose();
@@ -857,6 +921,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width >= 700;
 
@@ -877,6 +942,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
 
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildDesktopLayout() {
     return Row(
       children: [
@@ -940,6 +1006,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildMobileLayout() {
     return Stack(
       children: [
@@ -1004,6 +1071,7 @@ class _SessionPickerScreen extends StatefulWidget {
   final String? highlightedSessionId;
   final ValueChanged<TrainingSessionStats> onSelect;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _SessionPickerScreen({
     required this.target,
     required this.highlightedSessionId,
@@ -1011,6 +1079,7 @@ class _SessionPickerScreen extends StatefulWidget {
   });
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   State<_SessionPickerScreen> createState() => _SessionPickerScreenState();
 }
 
@@ -1019,11 +1088,13 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
   late Future<List<TrainingSessionStats>> _future;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void initState() {
     super.initState();
     _future = _loadSessions();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<List<TrainingSessionStats>> _loadSessions() async {
     final sessions = <TrainingSessionStats>[];
     final added = <String>{};
@@ -1119,6 +1190,7 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
     return sessions;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _sortSessions(List<TrainingSessionStats> sessions) {
     switch (_sort) {
       case SessionSort.dateDesc:
@@ -1142,14 +1214,18 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
     }
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _reload() {
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     setState(() {
       _future = _loadSessions();
     });
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sessioni'),
@@ -1180,6 +1256,7 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
                 value: SessionSort.durationDesc,
                 child: Text('Durata ↓'),
               ),
+              /// Funzione: descrive in modo semplice questo blocco di logica.
               PopupMenuItem(
                 value: SessionSort.durationAsc,
                 child: Text('Durata ↑'),
@@ -1282,6 +1359,7 @@ class _CachedThrowRecord {
   final String trainingTarget;
   final DartThrow dartThrow;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _CachedThrowRecord({
     required this.trainingId,
     required this.trainingTarget,
@@ -1310,6 +1388,7 @@ class TrainingSessionStats {
   final String? commento;
   final LocalTrainingSyncStatus? syncStatus;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TrainingSessionStats({
     required this.id,
     required this.target,
@@ -1344,6 +1423,7 @@ class PeriodStats {
   final int totalDurationSeconds;
   final int bestStreak;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const PeriodStats({
     required this.totalSessions,
     required this.totalThrows,
@@ -1375,6 +1455,7 @@ class _Stat extends StatelessWidget {
   const _Stat(this.label, this.value);
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -1403,6 +1484,7 @@ class _Box extends StatelessWidget {
   const _Box(this.text);
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1415,6 +1497,7 @@ class _Box extends StatelessWidget {
   }
 }
 
+/// Funzione: descrive in modo semplice questo blocco di logica.
 int _asInt(dynamic value) {
   if (value is int) return value;
   if (value is double) return value.round();
@@ -1422,6 +1505,7 @@ int _asInt(dynamic value) {
   return 0;
 }
 
+/// Funzione: descrive in modo semplice questo blocco di logica.
 int? _asNullableInt(dynamic value) {
   if (value == null) return null;
   if (value is int) return value;
@@ -1429,6 +1513,7 @@ int? _asNullableInt(dynamic value) {
   return int.tryParse(value.toString());
 }
 
+/// Funzione: descrive in modo semplice questo blocco di logica.
 double _asDouble(dynamic value) {
   if (value is double) return value;
   if (value is int) return value.toDouble();
@@ -1436,6 +1521,7 @@ double _asDouble(dynamic value) {
   return 0;
 }
 
+/// Funzione: descrive in modo semplice questo blocco di logica.
 String _formatDuration(int totalSeconds) {
   final duration = Duration(seconds: totalSeconds);
   final hours = duration.inHours;

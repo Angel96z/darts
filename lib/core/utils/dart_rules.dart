@@ -1,3 +1,5 @@
+/// File: dart_rules.dart. Contiene componenti condivisi usati in più parti dell'app.
+
 import 'dart:math';
 
 class DartRuleResult {
@@ -6,6 +8,7 @@ class DartRuleResult {
   final double distanceMm;
   final String? targetQuadrant;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const DartRuleResult({
     required this.sector,
     required this.score,
@@ -19,6 +22,7 @@ class DartRules {
     20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5,
   ];
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static DartRuleResult calculateHit({
     required double dx,
     required double dy,
@@ -120,6 +124,7 @@ class DartRules {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static String _quadrant(double ddx, double ddy, bool isCenter) {
     if (isCenter) return 'center';
     if (ddx < 0 && ddy < 0) return 'tl';

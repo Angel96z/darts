@@ -1,7 +1,10 @@
+/// File: match_vm.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
+
 import '../../../domain/entities/match.dart';
 import '../controllers/match_controller.dart';
 
 class MatchVm {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const MatchVm({
     required this.players,
     required this.currentPlayerId,
@@ -26,6 +29,7 @@ class MatchVm {
   final int bufferedTurnTotal;
   final List<String> displayTurnLabels;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   MatchVm copyWith({
     List<PlayerVm>? players,
     String? currentPlayerId,
@@ -59,6 +63,7 @@ class PlayerVm {
   final int score;
   final bool isCurrent;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   PlayerVm({
     required this.id,
     required this.name,

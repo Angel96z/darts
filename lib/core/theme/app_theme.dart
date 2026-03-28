@@ -1,3 +1,5 @@
+/// File: app_theme.dart. Contiene componenti condivisi usati in più parti dell'app.
+
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart';
 
@@ -43,6 +45,7 @@ class ThemeController {
   static final ValueNotifier<ThemeMode> themeMode =
   ValueNotifier(ThemeMode.system);
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static void setTheme(ThemeMode mode) {
     themeMode.value = mode;
   }

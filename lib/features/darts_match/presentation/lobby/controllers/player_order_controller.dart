@@ -1,3 +1,5 @@
+/// File: player_order_controller.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -8,6 +10,7 @@ import 'lobby_controller.dart';
 // -----------------------
 
 class PlayerOrderState {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const PlayerOrderState({
     required this.ordered,
     this.teamsEnabled = false,
@@ -19,6 +22,7 @@ class PlayerOrderState {
   final int teamSize;
 
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   PlayerOrderState copyWith({
     List<LobbyPlayerVm>? ordered,
     bool? teamsEnabled,
@@ -37,6 +41,7 @@ class PlayerOrderState {
 // -----------------------
 
 class PlayerOrderController extends StateNotifier<PlayerOrderState> {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> addPlayer(LobbyPlayerVm player) async {
     final list = [...state.ordered, player];
 
@@ -46,6 +51,7 @@ class PlayerOrderController extends StateNotifier<PlayerOrderState> {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> removePlayerById(String playerId) async {
     final list = state.ordered.where((p) => p.id != playerId).toList();
 
@@ -66,6 +72,7 @@ class PlayerOrderController extends StateNotifier<PlayerOrderState> {
     state = state.copyWith(ordered: updated);
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _applyLayoutChange({
     required int teamSize,
     required List<LobbyPlayerVm> reorderList,
@@ -117,6 +124,7 @@ class PlayerOrderController extends StateNotifier<PlayerOrderState> {
   }
 
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   List<int> computeValidTeamSizes(int playerCount) {
     if (playerCount <= 1) return const [1];
 
@@ -136,6 +144,7 @@ class PlayerOrderController extends StateNotifier<PlayerOrderState> {
     return result;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> setTeamMode(int teamSize) async {
     await _applyLayoutChange(
       teamSize: teamSize,
@@ -150,10 +159,12 @@ class PlayerOrderController extends StateNotifier<PlayerOrderState> {
 
   // 🔴 FLAG BLOCCO SNAPSHOT
   bool _isReordering = false;
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void beginRemoteMutation() {
     _isReordering = true;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void endRemoteMutation() {
     _isReordering = false;
   }
@@ -161,6 +172,7 @@ class PlayerOrderController extends StateNotifier<PlayerOrderState> {
   // INIT FROM LOBBY
   // -----------------------
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void syncFromLobby(List<LobbyPlayerVm> players) {
 // Se stiamo facendo un drag&drop manuale, non interrompiamo l'animazione
     if (_isReordering) return;
@@ -210,6 +222,7 @@ class PlayerOrderController extends StateNotifier<PlayerOrderState> {
   // DRAG LOCAL (UI ONLY)
   // -----------------------
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> reorderLocal(int oldIndex, int newIndex) async {
     if (_isReordering) return;
     _isReordering = true;

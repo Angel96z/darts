@@ -1,3 +1,5 @@
+/// File: guest_auth_service.dart. Contiene accesso e trasformazione dati (datasource, dto, repository o mapper).
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 
@@ -6,6 +8,7 @@ class GuestAuthResult {
   final String? email;
   final String? name;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   GuestAuthResult({
     required this.uid,
     this.email,
@@ -16,6 +19,7 @@ class GuestAuthResult {
 class GuestAuthService {
   static int _counter = 0;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<GuestAuthResult> signIn({
     required String email,
     required String password,

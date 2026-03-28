@@ -1,9 +1,12 @@
+/// File: training_save_logic.dart. Contiene regole di dominio, entità o casi d'uso per questa funzionalità.
+
 import '../../../game/domain/entities/dart_models.dart';
 
 class TrainingSaveResult {
   final bool canSave;
   final String message;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TrainingSaveResult({
     required this.canSave,
     required this.message,
@@ -12,6 +15,7 @@ class TrainingSaveResult {
 
 class TrainingSaveLogic {
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static TrainingSaveResult validateSave(
       DartThrowManagerController controller,
       ) {

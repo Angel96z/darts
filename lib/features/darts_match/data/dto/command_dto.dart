@@ -1,4 +1,7 @@
+/// File: command_dto.dart. Contiene accesso e trasformazione dati (datasource, dto, repository o mapper).
+
 class CommandDto {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const CommandDto({
     required this.commandId,
     required this.roomId,

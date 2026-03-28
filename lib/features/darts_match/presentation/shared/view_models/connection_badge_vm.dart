@@ -1,3 +1,5 @@
+/// File: connection_badge_vm.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
+
 class ConnectionBadgeVm {
   const ConnectionBadgeVm({required this.isOnline});
 

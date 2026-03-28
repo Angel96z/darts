@@ -1,3 +1,5 @@
+/// File: score_controller.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
+
 import 'package:flutter/material.dart';
 
 class DartScore {
@@ -45,12 +47,14 @@ class ScoreController extends ChangeNotifier {
     return value;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void setTarget(String sector) {
     _target = sector;
     _recalculate();
     notifyListeners();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void registerHit(String label, int score) {
     _scores.add(DartScore(label, score));
 
@@ -61,6 +65,7 @@ class ScoreController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void registerDistance(double mm) {
     if (mm.isNaN || mm.isInfinite) return;
 
@@ -68,12 +73,14 @@ class ScoreController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void registerTurn(int score) {
     _scores.add(DartScore("TURN", score));
     _recalculate();
     notifyListeners();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void undoLast() {
     if (_scores.isEmpty) return;
 
@@ -87,6 +94,7 @@ class ScoreController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void clear() {
     _scores.clear();
     _distances.clear();
@@ -96,6 +104,7 @@ class ScoreController extends ChangeNotifier {
 
   int get total => _scores.fold(0, (p, e) => p + e.score);
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _recalculate() {
     _hitsOnTarget = 0;
 
