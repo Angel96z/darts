@@ -1,3 +1,5 @@
+/// File: lobby_controller.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
+
 import 'dart:async';
 import 'dart:math';
 
@@ -16,6 +18,7 @@ import 'player_order_controller.dart';
 import 'package:flutter/foundation.dart';
 
 class LobbyPlayerVm {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const LobbyPlayerVm({
     required this.id,
     required this.name,
@@ -37,6 +40,7 @@ class LobbyPlayerVm {
 
 
 class LobbyConfigVm {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const LobbyConfigVm({
     required this.variant,
     required this.inMode,
@@ -53,6 +57,7 @@ class LobbyConfigVm {
   final int sets;
   final String gameType;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   LobbyConfigVm copyWith({
     X01Variant? variant,
     InMode? inMode,
@@ -73,6 +78,7 @@ class LobbyConfigVm {
 }
 
 class LobbyViewModel {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const LobbyViewModel({
     required this.roomState,
     required this.connection,
@@ -99,6 +105,7 @@ class LobbyViewModel {
 
   bool get canStart => players.isNotEmpty;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   LobbyViewModel copyWith({
     RoomState? roomState,
     ConnectionState? connection,
@@ -131,21 +138,25 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
   Timer? _heartbeatTimer;
   bool _isSpectator = false;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   int _nextOrder() {
     if (state.players.isEmpty) return 0;
     return state.players.map((p) => p.order).reduce(max) + 1;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
     if (_isSpectator) return;
 
     _heartbeatTimer = Timer.periodic(
+      /// Funzione: descrive in modo semplice questo blocco di logica.
       const Duration(seconds: 8),
           (_) => _ping(),
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _ping() async {
     final roomId = state.roomId;
     final uid = authUid;
@@ -199,11 +210,13 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
   Timer? _connectionTimer;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _roomSub;
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   LobbyController(this._ref) : super(_initial()) {
     _startConnectionMonitoring();
   }
   final Ref _ref;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static LobbyViewModel _initial() {
     return const LobbyViewModel(
       roomState: RoomState.waiting,
@@ -226,15 +239,18 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _startConnectionMonitoring() {
     _connectionTimer?.cancel();
     _refreshConnectionState();
     _connectionTimer = Timer.periodic(
+      /// Funzione: descrive in modo semplice questo blocco di logica.
       const Duration(seconds: 6),
           (_) => _refreshConnectionState(),
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _refreshConnectionState() async {
     try {
       final online =
@@ -274,6 +290,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       return isCurrentAuthPlayer && hasAdminControl;
     });
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> initAsHost() async {
     final uid = authUid;
     if (uid == null) return;
@@ -300,6 +317,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     }
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> participateInRoom() async {
     final uid = authUid;
     final roomId = state.roomId;
@@ -363,6 +381,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
   }
 
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<LobbyPlayerVm> buildLocalGuestVm(String name) async {
     final id = 'guest_${DateTime.now().millisecondsSinceEpoch}';
 
@@ -377,6 +396,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<LobbyPlayerVm> buildExternalGuestVm({
     required String externalId,
     required String email,
@@ -394,6 +414,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> removePlayer(String playerId) async {
     if (playerId == _hostId) return;
 
@@ -445,6 +466,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     }
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> invite() async {
     if (state.roomId != null) {
       state = state.copyWith(
@@ -499,6 +521,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     _startHeartbeat();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> closeRoom() async {
     _roomSub?.cancel();
     _heartbeatTimer?.cancel();
@@ -539,6 +562,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     state = _initial();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> leaveRoom() async {
     final uid = authUid;
     if (uid == null) return;
@@ -588,6 +612,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     }
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> updatePlayersFromOrder(List<LobbyPlayerVm> ordered) async {
     final roomId = state.roomId;
     if (roomId == null) return;
@@ -644,6 +669,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     }, SetOptions(merge: true));
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> resetForNewRoom() async {
     _roomSub?.cancel();
     _heartbeatTimer?.cancel();
@@ -655,6 +681,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
   }
 
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<Match?> startMatch() async {
     if (state.players.isEmpty) return null;
     if (!canCurrentAuthControlAsAdmin) return null;
@@ -714,6 +741,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     return match;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> reloadRoomFromDb() async {
     final roomId = state.roomId;
 
@@ -757,6 +785,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void dispose() {
     _connectionTimer?.cancel();
     _heartbeatTimer?.cancel();
@@ -764,6 +793,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     super.dispose();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _watchRoom(String roomId) {
     _roomSub?.cancel();
     _roomSub = FirebaseFirestore.instance
@@ -830,6 +860,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
 
     });
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   bool _isTerminalRemoteStatus(String? status) {
     switch ((status ?? '').trim()) {
       case 'finished':
@@ -840,6 +871,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
         return false;
     }
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   RoomState _mapRemoteStatus(String status) {
     switch (status) {
       case 'ready':
@@ -863,6 +895,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     }
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   String? _extractAuthenticatedUidFromPlayer(LobbyPlayerVm player) {
     if (!player.isGuest) return player.id;
     if (player.id.startsWith('guest_ext_')) {
@@ -871,6 +904,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     return null;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _syncUserRoomBindingsForAuthenticatedPlayers(String roomId) async {
     final db = FirebaseFirestore.instance;
     final batch = db.batch();
@@ -909,6 +943,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     };
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   String _buildInviteLink(String roomId) {
     return Uri(
       scheme: 'https',
@@ -917,6 +952,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     ).toString();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   String _buildWatchLink(String roomId) {
     return Uri(
       scheme: 'https',
@@ -925,6 +961,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     ).toString();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> joinFromLink(String roomId) async {
     if (roomId.isEmpty) return;
 
@@ -969,6 +1006,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     _startHeartbeat();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> joinAsSpectator(String roomId) async {
     if (roomId.isEmpty) return;
     final roomSnap = await FirebaseFirestore.instance.collection('rooms').doc(roomId).get();
@@ -982,6 +1020,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     _watchRoom(roomId);
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void updateConfig({
     X01Variant? variant,
     InMode? inMode,
@@ -1000,6 +1039,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     );
     state = state.copyWith(config: next);
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> autoRejoinRoomIfNeeded() async {
     final uid = authUid;
     if (uid == null) return;
@@ -1054,6 +1094,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
       _startHeartbeat();
     } catch (_) {}
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<Match?> loadCurrentMatch() async {
     final roomId = state.roomId;
     final currentMatchId = state.currentMatchId;
@@ -1065,6 +1106,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
         .getMatch(RoomId(roomId), MatchId(currentMatchId));
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> reopenRoomFromResult() async {
     final roomId = state.roomId;
     if (roomId == null) {
@@ -1081,6 +1123,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     state = state.copyWith(roomState: RoomState.waiting, currentMatchId: null);
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> markRoomTerminated() async {
     final roomId = state.roomId;
     if (roomId == null) {
@@ -1111,6 +1154,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> markRoomFinished() async {
     final roomId = state.roomId;
     if (roomId == null) return;
@@ -1121,6 +1165,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     state = state.copyWith(roomState: RoomState.finished);
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Match _buildInitialMatch({required String roomId, required String matchId}) {
     final sortedPlayers = [...state.players]..sort((a, b) => a.order.compareTo(b.order));
     final orderState = _ref.read(playerOrderControllerProvider);
@@ -1213,6 +1258,7 @@ class LobbyController extends StateNotifier<LobbyViewModel> {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   int _variantScore(X01Variant variant) {
     switch (variant) {
       case X01Variant.x101:

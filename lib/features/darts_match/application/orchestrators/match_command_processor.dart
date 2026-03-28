@@ -1,3 +1,5 @@
+/// File: match_command_processor.dart. Contiene codice Dart del progetto.
+
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,6 +10,7 @@ import '../../domain/value_objects/identifiers.dart';
 import 'match_orchestrator.dart';
 
 class MatchCommandProcessor {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   MatchCommandProcessor({
     required FirebaseFirestore firestore,
     required MatchOrchestrator orchestrator,
@@ -21,6 +24,7 @@ class MatchCommandProcessor {
   CollectionReference<Map<String, dynamic>> _commands(String roomId) =>
       _firestore.collection('rooms').doc(roomId).collection('commands');
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void bindRoom(String roomId) {
     _sub?.cancel();
     _sub = _commands(roomId).where('status', isEqualTo: 'pending').snapshots().listen((snapshot) {
@@ -30,6 +34,7 @@ class MatchCommandProcessor {
     });
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _processDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) async {
     final claimed = await _claimPending(doc.reference);
     if (!claimed) return;
@@ -53,7 +58,9 @@ class MatchCommandProcessor {
     }
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<bool> _claimPending(DocumentReference<Map<String, dynamic>> ref) async {
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return _firestore.runTransaction((tx) async {
       final snap = await tx.get(ref);
       final status = snap.data()?['status'] as String?;
@@ -66,6 +73,7 @@ class MatchCommandProcessor {
     });
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   MatchCommand? _toCommand(Map<String, dynamic> data) {
     final type = data['type'] as String?;
     if (type != 'SubmitTurnCommand') return null;
@@ -95,6 +103,7 @@ class MatchCommandProcessor {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> dispose() async {
     await _sub?.cancel();
   }

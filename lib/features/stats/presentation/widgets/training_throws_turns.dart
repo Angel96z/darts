@@ -1,15 +1,19 @@
+/// File: training_throws_turns.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
+
 import 'package:flutter/material.dart';
 
 class TrainingThrowsTurns extends StatelessWidget {
   final int throwsCount;
   final int turns;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TrainingThrowsTurns({
     super.key,
     required this.throwsCount,
     required this.turns,
   });
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _chip(BuildContext context, IconData icon, String value) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -49,6 +53,7 @@ class TrainingThrowsTurns extends StatelessWidget {
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.centerLeft,

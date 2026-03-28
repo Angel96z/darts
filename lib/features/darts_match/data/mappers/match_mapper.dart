@@ -1,3 +1,5 @@
+/// File: match_mapper.dart. Contiene accesso e trasformazione dati (datasource, dto, repository o mapper).
+
 import '../../domain/entities/identity.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/policies/input_fidelity_policy.dart';
@@ -7,7 +9,9 @@ import '../dto/match_dto.dart';
 class MatchMapper {
   const MatchMapper();
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   MatchDto toDto(Match match) {
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return MatchDto(
       matchId: match.id.value,
       roomId: match.roomId.value,
@@ -126,6 +130,7 @@ class MatchMapper {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Match toDomain(MatchDto dto) {
     final configMap = dto.config;
     final rosterMap = dto.roster;
@@ -176,6 +181,7 @@ class MatchMapper {
 
     final inputSnapshot = <PlayerId, InputModeSnapshot>{
       for (final entry in inputSnapshotRaw.entries)
+        /// Funzione: descrive in modo semplice questo blocco di logica.
         PlayerId(entry.key): InputModeSnapshot(
           mode: InputMode.values.firstWhere(
                 (e) => e.name == ((entry.value as Map)['mode'] ?? InputMode.totalTurnInput.name),
@@ -226,6 +232,7 @@ class MatchMapper {
       )
           .toList();
 
+      /// Funzione: descrive in modo semplice questo blocco di logica.
       return TurnCommitted(
         turnId: (turnMap['turnId'] ?? '') as String,
         committedAt: DateTime.tryParse((turnMap['committedAt'] ?? '') as String) ?? DateTime.now(),
@@ -303,6 +310,7 @@ class MatchMapper {
       );
     }
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return Match(
       id: MatchId(dto.matchId),
       roomId: RoomId(dto.roomId),
@@ -367,6 +375,7 @@ class MatchMapper {
         scoreboard: Scoreboard(
           playerScores: {
             for (final entry in playerScoresRaw.entries)
+              /// Funzione: descrive in modo semplice questo blocco di logica.
               PlayerId(entry.key): (entry.value as num).toInt(),
           },
           teamScores: {

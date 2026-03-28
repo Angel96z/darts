@@ -1,3 +1,5 @@
+/// File: auth_datasource.dart. Contiene accesso e trasformazione dati (datasource, dto, repository o mapper).
+
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AuthDataSource {

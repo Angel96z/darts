@@ -1,4 +1,7 @@
+/// File: match_dto.dart. Contiene accesso e trasformazione dati (datasource, dto, repository o mapper).
+
 class MatchDto {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const MatchDto({
     required this.matchId,
     required this.roomId,

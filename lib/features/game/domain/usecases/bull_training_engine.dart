@@ -1,3 +1,5 @@
+/// File: bull_training_engine.dart. Contiene regole di dominio, entità o casi d'uso per questa funzionalità.
+
 import 'dart:async';
 import '../entities/dart_models.dart';
 import '../../../score/presentation/state/score_controller.dart';
@@ -17,6 +19,7 @@ class BullTrainingEngine implements DartGameEngine {
   bool get isTurnComplete => _currentTurn.length == 3;
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void onThrow(String sector, int scoreValue, double distanceMm) {
 
     _turnTimer?.cancel();
@@ -34,6 +37,7 @@ class BullTrainingEngine implements DartGameEngine {
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void undo() {
 
     _turnTimer?.cancel();
@@ -62,6 +66,7 @@ class BullTrainingEngine implements DartGameEngine {
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void clear() {
 
     _turnTimer?.cancel();

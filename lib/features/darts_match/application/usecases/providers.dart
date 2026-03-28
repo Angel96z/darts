@@ -1,3 +1,5 @@
+/// File: providers.dart. Contiene codice Dart del progetto.
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

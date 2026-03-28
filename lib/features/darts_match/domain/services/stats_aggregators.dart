@@ -1,3 +1,5 @@
+/// File: stats_aggregators.dart. Contiene regole di dominio, entità o casi d'uso per questa funzionalità.
+
 import '../entities/match.dart';
 import '../policies/input_fidelity_policy.dart';
 
@@ -19,6 +21,7 @@ class X01Stats {
 class InputFidelityAwareStats {
   const InputFidelityAwareStats();
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   X01Stats build(List<TurnCommitted> turns, StatsFidelity fidelity) {
     final totals = turns.map((t) => t.draft.total).toList();
     final avg = totals.isEmpty ? 0.0 : totals.reduce((a, b) => a + b) / totals.length;
@@ -35,6 +38,7 @@ class MatchStatsAggregator {
   MatchStatsAggregator(this._fidelityAwareStats);
   final InputFidelityAwareStats _fidelityAwareStats;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   StatsSnapshot aggregate(Match match) {
     final players = <PlayerMatchStats>[];
     for (final player in match.roster.players) {

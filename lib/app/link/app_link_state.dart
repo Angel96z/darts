@@ -1,3 +1,5 @@
+/// File: app_link_state.dart. Contiene configurazione e avvio dell'applicazione.
+
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:app_links/app_links.dart';
@@ -11,8 +13,10 @@ class AppLinkState {
   final String? pendingRoomId;
   final String? pendingWatchRoomId;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const AppLinkState({this.pendingRoomId, this.pendingWatchRoomId});
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   AppLinkState copyWith({
     String? pendingRoomId,
     String? pendingWatchRoomId,
@@ -33,12 +37,14 @@ StateNotifierProvider<AppLinkCoordinator, AppLinkState>(
 
 class AppLinkCoordinator extends StateNotifier<AppLinkState> {
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> saveLastRoomId(String roomId) async {
     if (roomId.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_lastRoomIdKey, roomId);
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<String?> getLastRoomId() async {
     final prefs = await SharedPreferences.getInstance();
     final id = prefs.getString(_lastRoomIdKey);
@@ -46,6 +52,7 @@ class AppLinkCoordinator extends StateNotifier<AppLinkState> {
     return id.trim();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> clearLastRoomId() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_lastRoomIdKey);
@@ -58,6 +65,7 @@ class AppLinkCoordinator extends StateNotifier<AppLinkState> {
   final _appLinks = AppLinks();
   StreamSubscription? _sub;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> init() async {
     if (_initialized) return;
     _initialized = true;
@@ -95,12 +103,14 @@ class AppLinkCoordinator extends StateNotifier<AppLinkState> {
       await _handleUri(uri);
     });
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> clearAll() async {
     state = const AppLinkState();
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_pendingRoomIdKey);
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _handleUri(Uri uri) async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -143,6 +153,7 @@ class AppLinkCoordinator extends StateNotifier<AppLinkState> {
     }
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<String?> consumeRoomId() async {
     final id = state.pendingRoomId;
     if (id == null || id.isEmpty) return null;
@@ -158,6 +169,7 @@ class AppLinkCoordinator extends StateNotifier<AppLinkState> {
 
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<String?> consumeWatchRoomId() async {
     final id = state.pendingWatchRoomId;
     if (id == null || id.isEmpty) return null;
@@ -169,6 +181,7 @@ class AppLinkCoordinator extends StateNotifier<AppLinkState> {
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void dispose() {
     _sub?.cancel();
     super.dispose();

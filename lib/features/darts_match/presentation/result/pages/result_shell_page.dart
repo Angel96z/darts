@@ -1,3 +1,5 @@
+/// File: result_shell_page.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,15 +9,18 @@ import '../../../domain/entities/room.dart';
 import '../controllers/result_controller.dart';
 
 class ResultShellPage extends ConsumerStatefulWidget {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const ResultShellPage({super.key});
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   ConsumerState<ResultShellPage> createState() => _ResultShellPageState();
 }
 
 class _ResultShellPageState extends ConsumerState<ResultShellPage> {
   bool _routing = false;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _handleRoomState(LobbyViewModel next) async {
     if (!mounted || _routing) return;
 
@@ -23,6 +28,7 @@ class _ResultShellPageState extends ConsumerState<ResultShellPage> {
       _routing = true;
       await Navigator.pushAndRemoveUntil(
         context,
+        /// Funzione: descrive in modo semplice questo blocco di logica.
         MaterialPageRoute(builder: (_) => const RoomLobbyShellPage()),
         (route) => false,
       );
@@ -36,6 +42,7 @@ class _ResultShellPageState extends ConsumerState<ResultShellPage> {
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     final result = ref.watch(resultControllerProvider);
     final lobbyVm = ref.watch(lobbyControllerProvider);
@@ -46,6 +53,7 @@ class _ResultShellPageState extends ConsumerState<ResultShellPage> {
       _handleRoomState(next);
     });
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return WillPopScope(
       onWillPop: () async => false,
       child: Scaffold(
@@ -57,14 +65,22 @@ class _ResultShellPageState extends ConsumerState<ResultShellPage> {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    /// Funzione: descrive in modo semplice questo blocco di logica.
                     Text('Stato room: ${lobbyVm.roomState.name}'),
+                    /// Funzione: descrive in modo semplice questo blocco di logica.
                     const SizedBox(height: 8),
+                    /// Funzione: descrive in modo semplice questo blocco di logica.
                     Text('Vincitore: ${result.winnerId}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    /// Funzione: descrive in modo semplice questo blocco di logica.
                     const SizedBox(height: 8),
+                    /// Funzione: descrive in modo semplice questo blocco di logica.
                     Text('Highest score: ${result.highestScore}'),
+                    /// Funzione: descrive in modo semplice questo blocco di logica.
                     Text('Average: ${result.average}'),
+                    /// Funzione: descrive in modo semplice questo blocco di logica.
                     const Spacer(),
                     if (canControlAdmin)
+                      /// Funzione: descrive in modo semplice questo blocco di logica.
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(
@@ -74,6 +90,7 @@ class _ResultShellPageState extends ConsumerState<ResultShellPage> {
                       ),
                     if (canControlAdmin) const SizedBox(height: 8),
                     if (canControlAdmin)
+                      /// Funzione: descrive in modo semplice questo blocco di logica.
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton(

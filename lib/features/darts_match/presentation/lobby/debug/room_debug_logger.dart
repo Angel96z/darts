@@ -1,3 +1,5 @@
+/// File: room_debug_logger.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
+
 class RoomDebugSnapshot {
   final DateTime timestamp;
   final String? deviceId;
@@ -24,6 +26,7 @@ class RoomDebugSnapshot {
   final List<Map<String, dynamic>> players;
   final Map<String, dynamic> matchState;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const RoomDebugSnapshot({
     required this.timestamp,
     required this.deviceId,
@@ -50,6 +53,7 @@ class RoomDebugSnapshot {
 }
 
 class RoomDebugLogger {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static void dump(RoomDebugSnapshot s, {required String reason}) {
     final buffer = StringBuffer()
       ..writeln('========== ROOM DEBUG ==========')

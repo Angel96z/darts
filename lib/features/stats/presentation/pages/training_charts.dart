@@ -1,3 +1,5 @@
+/// File: training_charts.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
+
 import 'dart:math';
 
 import 'package:flutter/gestures.dart';
@@ -9,8 +11,10 @@ import 'package:fl_chart/fl_chart.dart';
 import '../widgets/training_sector_hits.dart';
 
 class TrainingCharts {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static List<DartThrow> _sortThrowsChronologically(List<DartThrow> throws) {
     final ordered = [...throws];
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     ordered.sort((a, b) {
       final byTime = a.timestamp.compareTo(b.timestamp);
       if (byTime != 0) return byTime;
@@ -23,6 +27,7 @@ class TrainingCharts {
     return ordered;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static List<SessionPerformancePoint> _sortSessionsChronologically(
       List<SessionPerformancePoint> sessions,
       ) {
@@ -34,6 +39,7 @@ class TrainingCharts {
   // PUBLIC API (compatibile)
   // =========================
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget dartBreakdown(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
 
@@ -107,6 +113,7 @@ class TrainingCharts {
       }
     }
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     Widget buildTurnRow({
       required String label,
       required int hitCount,
@@ -169,6 +176,7 @@ class TrainingCharts {
       ],
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget hitTrend(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
 
@@ -191,6 +199,7 @@ class TrainingCharts {
     t.map((e) => e.distanceMm).reduce((a, b) => a + b) / t.length)
         .toList();
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return BaseChartWidget(
       title:
       singleDart ? 'Hit nel tempo (D$selectedDart)' : 'Trend hit per turno',
@@ -218,6 +227,7 @@ class TrainingCharts {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget mmTrend(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
 
@@ -232,6 +242,7 @@ class TrainingCharts {
     final hitByTurn =
     turns.map((t) => t.where((e) => e.sector == target).length).toList();
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return BaseChartWidget(
       title: 'Precisione nel tempo',
       series: [series],
@@ -255,6 +266,7 @@ class TrainingCharts {
       rendererBuilder: (ctx) => LineChartRenderer(ctx: ctx, showDots: false),
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget topSessions(List<SessionPerformancePoint> sessions) {
     if (sessions.isEmpty) return _empty();
 
@@ -268,6 +280,7 @@ class TrainingCharts {
       color: Colors.green,
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget worstSessions(List<SessionPerformancePoint> sessions) {
     if (sessions.isEmpty) return _empty();
 
@@ -281,6 +294,7 @@ class TrainingCharts {
       color: Colors.red,
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget _sessionScatterChart({
     required String title,
     required List<SessionPerformancePoint> sessions,
@@ -306,6 +320,7 @@ class TrainingCharts {
       'Distrazioni': 0,
     };
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     void collect(String key, num? value) {
       if (value == null) return;
       sums[key] = (sums[key] ?? 0) + value.toDouble();
@@ -326,6 +341,7 @@ class TrainingCharts {
       if (count > 0) averages[entry.key] = entry.value / count;
     }
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     Widget mediaRow(String label, double value) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -391,6 +407,7 @@ class TrainingCharts {
       ],
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget directionalBias(List<DartThrow> throws) {
     if (throws.isEmpty) return _empty();
 
@@ -419,6 +436,7 @@ class TrainingCharts {
     final xDir = meanXmm >= 0 ? 'destra' : 'sinistra';
     final yDir = meanYmm >= 0 ? 'basso' : 'alto';
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     Widget row(String label, String value) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
@@ -449,6 +467,7 @@ class TrainingCharts {
       tip: 'Correggi setup iniziale e allineamento del corpo.',
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget streak(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
 
@@ -510,6 +529,7 @@ class TrainingCharts {
       }
     }
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     Widget row(String label, int value) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
@@ -544,6 +564,7 @@ class TrainingCharts {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget performanceScore(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
 
@@ -629,6 +650,7 @@ class TrainingCharts {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget relationalPerformance(
       List<DartThrow> throws,
       String target, {
@@ -668,11 +690,13 @@ class TrainingCharts {
         xInterval: 1,
       ),
       highlightedRanges: [
+        /// Funzione: descrive in modo semplice questo blocco di logica.
         ChartRange(
           start: metrics.indexOf(best).toDouble(),
           end: metrics.indexOf(best).toDouble(),
           color: Colors.green.withOpacity(0.18),
         ),
+        /// Funzione: descrive in modo semplice questo blocco di logica.
         ChartRange(
           start: metrics.indexOf(worst).toDouble(),
           end: metrics.indexOf(worst).toDouble(),
@@ -694,6 +718,7 @@ class TrainingCharts {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget bestWorstAnalysis(List<DartThrow> throws, String target) {
     if (throws.length < 3) return _empty();
 
@@ -713,6 +738,7 @@ class TrainingCharts {
     final best = sortedByScore.first;
     final worst = sortedByScore.last;
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     Widget row(String label, String value) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 3),
@@ -726,6 +752,7 @@ class TrainingCharts {
       );
     }
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     String signed(double v, {String unit = ''}) {
       final sign = v > 0 ? '+' : '';
       return '$sign${v.toStringAsFixed(1)}$unit';
@@ -765,6 +792,7 @@ class TrainingCharts {
       tip: 'Replica la routine del turno migliore e correggi subito l’errore principale.',
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget consistencyTrend(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
 
@@ -801,6 +829,7 @@ class TrainingCharts {
     t.map((e) => e.distanceMm).reduce((a, b) => a + b) / t.length)
         .toList();
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return BaseChartWidget(
       title: 'Controllo nel tempo',
       series: [series],
@@ -823,6 +852,7 @@ class TrainingCharts {
       rendererBuilder: (ctx) => LineChartRenderer(ctx: ctx, showDots: false),
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static List<List<DartThrow>> _buildTurns(List<DartThrow> throws) {
     final orderedThrows = _sortThrowsChronologically(throws);
     final turns = <List<DartThrow>>[];
@@ -833,6 +863,7 @@ class TrainingCharts {
     return turns;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static List<_TurnMetric> _buildTurnMetrics({
     required List<List<DartThrow>> turns,
     required String target,
@@ -863,6 +894,7 @@ class TrainingCharts {
 
     final sessionDurations = showSessionTime ? _buildSessionDurations(turns) : <int, Duration>{};
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return raw.map((r) {
       final consistencyNorm = maxVariance == 0 ? 100.0 : (1 - (r.variance / maxVariance)).clamp(0.0, 1.0) * 100;
       final precisionForChart = maxAvgMm == minMm ? 100.0 : (1 - ((r.avgMm - minMm) / (maxAvgMm - minMm))).clamp(0.0, 1.0) * 100;
@@ -887,6 +919,7 @@ class TrainingCharts {
     final out = <int, Duration>{};
     int sessionStart = 0;
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     void flush(int endExclusive) {
       if (sessionStart >= endExclusive) return;
       final block = turns.sublist(sessionStart, endExclusive).expand((e) => e).toList();
@@ -911,12 +944,14 @@ class TrainingCharts {
     return out;
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static String _formatDurationHHmm(Duration d) {
     final hours = d.inHours.toString().padLeft(2, '0');
     final minutes = (d.inMinutes % 60).toString().padLeft(2, '0');
     return '$hours:$minutes';
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget _perfRow(String label, double value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -929,6 +964,7 @@ class TrainingCharts {
       ),
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget distanceAnalysis(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
 
@@ -955,6 +991,7 @@ class TrainingCharts {
       }
     }
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     double avg(List<DartThrow> list) {
       if (list.isEmpty) return 0;
       return list.map((e) => e.distanceMm).reduce((a, b) => a + b) /
@@ -965,6 +1002,7 @@ class TrainingCharts {
     final d2 = avg(dartMap[2]!);
     final d3 = avg(dartMap[3]!);
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     Widget row(String label, double value) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
@@ -998,6 +1036,7 @@ class TrainingCharts {
       tip: 'Inserisci un micro-reset prima della freccia più debole.',
     );
   }
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget ringDistribution(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
 
@@ -1077,6 +1116,7 @@ class TrainingCharts {
   // UI
   // =========================
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget _barChart({
     required String title,
     required Map<String, double> data,
@@ -1094,8 +1134,10 @@ class TrainingCharts {
         ? 1.0
         : data.values.reduce((a, b) => a > b ? a : b));
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return _box(
       title,
+      /// Funzione: descrive in modo semplice questo blocco di logica.
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: data.entries.map((e) {
@@ -1143,6 +1185,7 @@ class TrainingCharts {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget _box(
     String title,
     Widget child, {
@@ -1194,6 +1237,7 @@ class TrainingCharts {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget _empty() {
     return const Center(child: Text('Nessun dato'));
   }
@@ -1203,6 +1247,7 @@ class ChartDataPoint {
   final double x;
   final double y;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const ChartDataPoint({required this.x, required this.y});
 }
 
@@ -1217,6 +1262,7 @@ class SessionPerformancePoint {
   final int? distrazioni;
   final String? commento;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const SessionPerformancePoint({
     required this.id,
     required this.performance,
@@ -1235,6 +1281,7 @@ class ChartSeries {
   final List<ChartDataPoint> points;
   final Color color;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const ChartSeries({
     required this.name,
     required this.points,
@@ -1247,6 +1294,7 @@ class ChartRange {
   final double end;
   final Color color;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const ChartRange({
     required this.start,
     required this.end,
@@ -1261,6 +1309,7 @@ class ChartConfig {
   final double xInterval;
   final String Function(double)? yLabelBuilder;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const ChartConfig({
     required this.minY,
     required this.maxY,
@@ -1271,6 +1320,7 @@ class ChartConfig {
 }
 
 class ChartDataSource {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static ChartSeries hitTrendSeries({
     required List<List<DartThrow>> turns,
     required String target,
@@ -1298,6 +1348,7 @@ class ChartDataSource {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static ChartSeries mmTrendSeries({required List<List<DartThrow>> turns}) {
     final points = <ChartDataPoint>[];
     for (int i = 0; i < turns.length; i++) {
@@ -1307,6 +1358,7 @@ class ChartDataSource {
     return ChartSeries(name: 'Distanza', points: points, color: Colors.orange);
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static List<ChartSeries> relationalSeries(List<_TurnMetric> metrics) {
     final hit = <ChartDataPoint>[];
     final precision = <ChartDataPoint>[];
@@ -1326,6 +1378,7 @@ class ChartDataSource {
 }
 
 class TurnMetricsBuilder {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static List<_TurnMetric> build({
     required List<List<DartThrow>> turns,
     required String target,
@@ -1353,6 +1406,7 @@ class BaseChartWidget extends StatefulWidget {
   final String legendText;
   final _ChartRendererBuilder rendererBuilder;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const BaseChartWidget({
   required this.title,
   required this.series,
@@ -1367,11 +1421,13 @@ class BaseChartWidget extends StatefulWidget {
   super.key,
   });
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget _defaultRenderer(_BaseChartContext ctx) {
   return LineChartRenderer(ctx: ctx);
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   State<BaseChartWidget> createState() => _BaseChartWidgetState();
 }
 
@@ -1390,12 +1446,14 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void initState() {
     super.initState();
     _resetView();
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void didUpdateWidget(covariant BaseChartWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.series != widget.series) {
@@ -1403,6 +1461,7 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
     }
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _resetView() {
     final maxIndex = max(0, _totalTurns - 1).toDouble();
     _viewStart = 0;
@@ -1410,19 +1469,23 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void dispose() {
     _keyboardFocusNode.dispose();
     _widgetFocusNode.dispose();
     super.dispose();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _onHoverIndex(int? index) {
     if (widget.tooltipBuilder == null) return;
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     setState(() {
       _tooltipText = index == null ? null : widget.tooltipBuilder!(index);
     });
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _zoomAround(double factor, double centerX) {
     if (_totalTurns <= 1) return;
 
@@ -1447,12 +1510,14 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
       newStart = newEnd - newSpan;
     }
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     setState(() {
       _viewStart = newStart.clamp(minIndex, maxIndex);
       _viewEnd = newEnd.clamp(minIndex, maxIndex);
     });
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _pan(double deltaTurns) {
     if (_totalTurns <= 1) return;
     final minIndex = 0.0;
@@ -1468,20 +1533,24 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
       newEnd = maxIndex;
       newStart = newEnd - span;
     }
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     setState(() {
       _viewStart = newStart.clamp(minIndex, maxIndex);
       _viewEnd = newEnd.clamp(minIndex, maxIndex);
     });
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   bool _isCtrlPressed() {
     return RawKeyboard.instance.keysPressed.contains(LogicalKeyboardKey.controlLeft) ||
         RawKeyboard.instance.keysPressed.contains(LogicalKeyboardKey.controlRight);
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     if (_totalTurns == 0) return TrainingCharts._empty();
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth <= 0 ? 320.0 : constraints.maxWidth;
@@ -1512,9 +1581,11 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
 
         return TrainingCharts._box(
           widget.title,
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              /// Funzione: descrive in modo semplice questo blocco di logica.
               Listener(
                 onPointerSignal: (event) {
                   if (event is PointerScrollEvent && _isCtrlPressed()) {
@@ -1604,6 +1675,7 @@ class _BaseChartContext {
   final void Function(int? index) onHoverIndex;
   final List<ChartRange> highlightedRanges;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _BaseChartContext({
     required this.series,
     required this.config,
@@ -1618,12 +1690,16 @@ class LineChartRenderer extends StatelessWidget {
   final _BaseChartContext ctx;
   final bool showDots;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const LineChartRenderer({required this.ctx, this.showDots = false, super.key});
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     final s = ctx.series.first;
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return LineChart(
+      /// Funzione: descrive in modo semplice questo blocco di logica.
       LineChartData(
         minX: ctx.minX,
         maxX: ctx.maxX,
@@ -1634,6 +1710,7 @@ class LineChartRenderer extends StatelessWidget {
         titlesData: _titles(ctx.config),
         lineTouchData: _touch(ctx.onHoverIndex),
         lineBarsData: [
+          /// Funzione: descrive in modo semplice questo blocco di logica.
           LineChartBarData(
             spots: s.points.map((p) => FlSpot(p.x, p.y)).toList(),
             color: s.color,
@@ -1650,11 +1727,15 @@ class LineChartRenderer extends StatelessWidget {
 class MultiLineChartRenderer extends StatelessWidget {
   final _BaseChartContext ctx;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const MultiLineChartRenderer({required this.ctx, super.key});
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return LineChart(
+      /// Funzione: descrive in modo semplice questo blocco di logica.
       LineChartData(
         minX: ctx.minX,
         maxX: ctx.maxX,
@@ -1687,7 +1768,9 @@ class MultiLineChartRenderer extends StatelessWidget {
   }
 }
 
+/// Funzione: descrive in modo semplice questo blocco di logica.
 FlTitlesData _titles(ChartConfig config) {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   return FlTitlesData(
     topTitles: const AxisTitles(
       sideTitles: SideTitles(showTitles: false),
@@ -1727,7 +1810,9 @@ FlTitlesData _titles(ChartConfig config) {
   );
 }
 
+/// Funzione: descrive in modo semplice questo blocco di logica.
 LineTouchData _touch(void Function(int? index) onHoverIndex) {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   return LineTouchData(
     enabled: true,
     handleBuiltInTouches: true,
@@ -1752,13 +1837,17 @@ class _SimpleLegend extends StatelessWidget {
   final List<ChartSeries> series;
   final String text;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _SimpleLegend({required this.series, required this.text});
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        /// Funzione: descrive in modo semplice questo blocco di logica.
         Wrap(
           spacing: 12,
           runSpacing: 4,
@@ -1789,6 +1878,7 @@ class _TurnMetricRaw {
   final double avgMm;
   final double variance;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _TurnMetricRaw({
     required this.turnNumber,
     required this.hits,
@@ -1809,6 +1899,7 @@ class _TurnMetric {
   final double score;
   final Duration? sessionDuration;
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _TurnMetric({
     required this.turnNumber,
     required this.hits,

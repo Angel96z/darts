@@ -1,3 +1,5 @@
+/// File: room_mapper.dart. Contiene accesso e trasformazione dati (datasource, dto, repository o mapper).
+
 import '../../domain/entities/room.dart';
 import '../../domain/value_objects/identifiers.dart';
 import '../dto/room_dto.dart';
@@ -5,7 +7,9 @@ import '../dto/room_dto.dart';
 class RoomMapper {
   const RoomMapper();
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Room toDomain(RoomDto dto) {
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     ConnectionState parseConnection(String raw) {
       return ConnectionState.values.firstWhere(
         (value) => value.name == raw,
@@ -13,6 +17,7 @@ class RoomMapper {
       );
     }
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return Room(
       id: RoomId(dto.roomId),
       state: RoomState.values.firstWhere(
@@ -52,7 +57,9 @@ class RoomMapper {
     );
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   RoomDto toDto(Room room) {
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     return RoomDto(
       roomId: room.id.value,
       state: room.state.name,

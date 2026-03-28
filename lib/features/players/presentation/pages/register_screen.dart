@@ -1,10 +1,14 @@
+/// File: register_screen.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class RegisterScreen extends StatefulWidget {
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   const RegisterScreen({super.key});
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
@@ -21,16 +25,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String error = "";
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   void dispose() {
     emailController.dispose();
     passwordController.dispose();
     super.dispose();
   }
 
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> register() async {
 
     if (!_formKey.currentState!.validate()) return;
 
+    /// Funzione: descrive in modo semplice questo blocco di logica.
     setState(() {
       loading = true;
       error = "";
@@ -77,12 +84,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
           message = e.message ?? "Errore registrazione";
       }
 
+      /// Funzione: descrive in modo semplice questo blocco di logica.
       setState(() {
         error = message;
       });
 
     } catch (e) {
 
+      /// Funzione: descrive in modo semplice questo blocco di logica.
       setState(() {
         error = "Errore inatteso";
       });
@@ -90,6 +99,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } finally {
 
       if (mounted) {
+        /// Funzione: descrive in modo semplice questo blocco di logica.
         setState(() {
           loading = false;
         });
@@ -99,6 +109,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   @override
+  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
 
     return Scaffold(
@@ -131,8 +142,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     textAlign: TextAlign.center,
                   ),
 
+                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   const SizedBox(height: 30),
 
+                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   TextFormField(
                     controller: emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -174,6 +187,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
 
                         onPressed: () {
+                          /// Funzione: descrive in modo semplice questo blocco di logica.
                           setState(() {
                             showPassword = !showPassword;
                           });
