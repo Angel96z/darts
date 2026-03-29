@@ -1,9 +1,11 @@
 /// Obiettivo: definire in modo STUPIDO e chiaro dove deve stare l’utente.
 /// Responsabilità: dato lo stato della room, decide la schermata.
+import 'package:darts/features/room_v2/room_data.dart';
+import 'package:darts/features/room_v2/room_lobby_v2_page.dart';
+import 'package:darts/features/room_v2/room_repository.dart';
 import 'package:darts/features/room_v2/room_result_page.dart';
 import 'package:flutter/material.dart';
 import 'room_match_page.dart';
-
 
 enum RoomUserLocation {
   lobby,
@@ -11,17 +13,64 @@ enum RoomUserLocation {
   result,
 }
 
+class RoomGate extends StatelessWidget {
+  final RoomRepository repo;
+
+  const RoomGate({
+    super.key,
+    required this.repo,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<RoomData>(
+      stream: repo.watch(),
+      initialData: repo.current,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final data = snapshot.data!;
+
+        final location = resolveUserLocation(RoomState(
+          roomId: data.roomId,
+          phase: data.phase,
+        ));
+
+        switch (location) {
+          case RoomUserLocation.lobby:
+            return RoomLobbyV2Page(
+              data: data,
+              repo: repo,
+            );
+          case RoomUserLocation.match:
+            return RoomMatchPage(
+              data: data,
+              repo: repo,
+            );
+          case RoomUserLocation.result:
+            return RoomResultPage(
+              data: data,
+              repo: repo,
+            );
+        }
+      },
+    );
+  }
+}
+
 /// Stato minimo della room.
 /// UNA sola fonte di verità.
 class RoomState {
-  final String? roomId; // null = locale, valore = online
-  final bool matchStarted;
-  final bool matchFinished;
+  final String? roomId;
+  final RoomPhase phase;
 
   const RoomState({
     required this.roomId,
-    required this.matchStarted,
-    required this.matchFinished,
+    required this.phase,
   });
 }
 
@@ -29,40 +78,12 @@ class RoomState {
 /// Input: stato room
 /// Output: dove deve andare l’utente
 RoomUserLocation resolveUserLocation(RoomState state) {
-  /// 1. match finito → risultati
-  if (state.matchFinished) {
-    return RoomUserLocation.result;
+  switch (state.phase) {
+    case RoomPhase.match:
+      return RoomUserLocation.match;
+    case RoomPhase.result:
+      return RoomUserLocation.result;
+    case RoomPhase.lobby:
+      return RoomUserLocation.lobby;
   }
-
-  /// 2. match iniziato → partita
-  if (state.matchStarted) {
-    return RoomUserLocation.match;
-  }
-
-  /// 3. default → lobby
-  return RoomUserLocation.lobby;
-}
-
-/// NAVIGAZIONE → MATCH
-/// Obiettivo: centralizzare la navigazione.
-/// Responsabilità: andare alla pagina match.
-void goToMatch(BuildContext context) {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const RoomMatchPage(roomId: null),
-    ),
-  );
-}
-
-/// NAVIGAZIONE → RESULT
-/// Obiettivo: centralizzare la navigazione.
-/// Responsabilità: andare alla pagina risultati.
-void goToResult(BuildContext context, String? roomId) {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => RoomResultPage(roomId: roomId),
-    ),
-  );
 }

@@ -1,116 +1,24 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:darts/features/room_v2/room_data.dart';
-import 'package:darts/features/room_v2/room_match_page.dart';
-import 'package:darts/features/room_v2/room_repository.dart';
-import 'package:darts/features/room_v2/room_user_flow.dart';
 import 'package:flutter/material.dart';
+import 'room_data.dart';
+import 'room_repository.dart';
+import 'room_current_user.dart';
+import 'room_players.dart';
 
-class RoomLobbyV2Page extends StatefulWidget {
-  const RoomLobbyV2Page({super.key});
+class RoomLobbyV2Page extends StatelessWidget {
+  final RoomData data;
+  final RoomRepository repo;
 
-  @override
-  State<RoomLobbyV2Page> createState() => _RoomLobbyV2PageState();
-}
-
-class _RoomLobbyV2PageState extends State<RoomLobbyV2Page> {
-  late final RoomRepository _repo;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _repo = RoomRepository(FirebaseFirestore.instance);
-
-    _repo.initLocal(
-      RoomData(
-        roomId: null,
-        createdAt: DateTime.now(),
-        gameMode: GameMode.x01,
-        x01: X01Variant.x501,
-        matchStarted: false,
-        matchFinished: false,
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _repo.dispose();
-    super.dispose();
-  }
+  const RoomLobbyV2Page({
+    super.key,
+    required this.data,
+    required this.repo,
+  });
 
   Future<void> _invite() async {
-    final current = _repo.current;
-    if (current == null) return;
-    if (current.roomId != null) return;
-
-    await _repo.createOnline();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async => await _confirmExit(context),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Lobby'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () async {
-              final ok = await _confirmExit(context);
-              if (ok && context.mounted) {
-                Navigator.pop(context);
-              }
-            },
-          ),
-        ),
-        body: StreamBuilder<RoomData>(
-          stream: _repo.watch(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            final data = snapshot.data!;
-
-            return Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  const Text('LOBBY'),
-                  Text('LOBBY - ${data.createdAt.toIso8601String()}'),
-
-                  const SizedBox(height: 16),
-
-                  Text('Room ID: ${data.roomId ?? "LOCALE"}'),
-
-                  const SizedBox(height: 16),
-
-                  ElevatedButton(
-                    onPressed: _invite,
-                    child: const Text('Invita'),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  ElevatedButton(
-                    onPressed: () async {
-                      await _repo.update(
-                        data.copyWith(matchStarted: true),
-                      );
-                      if (context.mounted) {
-                        goToMatch(context);
-                      }
-                    },
-                    child: const Text('Start match'),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
-    );
+    final current = repo.current;
+    if (current == null || current.roomId != null) return;
+    await repo.createOnline();
   }
 
   Future<bool> _confirmExit(BuildContext context) async {
@@ -133,16 +41,86 @@ class _RoomLobbyV2PageState extends State<RoomLobbyV2Page> {
     );
 
     if (result == true) {
-      final current = _repo.current;
+      final current = repo.current;
 
-      if (current?.roomId != null) {
-        final db = FirebaseFirestore.instance;
-        await db.collection('rooms').doc(current!.roomId).delete();
+      if (current?.roomId != null &&
+          current!.adminIds.contains(RoomCurrentUser.current.uid)) {
+        await FirebaseFirestore.instance
+            .collection('rooms')
+            .doc(current.roomId)
+            .delete();
       }
 
       return true;
     }
 
     return false;
+  }
+
+
+  @override
+  Widget build(BuildContext context) {
+    final isCurrentUserAdmin = data.adminIds.contains(RoomCurrentUser.current.uid);
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+
+        final ok = await _confirmExit(context);
+
+        if (ok && context.mounted) {
+          Navigator.pop(context); // unico punto in cui esci dal flow
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Lobby')),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              const Text('LOBBY'),
+              Text('LOBBY - ${data.createdAt.toIso8601String()}'),
+              const SizedBox(height: 16),
+              Text('Room ID: ${data.roomId ?? "LOCALE"}'),
+              Text('STATO: ${data.phase.name}'),
+              const SizedBox(height: 16),
+              const RoomCurrentUserView(),
+              const SizedBox(height: 16),
+              RoomPlayersView(
+                players: data.players,
+                onAddPlayer: (player) async {
+                  final currentUserId = RoomCurrentUser.current.uid;
+                  final updated =
+                  data.addPlayer(player, currentUserId).syncAdminsFromPlayers();
+                  await repo.update(updated);
+                },
+              ),
+              const SizedBox(height: 16),
+              Text('ADMINS: ${data.adminIds.join(", ")}'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: isCurrentUserAdmin ? () {} : null,
+                child: const Text('Admin Action'),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _invite,
+                child: const Text('Invita'),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: isCurrentUserAdmin
+                    ? () async {
+                  await repo.update(data.copyWith(phase: RoomPhase.match));
+                }
+                    : null,
+                child: const Text('Start match'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

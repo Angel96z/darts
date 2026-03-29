@@ -4,8 +4,6 @@ import 'room_data.dart';
 
 class RoomRepository {
   final FirebaseFirestore db;
-
-  // Il controller è l'unico punto di uscita dei dati verso la UI.
   final StreamController<RoomData> _controller =
   StreamController<RoomData>.broadcast();
 
@@ -14,69 +12,49 @@ class RoomRepository {
 
   RoomRepository(this.db);
 
-  /// La UI ascolta solo questo stream.
-  Stream<RoomData> watch() async* {
-    if (_state != null) {
-      yield _state!;
-    }
-    yield* _controller.stream;
-  }
+  Stream<RoomData> watch() => _controller.stream;
 
-  /// Getter per lo stato attuale in memoria.
   RoomData? get current => _state;
 
-  /// 1. INIT: Crea lo stato iniziale in memoria locale.
-  Future<void> initLocal(RoomData data) async {
+  void initLocal(RoomData data) {
     _state = data;
-    // NON emettere subito: sarà letto da watch() al primo subscribe
+    _controller.add(data);
   }
 
-  /// 2. UPDATE: L'unico punto di scrittura di tutta l'app.
-  /// Gestisce sia il salvataggio locale che quello remoto.
   Future<void> update(RoomData newData) async {
-    // Se siamo ONLINE: scriviamo su Firestore.
-    // Non aggiorniamo il controller qui: ci penserà il listener di connectToRoom.
+    _state = newData;
+    _controller.add(newData);
     if (newData.roomId != null) {
       await db.collection('rooms').doc(newData.roomId).set(newData.toMap());
-    } else {
-      // Se siamo LOCALE: aggiorniamo la memoria e lo stream.
-      _state = newData;
-      _controller.add(newData);
     }
   }
 
-  /// 3. CONNECT: Aggancia il flusso dati da Firebase.
-  /// Qualsiasi modifica esterna (backend) o interna (update) passerà da qui.
-  Future<void> connectToRoom(String roomId) async {
-    await _remoteSub?.cancel();
-
+  void connectToRoom(String roomId) {
+    _remoteSub?.cancel();
     _remoteSub = db.collection('rooms').doc(roomId).snapshots().listen((doc) {
-      final data = doc.data();
-      if (data == null) return;
-
-      final room = RoomData.fromMap(data);
-      _state = room; // Sincronizza lo stato locale con il DB.
-      _controller.add(room); // Notifica la UI.
+      if (!doc.exists) return;
+      final room = RoomData.fromMap(doc.data() as Map<String, dynamic>);
+      _state = room;
+      _controller.add(room);
     });
   }
 
-  /// 4. CREATE ONLINE: Trasforma la room locale in una room online.
   Future<String> createOnline() async {
-    if (_state == null) throw Exception("Stato non inizializzato");
+    if (_state == null) {
+      throw Exception('Errore: stato locale nullo');
+    }
 
-    final doc = db.collection('rooms').doc();
-    final id = doc.id;
+    final docRef = db.collection('rooms').doc();
+    final newId = docRef.id;
+    final onlineData = _state!.copyWith(roomId: newId);
 
-    // Creiamo il nuovo oggetto con l'ID assegnato.
-    final updated = _state!.copyWith(roomId: id);
+    await docRef.set(onlineData.toMap());
 
-    // Prima attiviamo l'ascolto sul nuovo documento.
-    await connectToRoom(id);
+    _state = onlineData;
+    _controller.add(onlineData);
+    connectToRoom(newId);
 
-    // Poi salviamo il dato (questo scatenerà il listener sopra).
-    await update(updated);
-
-    return id;
+    return newId;
   }
 
   Future<void> dispose() async {

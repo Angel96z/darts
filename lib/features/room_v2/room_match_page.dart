@@ -1,42 +1,19 @@
-import 'package:darts/features/room_v2/room_user_flow.dart';
 import 'package:flutter/material.dart';
-import 'room_result_page.dart';
+import 'room_data.dart';
+import 'room_repository.dart';
 
-/// Obiettivo: pagina match.
-/// Responsabilità: UNA sola → gestire partita attiva.
 class RoomMatchPage extends StatelessWidget {
-  final String? roomId;
+  final RoomData data;
+  final RoomRepository repo;
 
-  const RoomMatchPage({super.key, required this.roomId});
+  const RoomMatchPage({
+    super.key,
+    required this.data,
+    required this.repo,
+  });
 
-  @override
-  Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async => await _confirmExit(context),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Match'),
-        ),
-        body: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              const Text('MATCH IN CORSO'),
-
-              const SizedBox(height: 16),
-
-              /// vai a RESULT
-              ElevatedButton(
-                onPressed: () {
-                  goToResult(context, roomId);
-                },
-                child: const Text('Finish match'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  Future<void> _finishMatch() async {
+    await repo.update(data.copyWith(phase: RoomPhase.result));
   }
 
   Future<bool> _confirmExit(BuildContext context) async {
@@ -51,20 +28,53 @@ class RoomMatchPage extends StatelessWidget {
             child: const Text('No'),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context, true);
-            },
+            onPressed: () => Navigator.pop(context, true),
             child: const Text('Si'),
           ),
         ],
       ),
     );
 
-    if (result == true) {
-      Navigator.pop(context); // torna alla lobby
-      return false;
-    }
+    return result == true;
+  }
 
-    return false;
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+
+        final ok = await _confirmExit(context);
+
+        if (ok && context.mounted) {
+          // torna alla lobby SENZA usare Navigator
+          await repo.update(data.copyWith(phase: RoomPhase.lobby));
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Match'),
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              const Text('MATCH IN CORSO'),
+              const SizedBox(height: 16),
+              Text('Room ID: ${data.roomId ?? "LOCALE"}'),
+              Text('STATO: ${data.phase.name}'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () async {
+                  await _finishMatch();
+                },
+                child: const Text('Finish match'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
