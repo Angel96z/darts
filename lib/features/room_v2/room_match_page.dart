@@ -3,6 +3,8 @@ import 'package:darts/features/room_v2/room_current_user.dart';
 import 'package:darts/features/room_v2/user_room_repository.dart';
 import 'package:flutter/material.dart';
 import 'room_data.dart';
+import 'room_input_keyboard.dart';
+import 'room_match_engine.dart';
 import 'room_repository.dart';
 
 class RoomMatchPage extends StatelessWidget {
@@ -96,21 +98,17 @@ class RoomMatchPage extends StatelessWidget {
         appBar: AppBar(
           title: const Text('Match'),
         ),
-        body: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              const Text('MATCH IN CORSO'),
-              const SizedBox(height: 16),
-              Text('Room ID: ${data.roomId ?? "LOCALE"}'),
-              Text('STATO: ${data.phase.name}'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _finishMatch,
-                child: const Text('Finish match'),
-              ),
-            ],
-          ),
+        body: Column(
+          children: [
+            Expanded(
+              child: RoomMatchEngineView(data: data),
+            ),
+
+            RoomInputKeyboard(
+              data: data,
+              repo: repo,
+            ),
+          ],
         ),
       ),
     );

@@ -4,9 +4,10 @@ import 'package:darts/features/room_v2/user_room_repository.dart';
 import 'package:flutter/material.dart';
 import 'games_darts.dart';
 import 'room_data.dart';
+import 'room_match_engine.dart';
 import 'room_repository.dart';
 import 'room_current_user.dart';
-import 'room_players.dart';
+import 'games_darts.dart';
 
 class RoomLobbyV2Page extends StatelessWidget {
   final RoomData data;
@@ -164,7 +165,16 @@ class RoomLobbyV2Page extends StatelessWidget {
                       await repo.update(liveData.copyWith(game: newGame));
                     },
                   ),
+                  const SizedBox(height: 16),
 
+                  MatchSelector(
+                    config: liveData.matchConfig,
+                    onChanged: (newConfig) async {
+                      await repo.update(
+                        liveData.copyWith(matchConfig: newConfig),
+                      );
+                    },
+                  ),
                   const SizedBox(height: 16),
 
                   Text('STATO: ${liveData.phase.name}'),
@@ -184,8 +194,23 @@ class RoomLobbyV2Page extends StatelessWidget {
 
                   Text('ADMINS: ${liveData.adminIds.join(", ")}'),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
 
+                  const Divider(),
+
+                  const SizedBox(height: 8),
+
+                  const Text(
+                    'ENGINE DEBUG',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  SizedBox(
+                    height: 400,
+                    child: RoomMatchEngineView(data: liveData),
+                  ),
                   ElevatedButton(
                     onPressed: isCurrentUserAdmin ? () {} : null,
                     child: const Text('Admin Action'),
@@ -204,7 +229,8 @@ class RoomLobbyV2Page extends StatelessWidget {
                     onPressed: isCurrentUserAdmin
                         ? () async {
                       await repo.update(
-                          liveData.copyWith(phase: RoomPhase.match));
+                          liveData.initMatch()
+                      );
                     }
                         : null,
                     child: const Text('Start match'),

@@ -80,7 +80,12 @@ class RoomRepository {
     _state = data;
     _controller.add(data);
   }
+  Future<void> startMatch() async {
+    if (_state == null) return;
 
+    final updated = _state!.initMatch();
+    await update(updated);
+  }
   Future<void> update(RoomData newData) async {
     _state = newData;
     _controller.add(newData);

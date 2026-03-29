@@ -4,7 +4,8 @@ enum GameType {
   x01,
   cricket,
 }
-
+enum MatchMode { firstTo, bestOf }
+enum MatchUnit { legs, sets }
 /// Config base comune a tutti i giochi
 class GameConfig {
   final GameType type;
@@ -140,7 +141,79 @@ class GameSelector extends StatelessWidget {
     );
   }
 }
+class MatchSelector extends StatelessWidget {
+  final MatchConfig config;
+  final ValueChanged<MatchConfig> onChanged;
 
+  const MatchSelector({
+    super.key,
+    required this.config,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'MATCH STRUCTURE',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+
+        const SizedBox(height: 12),
+
+        // MODE
+        const Text('Win Mode'),
+
+        SegmentedButton<MatchMode>(
+          segments: const [
+            ButtonSegment(value: MatchMode.firstTo, label: Text('First To')),
+            ButtonSegment(value: MatchMode.bestOf, label: Text('Best Of')),
+          ],
+          selected: {config.mode},
+          onSelectionChanged: (set) {
+            onChanged(config.copyWith(mode: set.first));
+          },
+        ),
+
+        const SizedBox(height: 16),
+
+        // SET
+        const Text('Sets (match level)'),
+
+        DropdownButton<int>(
+          value: config.setCount,
+          items: List.generate(10, (i) {
+            final v = i + 1;
+            return DropdownMenuItem(value: v, child: Text('$v'));
+          }),
+          onChanged: (v) {
+            if (v == null) return;
+            onChanged(config.copyWith(setCount: v));
+          },
+        ),
+
+        const SizedBox(height: 16),
+
+        // LEG
+        const Text('Legs per set'),
+
+        DropdownButton<int>(
+          value: config.legCount,
+          items: List.generate(10, (i) {
+            final v = i + 1;
+            return DropdownMenuItem(value: v, child: Text('$v'));
+          }),
+          onChanged: (v) {
+            if (v == null) return;
+            onChanged(config.copyWith(legCount: v));
+          },
+        ),
+      ],
+    );
+  }
+}
 class _X01ConfigView extends StatelessWidget {
   final GameConfig config;
   final ValueChanged<GameConfig> onChanged;
@@ -224,6 +297,91 @@ class _CricketConfigView extends StatelessWidget {
       onChanged: (v) {
         onChanged(config.copyWith(cutThroat: v));
       },
+    );
+  }
+}
+
+class MatchConfig {
+  final MatchMode mode;
+
+  final int setCount; // quanti set
+  final int legCount; // quanti leg per set
+
+  const MatchConfig({
+    required this.mode,
+    this.setCount = 1,
+    this.legCount = 5,
+  });
+
+  int get setsToWin {
+    if (mode == MatchMode.firstTo) return setCount;
+    return (setCount ~/ 2) + 1;
+  }
+
+  int get legsToWin {
+    if (mode == MatchMode.firstTo) return legCount;
+    return (legCount ~/ 2) + 1;
+  }
+
+  MatchConfig copyWith({
+    MatchMode? mode,
+    int? setCount,
+    int? legCount,
+  }) {
+    return MatchConfig(
+      mode: mode ?? this.mode,
+      setCount: setCount ?? this.setCount,
+      legCount: legCount ?? this.legCount,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'mode': mode.name,
+    'setCount': setCount,
+    'legCount': legCount,
+  };
+
+  factory MatchConfig.fromMap(Map<String, dynamic> map) {
+    return MatchConfig(
+      mode: MatchMode.values.byName(map['mode']),
+      setCount: map['setCount'] ?? 1,
+      legCount: map['legCount'] ?? 5,
+    );
+  }
+}
+
+
+class SetConfig {
+  final MatchMode mode;
+  final int legs;
+
+  const SetConfig({
+    required this.mode,
+    required this.legs,
+  });
+  SetConfig copyWith({
+    MatchMode? mode,
+    int? legs,
+  }) {
+    return SetConfig(
+      mode: mode ?? this.mode,
+      legs: legs ?? this.legs,
+    );
+  }
+  int get winTarget {
+    if (mode == MatchMode.firstTo) return legs;
+    return (legs ~/ 2) + 1;
+  }
+
+  Map<String, dynamic> toMap() => {
+    'mode': mode.name,
+    'legs': legs,
+  };
+
+  factory SetConfig.fromMap(Map<String, dynamic> map) {
+    return SetConfig(
+      mode: MatchMode.values.byName(map['mode']),
+      legs: map['legs'],
     );
   }
 }
