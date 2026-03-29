@@ -46,6 +46,14 @@ bool isCurrentUserAdmin(List<String> adminIds) {
   final uid = RoomCurrentUser.current.uid;
   return adminIds.contains(uid);
 }
+String? getRoomCreatorId(RoomData data) {
+  return data.creatorId;
+}
+
+bool isCurrentUserCreator(RoomData data) {
+  final uid = RoomCurrentUser.current.uid;
+  return data.creatorId == uid;
+}
 /// UI → mostra dati utente corrente
 class RoomCurrentUserView extends StatelessWidget {
   const RoomCurrentUserView({super.key});

@@ -1,3 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:darts/features/room_v2/room_current_user.dart';
+import 'package:darts/features/room_v2/user_room_repository.dart';
 import 'package:flutter/material.dart';
 import 'room_data.dart';
 import 'room_repository.dart';
@@ -16,7 +19,9 @@ class RoomMatchPage extends StatelessWidget {
     await repo.update(data.copyWith(phase: RoomPhase.result));
   }
 
-  Future<bool> _confirmExit(BuildContext context) async {
+  /// Restituisce TRUE se l'uscita è confermata, FALSE altrimenti.
+  /// Gestisce internamente la pulizia del DB.
+  Future<bool> handleExitLogic(BuildContext context) async {
     final result = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -35,7 +40,41 @@ class RoomMatchPage extends StatelessWidget {
       ),
     );
 
-    return result == true;
+    if (result != true) return false;
+
+    final uid = RoomCurrentUser.current.uid;
+    final isCreator = data.creatorId == uid;
+
+    try {
+      if (isCreator) {
+        // IL CREATOR riporta la stanza in lobby per tutti
+        await repo.update(data.copyWith(phase: RoomPhase.lobby));
+        // In questo caso NON facciamo il pop manuale perché
+        // il RoomGate reagirà al cambio di fase portando il creator in lobby.
+        return false;
+      } else {
+        // IL PARTECIPANTE si disconnette e basta
+        final ownedPlayers = data.players.where((p) {
+          final owner = p['ownerId'];
+          final id = p['id'];
+          return owner == uid || id == uid;
+        }).toList();
+
+        for (final p in ownedPlayers) {
+          final id = p['id'];
+          final isGuest = p['isGuest'] == true;
+          if (!isGuest && id != null) {
+            await UserRoomRepository(FirebaseFirestore.instance)
+                .clearCurrentRoom(id);
+          }
+        }
+        // Restituiamo true per dire al PopScope di eseguire il Navigator.pop
+        return true;
+      }
+    } catch (e) {
+      debugPrint("Errore durante l'uscita: $e");
+      return false;
+    }
   }
 
   @override
@@ -45,11 +84,12 @@ class RoomMatchPage extends StatelessWidget {
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
 
-        final ok = await _confirmExit(context);
+        // Eseguiamo la logica di uscita
+        final shouldPopPhysically = await handleExitLogic(context);
 
-        if (ok && context.mounted) {
-          // torna alla lobby SENZA usare Navigator
-          await repo.update(data.copyWith(phase: RoomPhase.lobby));
+        if (shouldPopPhysically && context.mounted) {
+          // Se partecipante: esce fisicamente dal RoomGate e torna alla sezione GIOCA
+          Navigator.of(context).pop();
         }
       },
       child: Scaffold(
@@ -66,9 +106,7 @@ class RoomMatchPage extends StatelessWidget {
               Text('STATO: ${data.phase.name}'),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () async {
-                  await _finishMatch();
-                },
+                onPressed: _finishMatch,
                 child: const Text('Finish match'),
               ),
             ],

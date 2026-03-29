@@ -28,8 +28,29 @@ Future<FirebaseAuth> _getSecondaryAuth() async {
 class RoomPlayersView extends StatelessWidget {
   final List<Map<String, dynamic>> players;
   final Function(RoomPlayer) onAddPlayer;
+  final Function(Map<String, dynamic>) onRemovePlayer;
+  final String currentUserId;
+  final List<String> adminIds;
 
-  const RoomPlayersView({super.key, required this.players, required this.onAddPlayer});
+  const RoomPlayersView({
+    super.key,
+    required this.players,
+    required this.onAddPlayer,
+    required this.onRemovePlayer,
+    required this.currentUserId,
+    required this.adminIds,
+  });
+
+  bool _canRemove(Map<String, dynamic> player) {
+    final isAdmin = adminIds.contains(currentUserId);
+    if (isAdmin) return true;
+
+    final ownerId = player['ownerId'];
+    final id = player['id'];
+
+    return ownerId == currentUserId || id == currentUserId;
+
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,22 +59,33 @@ class RoomPlayersView extends StatelessWidget {
       children: [
         const Text('GIOCATORI', style: TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        ...players.map((p) => ListTile(
-          leading: Icon(p['isGuest'] ? Icons.person_outline : Icons.verified),
-          title: Text(p['name']),
-          subtitle: Text(p['id'], style: const TextStyle(fontSize: 10)),
-        )),
+        ...players.map((p) {
+          final canRemove = _canRemove(p);
+
+          return ListTile(
+            leading: Icon(p['isGuest'] ? Icons.person_outline : Icons.verified),
+            title: Text(p['name']),
+            subtitle: Text(p['id'], style: const TextStyle(fontSize: 10)),
+            trailing: canRemove
+                ? IconButton(
+              icon: const Icon(Icons.close, color: Colors.red),
+              onPressed: () => onRemovePlayer(p),
+            )
+                : null,
+          );
+        }),
         const SizedBox(height: 8),
         ElevatedButton.icon(
-          onPressed: () => _showAddDialog(context),
+          onPressed: () => showAddDialog(context),
           icon: const Icon(Icons.person_add),
           label: const Text('Aggiungi giocatore'),
         ),
       ],
     );
+
   }
 
-  void _showAddDialog(BuildContext context) async {
+  void showAddDialog(BuildContext context) async {
     final player = await showDialog<RoomPlayer>(
       context: context,
       builder: (_) => const _AddPlayerOverlay(),
