@@ -99,7 +99,9 @@ class _DartKeyboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canUndo = data.history.isNotEmpty;
+    final currentPlayer = player;
+    final liveThrows = List<int>.from(currentPlayer['throws'] ?? []);
+    final canUndo = data.history.isNotEmpty || liveThrows.isNotEmpty;
     final throws = List<int>.from(player['throws'] ?? []);
 
     return Column(
@@ -134,18 +136,25 @@ class _DartKeyboard extends StatelessWidget {
   }
 
   void _addThrow(int value) async {
-    final newState = RoomMatchEngineLogic.applyThrow(
-      data,
-      player['id'],
-      value,
-    );
+    await repo.enqueue(() async {
+      final newState = RoomMatchEngineLogic.applyThrow(
+        repo.current!,
+        player['id'],
+        value,
+      );
 
-    await repo.update(newState);
+
+      await repo.update(newState);
+    });
   }
 
   void _undo() async {
-    final newState = RoomMatchEngineLogic.undo(data);
-    await repo.update(newState);
+    await repo.enqueue(() async {
+      final newState = RoomMatchEngineLogic.undo(repo.current!);
+
+
+      await repo.update(newState);
+    });
   }
 }
 
@@ -236,13 +245,16 @@ class _TotalKeyboardState extends State<_TotalKeyboard> {
     final value = int.tryParse(input);
     if (value == null) return;
 
-    final newState = RoomMatchEngineLogic.applyTurn(
-      widget.data,
-      widget.player['id'],
-      value,
-    );
+    await widget.repo.enqueue(() async {
+      final newState = RoomMatchEngineLogic.applyTurn(
+        widget.repo.current!,
+        widget.player['id'],
+        value,
+      );
 
-    await widget.repo.update(newState);
+
+      await widget.repo.update(newState);
+    });
 
     setState(() {
       input = '';
@@ -250,23 +262,29 @@ class _TotalKeyboardState extends State<_TotalKeyboard> {
   }
 
   void _miss() async {
-    final newState = RoomMatchEngineLogic.applyTurn(
-      widget.data,
-      widget.player['id'],
-      0,
-    );
+    await widget.repo.enqueue(() async {
+      final newState = RoomMatchEngineLogic.applyTurn(
+        widget.repo.current!,
+        widget.player['id'],
+        0,
+      );
 
-    await widget.repo.update(newState);
+
+      await widget.repo.update(newState);
+    });
   }
 
   void _bust() async {
-    final newState = RoomMatchEngineLogic.applyTurn(
-      widget.data,
-      widget.player['id'],
-      999, // forza bust
-    );
+    await widget.repo.enqueue(() async {
+      final newState = RoomMatchEngineLogic.applyTurn(
+        widget.repo.current!,
+        widget.player['id'],
+        999,
+      );
 
-    await widget.repo.update(newState);
+
+      await widget.repo.update(newState);
+    });
   }
 
   void _undo() async {

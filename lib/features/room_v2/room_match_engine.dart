@@ -53,8 +53,20 @@ class RoomMatchEngineView extends StatelessWidget {
           final isTurn = p['turn'] == true;
 
           final throws = p['throws'] is List
-              ? List.from(p['throws'])
+              ? List<int?>.from(p['throws'])
+              : <int?>[];
+
+// NUOVO STORICO TURNI
+          final historyTurns = data.history is List
+              ? data.history
+              .where((h) => h['playerId'] == id)
+              .toList()
               : [];
+
+// DERIVATO: darts flat dai turni
+          final historyDarts = historyTurns
+              .expand((t) => List<int?>.from(t['throws'] ?? []))
+              .toList();
 
           return Card(
             child: Padding(
@@ -67,7 +79,26 @@ class RoomMatchEngineView extends StatelessWidget {
                   Text('Order: $order'),
                   Text('Score: $score'),
                   Text('Legs: $legs | Sets: $sets'),
-                  Text('Throws: ${throws.join(", ")}'),
+
+                  const SizedBox(height: 6),
+                  Text(
+                    'Current throws: ${throws.map((e) => e?.toString() ?? "null").join(", ")}',
+                  ),
+
+                  const SizedBox(height: 6),
+                  Text(
+                    'Darts history: ${historyDarts.map((e) => e?.toString() ?? "null").join(", ")}',
+                  ),
+
+                  const SizedBox(height: 6),
+                  Text(
+                    'Turns history: ${historyTurns.map((t) {
+                      final total = t['total'];
+                      final kind = t['endKind'];
+                      final mode = t['inputMode'];
+                      return '$total ($mode/$kind)';
+                    }).join(", ")}',
+                  ),
                 ],
               ),
             ),

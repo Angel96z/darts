@@ -13,6 +13,7 @@ class RoomData {
   final int teamSize;
   final MatchConfig matchConfig;
   final List<Map<String, dynamic>> history;
+  final int legStarterOrder;
 
   const RoomData({
     required this.roomId,
@@ -29,6 +30,7 @@ class RoomData {
       legCount: 2,
     ),
     this.history = const [],
+    this.legStarterOrder = 0,
   });
 
   // =========================
@@ -47,16 +49,23 @@ class RoomData {
 
     for (int i = 0; i < ordered.length; i++) {
       final p = ordered[i];
-      final copy = Map<String, dynamic>.from(p);
 
-      // GAME INIT
+      final base = <String, dynamic>{
+        'id': p['id'],
+        'name': p['name'],
+        'ownerId': p['ownerId'],
+        'isGuest': p['isGuest'],
+        'order': i,
+        'lastSeen': p['lastSeen'],
+      };
+
       if (isX01) {
-        copy['score'] = startScore;
+        base['score'] = startScore;
       }
 
       if (isCricket) {
-        copy['score'] = 0;
-        copy['cricket'] = {
+        base['score'] = 0;
+        base['cricket'] = {
           '20': 0,
           '19': 0,
           '18': 0,
@@ -67,27 +76,27 @@ class RoomData {
         };
       }
 
-      // MATCH STATE
-      copy['legs'] = 0;
-      copy['sets'] = 0;
-      copy['turn'] = i == 0;
+      base['legs'] = 0;
+      base['sets'] = 0;
+      base['turn'] = i == 0;
 
-      copy['throws'] = [];
-      copy['round'] = 1;
-      copy['dart'] = 0;
+      base['throws'] = [];
+      base['round'] = 1;
+      base['dart'] = 0;
+      base['turnStartScore'] = base['score'];
+      base['inputMode'] = 'dart';
+      base['lastDartMultiplier'] = 1;
 
-      copy['inputMode'] = p['inputMode'] ?? 'dart';
-
-      updatedPlayers.add(copy);
+      updatedPlayers.add(base);
     }
 
     return copyWith(
       players: updatedPlayers,
       phase: RoomPhase.match,
+      history: [],
+      legStarterOrder: 0,
     );
-  }
-
-  // =========================
+  }  // =========================
   // PLAYERS
   // =========================
   RoomData addPlayer(dynamic player, String ownerId) {
@@ -183,6 +192,7 @@ class RoomData {
     int? teamSize,
     MatchConfig? matchConfig,
     List<Map<String, dynamic>>? history,
+    int? legStarterOrder,
   }) {
     return RoomData(
       roomId: roomId ?? this.roomId,
@@ -195,6 +205,8 @@ class RoomData {
       teamSize: teamSize ?? this.teamSize,
       matchConfig: matchConfig ?? this.matchConfig,
       history: history ?? this.history,
+      legStarterOrder: legStarterOrder ?? this.legStarterOrder,
+
     );
   }
 
@@ -212,6 +224,7 @@ class RoomData {
     'teamSize': teamSize,
     'matchConfig': matchConfig.toMap(),
     'history': history,
+    'legStarterOrder': legStarterOrder,
   };
 
   factory RoomData.fromMap(Map<String, dynamic> map) {
@@ -244,6 +257,8 @@ class RoomData {
       history: map['history'] != null
           ? List<Map<String, dynamic>>.from(map['history'])
           : const [],
+      legStarterOrder: map['legStarterOrder'] ?? 0,
+
     );
   }
 }

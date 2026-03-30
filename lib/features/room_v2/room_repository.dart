@@ -76,6 +76,30 @@ class RoomRepository {
 
   RoomData? get current => _state;
 
+// =========================
+// QUEUE SERIALIZZATA
+// =========================
+  final List<Future<void> Function()> _queue = [];
+  bool _isRunning = false;
+
+  Future<void> enqueue(Future<void> Function() job) async {
+    _queue.add(job);
+    _runQueue();
+  }
+
+  Future<void> _runQueue() async {
+    if (_isRunning) return;
+    _isRunning = true;
+
+    while (_queue.isNotEmpty) {
+      final job = _queue.removeAt(0);
+      await job();
+    }
+
+    _isRunning = false;
+  }
+
+
   void initLocal(RoomData data) {
     _state = data;
     _controller.add(data);
@@ -86,12 +110,14 @@ class RoomRepository {
     final updated = _state!.initMatch();
     await update(updated);
   }
-  Future<void> update(RoomData newData) async {
-    _state = newData;
-    _controller.add(newData);
-    if (newData.roomId != null) {
-      await db.collection('rooms').doc(newData.roomId).set(newData.toMap());
-    }
+  Future<void> update(RoomData data) async {
+    _state = data;
+    _controller.add(data);
+
+    await db.collection('rooms').doc(data.roomId).set(
+      data.toMap(),
+      SetOptions(merge: true),
+    );
   }
 
   void connectToRoom(String roomId) {
@@ -154,3 +180,4 @@ class RoomRepository {
     await _controller.close();
   }
 }
+
