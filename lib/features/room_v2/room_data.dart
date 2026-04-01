@@ -14,6 +14,7 @@ class RoomData {
   final MatchConfig matchConfig;
   final List<Map<String, dynamic>> history;
   final int legStarterOrder;
+  final List<Map<String, dynamic>> match;
 
   const RoomData({
     required this.roomId,
@@ -31,7 +32,22 @@ class RoomData {
     ),
     this.history = const [],
     this.legStarterOrder = 0,
+    this.match = const [],
   });
+
+  List<Map<String, dynamic>> _createInitialMatchTree() {
+    return [
+      {
+        'setNumber': 1,
+        'legs': [
+          {
+            'legNumber': 1,
+            'turns': <Map<String, dynamic>>[],
+          },
+        ],
+      },
+    ];
+  }
 
   // =========================
   // INIT MATCH
@@ -93,10 +109,13 @@ class RoomData {
     return copyWith(
       players: updatedPlayers,
       phase: RoomPhase.match,
-      history: [],
+      history: const [],
       legStarterOrder: 0,
+      match: _createInitialMatchTree(),
     );
-  }  // =========================
+  }
+
+  // =========================
   // PLAYERS
   // =========================
   RoomData addPlayer(dynamic player, String ownerId) {
@@ -193,6 +212,7 @@ class RoomData {
     MatchConfig? matchConfig,
     List<Map<String, dynamic>>? history,
     int? legStarterOrder,
+    List<Map<String, dynamic>>? match,
   }) {
     return RoomData(
       roomId: roomId ?? this.roomId,
@@ -206,7 +226,7 @@ class RoomData {
       matchConfig: matchConfig ?? this.matchConfig,
       history: history ?? this.history,
       legStarterOrder: legStarterOrder ?? this.legStarterOrder,
-
+      match: match ?? this.match,
     );
   }
 
@@ -225,6 +245,7 @@ class RoomData {
     'matchConfig': matchConfig.toMap(),
     'history': history,
     'legStarterOrder': legStarterOrder,
+    'match': match,
   };
 
   factory RoomData.fromMap(Map<String, dynamic> map) {
@@ -238,9 +259,8 @@ class RoomData {
           ? RoomPhase.values.byName(map['phase'])
           : RoomPhase.lobby,
       creatorId: map['creatorId'],
-      adminIds: map['adminIds'] != null
-          ? List<String>.from(map['adminIds'])
-          : const [],
+      adminIds:
+      map['adminIds'] != null ? List<String>.from(map['adminIds']) : const [],
       players: map['players'] != null
           ? List<Map<String, dynamic>>.from(map['players'])
           : const [],
@@ -258,7 +278,9 @@ class RoomData {
           ? List<Map<String, dynamic>>.from(map['history'])
           : const [],
       legStarterOrder: map['legStarterOrder'] ?? 0,
-
+      match: map['match'] != null
+          ? List<Map<String, dynamic>>.from(map['match'])
+          : const [],
     );
   }
 }

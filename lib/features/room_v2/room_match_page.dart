@@ -101,7 +101,7 @@ class RoomMatchPage extends StatelessWidget {
         body: Column(
           children: [
             Expanded(
-              child: RoomMatchEngineView(data: data),
+              child: RoomMatchEngineView(data: data,   repo: repo,),
             ),
 
             RoomInputKeyboard(

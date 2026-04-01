@@ -209,7 +209,7 @@ class RoomLobbyV2Page extends StatelessWidget {
 
                   SizedBox(
                     height: 400,
-                    child: RoomMatchEngineView(data: liveData),
+                    child: RoomMatchEngineView(data: liveData, repo: repo,),
                   ),
                   ElevatedButton(
                     onPressed: isCurrentUserAdmin ? () {} : null,

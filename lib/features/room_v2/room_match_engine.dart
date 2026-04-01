@@ -1,28 +1,184 @@
+import 'package:darts/features/room_v2/room_match_engine_logic.dart';
+import 'package:darts/features/room_v2/room_repository.dart';
 import 'package:flutter/material.dart';
 import 'games_darts.dart';
+import 'room_current_user.dart';
 import 'room_data.dart';
 
 class RoomMatchEngineView extends StatelessWidget {
   final RoomData data;
+  final RoomRepository repo;
 
   const RoomMatchEngineView({
     super.key,
     required this.data,
+    required this.repo,
   });
+  Widget? _buildWinnerOverlay(BuildContext context) {
+    final uid = RoomCurrentUser.current.uid;
+    final isTeam = data.teamSize > 1;
+
+    bool hasWinner = false;
+    bool isLocalWinner = false;
+
+    if (isTeam) {
+      final teams = data.buildTeams();
+
+      List<Map<String, dynamic>>? winningTeam;
+
+      for (final team in teams) {
+        final sets = (team.first['sets'] ?? 0) as int;
+        if (sets >= data.matchConfig.setsToWin) {
+          winningTeam = team;
+          hasWinner = true;
+          break;
+        }
+      }
+
+      if (!hasWinner || winningTeam == null) return null;
+
+      isLocalWinner = winningTeam.any((p) {
+        return p['id'] == uid || p['ownerId'] == uid;
+      });
+
+      if (!isLocalWinner) return null;
+
+      final names = winningTeam.map((p) => p['name']).join(', ');
+
+      return Positioned.fill(
+        child: Container(
+          color: Colors.black.withOpacity(0.7),
+          child: Center(
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('TEAM VINCENTE', style: TextStyle(fontSize: 18)),
+                    const SizedBox(height: 8),
+                    Text(names, style: const TextStyle(fontSize: 22)),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () async {
+                            final newState =
+                            RoomMatchEngineLogic.undo(data);
+                            await repo.update(newState);
+                          },
+                          child: const Text('Undo'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: () async {
+                            await repo.update(
+                              data.copyWith(phase: RoomPhase.result),
+                            );
+                          },
+                          child: const Text('Vai ai risultati'),
+                        ),
+                      ],
+                    )
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    } else {
+      Map<String, dynamic>? winner;
+
+      for (final p in data.players) {
+        final sets = (p['sets'] ?? 0) as int;
+        if (sets >= data.matchConfig.setsToWin) {
+          winner = p;
+          hasWinner = true;
+          break;
+        }
+      }
+
+      if (!hasWinner || winner == null) return null;
+
+      isLocalWinner =
+          winner['id'] == uid || winner['ownerId'] == uid;
+
+      if (!isLocalWinner) return null;
+
+      final name = winner['name'] ?? '-';
+
+      return Positioned.fill(
+        child: Container(
+          color: Colors.black.withOpacity(0.7),
+          child: Center(
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('VINCITORE', style: TextStyle(fontSize: 18)),
+                    const SizedBox(height: 8),
+                    Text(name, style: const TextStyle(fontSize: 22)),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () async {
+                            final newState =
+                            RoomMatchEngineLogic.undo(data);
+                            await repo.update(newState);
+                          },
+                          child: const Text('Undo'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: () async {
+                            await repo.update(
+                              data.copyWith(phase: RoomPhase.result),
+                            );
+                          },
+                          child: const Text('Vai ai risultati'),
+                        ),
+                      ],
+                    )
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // NON ATTIVO
-    if (data.phase != RoomPhase.match) {
+    // AUTO NAVIGAZIONE A RISULTATI
+    if (data.phase == RoomPhase.result) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          Navigator.of(context).pop(); // esce dal match
+        }
+      });
+    }
+    // NON ATTIVO SOLO IN LOBBY
+    if (data.phase == RoomPhase.lobby) {
       return const Center(
         child: Text('ENGINE NON ATTIVO'),
       );
     }
 
+    final winnerOverlay = _buildWinnerOverlay(context);
     // ATTIVO
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
+    return Stack(
+        children: [
+    ListView(
+    padding: const EdgeInsets.all(16),
+    children: [
         const Text(
           'MATCH ENGINE',
           style: TextStyle(fontWeight: FontWeight.bold),
@@ -143,7 +299,13 @@ class RoomMatchEngineView extends StatelessWidget {
             );
           }),
         ],
-      ],
+    ],
+    ),
+          if (winnerOverlay != null) winnerOverlay,
+        ],
     );
   }
+
+
 }
+

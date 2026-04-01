@@ -21,25 +21,24 @@ class RoomMatchEngineLogic {
     if (currentPlayer == null) return data;
     if (currentPlayer['id'] != playerId) return data;
 
-    final throws = List<int?>.from(currentPlayer['throws'] ?? []);
-    if (throws.length >= 3) return data;
-    final score = (currentPlayer['score'] as int?) ?? 0;
+    final liveThrows = List<int?>.from(currentPlayer['throws'] ?? const <int?>[]);
+    if (liveThrows.length >= 3) return data;
 
-    final newThrows = List<int?>.from(throws)..add(value);
-    final newScore = score - value;
+    final currentScore = (currentPlayer['score'] as int?) ?? 0;
+    final nextThrows = List<int?>.from(liveThrows)..add(value);
+    final newScore = currentScore - value;
 
-    // aggiorna player live
     final players = List<Map<String, dynamic>>.from(data.players);
     final index = players.indexWhere((p) => p['id'] == playerId);
     if (index == -1) return data;
 
     final player = Map<String, dynamic>.from(players[index]);
-    player['throws'] = newThrows;
-    player['dart'] = newThrows.length;
+    player['throws'] = nextThrows;
+    player['dart'] = nextThrows.length;
     player['score'] = newScore;
+    player['inputMode'] = 'dart';
     players[index] = player;
 
-    // fine turno?
     bool isEnd = false;
     String endKind = 'normal';
 
@@ -49,7 +48,7 @@ class RoomMatchEngineLogic {
     } else if (newScore == 0) {
       isEnd = true;
       endKind = 'checkout';
-    } else if (newThrows.length == 3) {
+    } else if (nextThrows.length == 3) {
       isEnd = true;
       endKind = 'normal';
     }
@@ -58,21 +57,28 @@ class RoomMatchEngineLogic {
       return data.copyWith(players: players);
     }
 
-    final turn = {
+    final turn = <String, dynamic>{
       'playerId': playerId,
-      'startScore': (player['turnStartScore'] as int?) ?? player['score'],
-      'throws': newThrows,
-      'total': newThrows.fold<int>(0, (s, e) => s + ((e as int?) ?? 0)),
+      'startScore': (player['turnStartScore'] as int?) ?? currentScore,
+      'throws': nextThrows,
+      'total': nextThrows.fold<int>(0, (sum, e) => sum + (e ?? 0)),
       'inputMode': 'dart',
       'endKind': endKind,
     };
 
-    final history = List<Map<String, dynamic>>.from(data.history)..add(turn);
+    final updatedMatch = _appendTurnToMatch(
+      data,
+      turn,
+      winnerIndex: index,
+      endKind: endKind,
+    );
 
-    return _applyTurnResult(
-      data.copyWith(players: players, history: history),
-      index,
-      endKind,
+    return _rebuildStateFromMatch(
+      data.copyWith(
+        match: updatedMatch,
+        history: _flattenMatchToHistory(updatedMatch),
+      ),
+      updatedMatch,
     );
   }
 
@@ -85,53 +91,48 @@ class RoomMatchEngineLogic {
     if (currentPlayer == null) return data;
     if (currentPlayer['id'] != playerId) return data;
 
-    final score = (currentPlayer['score'] as int?) ?? 0;
-    final newScore = score - total;
+    final currentScore = (currentPlayer['score'] as int?) ?? 0;
+    final newScore = currentScore - total;
 
     String endKind = 'normal';
-
     if (newScore < 0) {
       endKind = 'bust';
     } else if (newScore == 0) {
       endKind = 'checkout';
     }
 
-    final turn = {
-      'playerId': playerId,
-      'startScore': (currentPlayer['turnStartScore'] as int?) ?? currentPlayer['score'],
-      'throws': [null, null, null],
-      'total': total,
-      'inputMode': 'total',
-      'endKind': endKind,
-    };
-
-    final history = List<Map<String, dynamic>>.from(data.history)..add(turn);
-
     final players = List<Map<String, dynamic>>.from(data.players);
     final index = players.indexWhere((p) => p['id'] == playerId);
     if (index == -1) return data;
 
     final player = Map<String, dynamic>.from(players[index]);
-
-    if (endKind == 'bust') {
-      player['score'] = player['turnStartScore'];
-    } else {
-      player['score'] = newScore;
-    }
-
-    player['throws'] = <int?>[];
-    player['dart'] = 0;
-    player['round'] = ((player['round'] as int?) ?? 1) + 1;
-
+    player['inputMode'] = 'total';
     players[index] = player;
 
-    return _applyTurnResult(
-      data.copyWith(players: players, history: history),
-      index,
-      endKind,
+    final turn = <String, dynamic>{
+      'playerId': playerId,
+      'startScore': (currentPlayer['turnStartScore'] as int?) ?? currentScore,
+      'throws': <int?>[null, null, null],
+      'total': total,
+      'inputMode': 'total',
+      'endKind': endKind,
+    };
+
+    final updatedMatch = _appendTurnToMatch(
+      data.copyWith(players: players),
+      turn,
+      winnerIndex: index,
+      endKind: endKind,
+    );
+
+    return _rebuildStateFromMatch(
+      data.copyWith(
+        match: updatedMatch,
+        history: _flattenMatchToHistory(updatedMatch),
+      ),
+      updatedMatch,
     );
   }
-
 
   static RoomData undo(RoomData state) {
     final currentPlayer = _currentTurnPlayer(state);
@@ -141,7 +142,6 @@ class RoomMatchEngineLogic {
     // =========================
     if (currentPlayer != null) {
       final throws = List<int?>.from(currentPlayer['throws'] ?? const <int?>[]);
-
       if (throws.isNotEmpty) {
         final players = List<Map<String, dynamic>>.from(state.players);
         final index = players.indexWhere((p) => p['id'] == currentPlayer['id']);
@@ -152,7 +152,7 @@ class RoomMatchEngineLogic {
 
         throws.removeLast();
 
-        final newTotal = throws.fold<int>(0, (s, e) => s + (e ?? 0));
+        final newTotal = throws.fold<int>(0, (sum, e) => sum + (e ?? 0));
 
         player['throws'] = throws;
         player['dart'] = throws.length;
@@ -165,193 +165,118 @@ class RoomMatchEngineLogic {
     }
 
     // =========================
-    // 2. UNDO TURNO CHIUSO
+    // 2. UNDO ULTIMO INPUT CHIUSO
+    // mantiene la logica attuale:
+    // dart chiuso -> ripristina il turno live senza ultima freccetta
+    // total chiuso -> ripristina inizio turno
+    // checkout -> ripristina correttamente punteggi/turni di TUTTI
     // =========================
-    final history = List<Map<String, dynamic>>.from(state.history);
-    if (history.isEmpty) return state;
+    final last = _peekLastClosedTurn(state.match);
+    if (last == null) return state;
 
-    final last = Map<String, dynamic>.from(history.removeLast());
+    final nextMatch = _removeLastClosedTurnFromMatch(state.match);
+
+    RoomData rebuilt = _rebuildStateFromMatch(
+      state.copyWith(
+        match: nextMatch,
+        history: _flattenMatchToHistory(nextMatch),
+        phase: RoomPhase.match,
+      ),
+      nextMatch,
+    );
 
     final playerId = last['playerId'];
     final inputMode = last['inputMode'] ?? 'total';
-    final endKind = last['endKind'] ?? 'normal';
-    final lastThrows = List<int?>.from(last['throws'] ?? const <int?>[]);
     final startScore = (last['startScore'] as int?) ?? 0;
+    final lastThrows = List<int?>.from(last['throws'] ?? const <int?>[]);
 
-    // =========================
-    // CHECKOUT:
-    // _winLeg ha già resettato tutti i player.
-    // Quindi prima si torna allo stato corretto del leg precedente
-    // rigiocando la history residua, poi si ripristina il turno chiuso
-    // come turno live SENZA l'ultima freccetta.
-    // =========================
-    if (endKind == 'checkout') {
-      RoomData rebuilt = _rebuildFromTurnHistory(state, history);
+    final players = List<Map<String, dynamic>>.from(rebuilt.players);
+    final index = players.indexWhere((p) => p['id'] == playerId);
+    if (index == -1) return rebuilt;
 
-      final players = List<Map<String, dynamic>>.from(rebuilt.players);
-      final index = players.indexWhere((p) => p['id'] == playerId);
-      if (index == -1) return rebuilt;
-
-      final player = Map<String, dynamic>.from(players[index]);
-
-      for (int i = 0; i < players.length; i++) {
-        final copy = Map<String, dynamic>.from(players[i]);
-        copy['turn'] = i == index;
-        players[i] = copy;
-      }
-
-      player['inputMode'] = inputMode;
-      player['turnStartScore'] = startScore;
-
-      if (inputMode == 'dart') {
-        final restored = List<int?>.from(lastThrows);
-        if (restored.isNotEmpty) {
-          restored.removeLast();
-        }
-
-        final partialTotal = restored.fold<int>(0, (s, e) => s + (e ?? 0));
-
-        player['throws'] = restored;
-        player['dart'] = restored.length;
-        player['score'] = startScore - partialTotal;
-      } else {
-        player['throws'] = <int?>[];
-        player['dart'] = 0;
-        player['score'] = startScore;
-      }
-
-      players[index] = player;
-
-      return rebuilt.copyWith(
-        players: players,
-        history: history,
-      );
+    for (int i = 0; i < players.length; i++) {
+      final copy = Map<String, dynamic>.from(players[i]);
+      copy['turn'] = i == index;
+      players[i] = copy;
     }
 
-    // =========================
-    // NORMAL / BUST / TOTAL
-    // mantiene la logica attuale:
-    // turno chiuso dart -> ripristina il turno live senza ultima freccetta
-    // turno total -> ripristina inizio turno
-    // =========================
-    final players = List<Map<String, dynamic>>.from(state.players);
-    final index = players.indexWhere((p) => p['id'] == playerId);
-    if (index == -1) return state;
-
     final player = Map<String, dynamic>.from(players[index]);
-    final turnStart = (player['turnStartScore'] as int?) ?? startScore;
+    player['inputMode'] = inputMode;
+    player['turnStartScore'] = startScore;
 
     if (inputMode == 'dart') {
       final restored = List<int?>.from(lastThrows);
-
       if (restored.isNotEmpty) {
         restored.removeLast();
       }
 
-      final newTotal = restored.fold<int>(0, (s, e) => s + (e ?? 0));
+      final partialTotal = restored.fold<int>(0, (sum, e) => sum + (e ?? 0));
 
       player['throws'] = restored;
       player['dart'] = restored.length;
-      player['score'] = turnStart - newTotal;
+      player['score'] = startScore - partialTotal;
     } else {
       player['throws'] = <int?>[];
       player['dart'] = 0;
-      player['score'] = turnStart;
+      player['score'] = startScore;
     }
-
-    final round = (player['round'] as int?) ?? 1;
-    player['round'] = round > 1 ? round - 1 : 1;
 
     players[index] = player;
 
-    final updated = <Map<String, dynamic>>[];
-    for (final p in players) {
-      final copy = Map<String, dynamic>.from(p);
-      copy['turn'] = p['id'] == playerId;
-      updated.add(copy);
+    return rebuilt.copyWith(
+      players: players,
+      history: _flattenMatchToHistory(nextMatch),
+      match: nextMatch,
+      phase: RoomPhase.match,
+    );
+  }
+
+  static RoomData _rebuildStateFromMatch(
+      RoomData base,
+      List<Map<String, dynamic>> match,
+      ) {
+    final normalizedMatch = _ensureMatchTree(match);
+    final flatTurns = _flattenMatchToHistory(normalizedMatch);
+
+    RoomData state = base.copyWith(
+      players: _resetPlayers(base),
+      history: flatTurns,
+      match: normalizedMatch,
+      legStarterOrder: 0,
+      phase: RoomPhase.match,
+    );
+
+    for (final rawTurn in flatTurns) {
+      final turn = Map<String, dynamic>.from(rawTurn);
+      state = _applyClosedTurn(state, turn);
     }
 
     return state.copyWith(
-      players: updated,
-      history: history,
+      history: flatTurns,
+      match: normalizedMatch,
     );
   }
 
-  static RoomData _rebuildFromHistory(
-      RoomData base,
-      List<Map<String, dynamic>> history,
-      ) {
-    RoomData state = base.copyWith(
-      players: _resetPlayers(base),
-      history: [],
-      legStarterOrder: 0,
-    );
-
-    for (final rawEvent in history) {
-      final event = Map<String, dynamic>.from(rawEvent);
-      final type = event['type'];
-
-      if (type == 'dart') {
-        state = _applyDartEvent(state, event);
-        continue;
-      }
-
-      if (type == 'turn_end') {
-        state = _applyTurnEndEvent(state, event);
-        continue;
-      }
-
-      if (type == 'turn_total_input') {
-        state = _applyTurnTotalInputEvent(state, event);
-        continue;
-      }
-    }
-
-    return state.copyWith(history: history);
-  }
-
-  static RoomData _applyDartEvent(
+  static RoomData _applyClosedTurn(
       RoomData state,
-      Map<String, dynamic> event,
+      Map<String, dynamic> turn,
       ) {
-    final playerId = event['playerId'];
-    final value = (event['value'] as int?) ?? 0;
+    final playerId = turn['playerId'];
+    final startScore = (turn['startScore'] as int?) ?? 0;
+    final total = (turn['total'] as int?) ?? 0;
+    final endKind = (turn['endKind'] as String?) ?? 'normal';
 
     final players = List<Map<String, dynamic>>.from(state.players);
     final index = players.indexWhere((p) => p['id'] == playerId);
     if (index == -1) return state;
 
     final player = Map<String, dynamic>.from(players[index]);
-    final throws = List<int?>.from(player['throws'] ?? const <int?>[])..add(value);
-
-    player['throws'] = throws;
-    player['dart'] = throws.length;
-    player['score'] = ((player['score'] as int?) ?? 0) - value;
-
-    players[index] = player;
-
-    return state.copyWith(players: players);
-  }
-
-  static RoomData _applyTurnEndEvent(
-      RoomData state,
-      Map<String, dynamic> event,
-      ) {
-    final playerId = event['playerId'];
-    final endKind = event['endKind'] ?? 'normal';
-
-    final players = List<Map<String, dynamic>>.from(state.players);
-    final index = players.indexWhere((p) => p['id'] == playerId);
-    if (index == -1) return state;
-
-    final player = Map<String, dynamic>.from(players[index]);
-
+    player['inputMode'] = turn['inputMode'] ?? 'dart';
     if (endKind == 'bust') {
-      player['score'] = player['turnStartScore'];
+      player['score'] = startScore;
       player['throws'] = <int?>[];
       player['dart'] = 0;
       player['round'] = ((player['round'] as int?) ?? 1) + 1;
-
       players[index] = player;
 
       final moved = _nextTurn(state, players, index);
@@ -360,149 +285,242 @@ class RoomMatchEngineLogic {
 
     if (endKind == 'checkout') {
       player['score'] = 0;
+      player['throws'] = <int?>[];
+      player['dart'] = 0;
       players[index] = player;
 
-      final won = _winLeg(state, players, index);
-      return _syncTurnStartScoreFromCurrentScore(won);
+      return _advanceAfterCheckout(state, players, index);
     }
 
+    player['score'] = startScore - total;
     player['throws'] = <int?>[];
     player['dart'] = 0;
     player['round'] = ((player['round'] as int?) ?? 1) + 1;
-
     players[index] = player;
 
     final moved = _nextTurn(state, players, index);
     return _syncTurnStartScoreFromCurrentScore(moved);
   }
 
-  static RoomData _applyTurnTotalInputEvent(
-      RoomData state,
-      Map<String, dynamic> event,
-      ) {
-    final playerId = event['playerId'];
-    final total = (event['total'] as int?) ?? 0;
+  static List<Map<String, dynamic>> _appendTurnToMatch(
+      RoomData data,
+      Map<String, dynamic> turn, {
+        required int winnerIndex,
+        required String endKind,
+      }) {
+    final match = _ensureMatchTree(data.match);
+    final copied = _deepCopyMatch(match);
 
-    final players = List<Map<String, dynamic>>.from(state.players);
-    final index = players.indexWhere((p) => p['id'] == playerId);
-    if (index == -1) return state;
-
-    final player = Map<String, dynamic>.from(players[index]);
-    final currentScore = (player['score'] as int?) ?? 0;
-    final newScore = currentScore - total;
-
-    if (newScore < 0) {
-      player['score'] = player['turnStartScore'];
-      player['throws'] = <int?>[];
-      player['dart'] = 0;
-      player['round'] = ((player['round'] as int?) ?? 1) + 1;
-
-      players[index] = player;
-
-      final moved = _nextTurn(state, players, index);
-      return _syncTurnStartScoreFromCurrentScore(moved);
+    if (copied.isEmpty) {
+      return _ensureMatchTree(copied);
     }
 
-    if (newScore == 0) {
-      player['score'] = 0;
-      player['throws'] = <int?>[];
-      player['dart'] = 0;
+    final setIndex = copied.length - 1;
+    final currentSet = Map<String, dynamic>.from(copied[setIndex]);
+    final legs = List<Map<String, dynamic>>.from(currentSet['legs'] ?? const []);
 
-      players[index] = player;
-
-      final won = _winLeg(state, players, index);
-      return _syncTurnStartScoreFromCurrentScore(won);
+    if (legs.isEmpty) {
+      legs.add({
+        'legNumber': 1,
+        'turns': <Map<String, dynamic>>[],
+      });
     }
 
-    player['score'] = newScore;
-    player['throws'] = <int?>[];
-    player['dart'] = 0;
-    player['round'] = ((player['round'] as int?) ?? 1) + 1;
+    final legIndex = legs.length - 1;
+    final currentLeg = Map<String, dynamic>.from(legs[legIndex]);
+    final turns = List<Map<String, dynamic>>.from(currentLeg['turns'] ?? const []);
 
-    players[index] = player;
+    turns.add(Map<String, dynamic>.from(turn));
+    currentLeg['turns'] = turns;
+    legs[legIndex] = currentLeg;
+    currentSet['legs'] = legs;
+    copied[setIndex] = currentSet;
 
-    final moved = _nextTurn(state, players, index);
-    return _syncTurnStartScoreFromCurrentScore(moved);
+    if (endKind != 'checkout') {
+      return copied;
+    }
+
+    final winner = Map<String, dynamic>.from(data.players[winnerIndex]);
+    final winnerLegsAfter = ((winner['legs'] as int?) ?? 0) + 1;
+    final setWon = winnerLegsAfter >= data.matchConfig.legsToWin;
+    final winnerSetsAfter =
+        ((winner['sets'] as int?) ?? 0) + (setWon ? 1 : 0);
+    final matchWon = winnerSetsAfter >= data.matchConfig.setsToWin;
+
+    if (matchWon) {
+      return copied;
+    }
+
+    if (setWon) {
+      copied.add({
+        'setNumber': copied.length + 1,
+        'legs': [
+          {
+            'legNumber': 1,
+            'turns': <Map<String, dynamic>>[],
+          },
+        ],
+      });
+      return copied;
+    }
+
+    final refreshedSet = Map<String, dynamic>.from(copied[setIndex]);
+    final refreshedLegs =
+    List<Map<String, dynamic>>.from(refreshedSet['legs'] ?? const []);
+
+    refreshedLegs.add({
+      'legNumber': refreshedLegs.length + 1,
+      'turns': <Map<String, dynamic>>[],
+    });
+
+    refreshedSet['legs'] = refreshedLegs;
+    copied[setIndex] = refreshedSet;
+
+    return copied;
   }
-  static RoomData _applyTurnResult(
-      RoomData state,
-      int playerIndex,
-      String endKind,
-      ) {
-    final players = List<Map<String, dynamic>>.from(state.players);
 
-    if (endKind == 'checkout') {
-      final won = _winLeg(state, players, playerIndex);
-      return _syncTurnStartScoreFromCurrentScore(won);
+  static Map<String, dynamic>? _peekLastClosedTurn(
+      List<Map<String, dynamic>> match,
+      ) {
+    final normalized = _ensureMatchTree(match);
+
+    for (int setIndex = normalized.length - 1; setIndex >= 0; setIndex--) {
+      final set = Map<String, dynamic>.from(normalized[setIndex]);
+      final legs = List<Map<String, dynamic>>.from(set['legs'] ?? const []);
+
+      for (int legIndex = legs.length - 1; legIndex >= 0; legIndex--) {
+        final leg = Map<String, dynamic>.from(legs[legIndex]);
+        final turns = List<Map<String, dynamic>>.from(leg['turns'] ?? const []);
+
+        if (turns.isNotEmpty) {
+          return Map<String, dynamic>.from(turns.last);
+        }
+      }
     }
 
-    final moved = _nextTurn(state, players, playerIndex);
-    return _syncTurnStartScoreFromCurrentScore(moved);
+    return null;
   }
 
-  static RoomData _rebuildFromTurnHistory(
-      RoomData base,
-      List<Map<String, dynamic>> history,
+  static List<Map<String, dynamic>> _removeLastClosedTurnFromMatch(
+      List<Map<String, dynamic>> match,
       ) {
-    RoomData state = base.copyWith(
-      players: _resetPlayers(base),
-      history: [],
-      legStarterOrder: 0,
-    );
+    final copied = _deepCopyMatch(_ensureMatchTree(match));
 
-    for (final rawTurn in history) {
-      final turn = Map<String, dynamic>.from(rawTurn);
+    while (copied.isNotEmpty) {
+      final setIndex = copied.length - 1;
+      final currentSet = Map<String, dynamic>.from(copied[setIndex]);
+      final legs = List<Map<String, dynamic>>.from(currentSet['legs'] ?? const []);
 
-      final playerId = turn['playerId'];
-      final total = (turn['total'] as int?) ?? 0;
-      final startScore = (turn['startScore'] as int?) ?? 0;
-      final endKind = (turn['endKind'] as String?) ?? 'normal';
-
-      final players = List<Map<String, dynamic>>.from(state.players);
-      final index = players.indexWhere((p) => p['id'] == playerId);
-      if (index == -1) {
+      if (legs.isEmpty) {
+        if (copied.length == 1) {
+          return _ensureMatchTree(const []);
+        }
+        copied.removeLast();
         continue;
       }
 
-      final player = Map<String, dynamic>.from(players[index]);
+      final legIndex = legs.length - 1;
+      final currentLeg = Map<String, dynamic>.from(legs[legIndex]);
+      final turns = List<Map<String, dynamic>>.from(currentLeg['turns'] ?? const []);
 
-      if (endKind == 'bust') {
-        player['score'] = player['turnStartScore'];
-        player['throws'] = <int?>[];
-        player['dart'] = 0;
-        player['round'] = ((player['round'] as int?) ?? 1) + 1;
+      if (turns.isEmpty) {
+        if (legs.length > 1) {
+          legs.removeLast();
+          currentSet['legs'] = legs;
+          copied[setIndex] = currentSet;
+          continue;
+        }
 
-        players[index] = player;
+        if (copied.length > 1) {
+          copied.removeLast();
+          continue;
+        }
 
-        final moved = _nextTurn(state, players, index);
-        state = _syncTurnStartScoreFromCurrentScore(moved);
-        continue;
+        return _ensureMatchTree(const []);
       }
 
-      if (endKind == 'checkout') {
-        player['score'] = 0;
-        player['throws'] = <int?>[];
-        player['dart'] = 0;
-
-        players[index] = player;
-
-        final won = _winLeg(state, players, index);
-        state = _syncTurnStartScoreFromCurrentScore(won);
-        continue;
-      }
-
-      player['score'] = startScore - total;
-      player['throws'] = <int?>[];
-      player['dart'] = 0;
-      player['round'] = ((player['round'] as int?) ?? 1) + 1;
-
-      players[index] = player;
-
-      final moved = _nextTurn(state, players, index);
-      state = _syncTurnStartScoreFromCurrentScore(moved);
+      turns.removeLast();
+      currentLeg['turns'] = turns;
+      legs[legIndex] = currentLeg;
+      currentSet['legs'] = legs;
+      copied[setIndex] = currentSet;
+      return copied;
     }
 
-    return state.copyWith(history: history);
+    return _ensureMatchTree(const []);
+  }
+
+  static List<Map<String, dynamic>> _flattenMatchToHistory(
+      List<Map<String, dynamic>> match,
+      ) {
+    final normalized = _ensureMatchTree(match);
+    final flat = <Map<String, dynamic>>[];
+
+    for (final rawSet in normalized) {
+      final set = Map<String, dynamic>.from(rawSet);
+      final legs = List<Map<String, dynamic>>.from(set['legs'] ?? const []);
+
+      for (final rawLeg in legs) {
+        final leg = Map<String, dynamic>.from(rawLeg);
+        final turns = List<Map<String, dynamic>>.from(leg['turns'] ?? const []);
+
+        for (final rawTurn in turns) {
+          flat.add(Map<String, dynamic>.from(rawTurn));
+        }
+      }
+    }
+
+    return flat;
+  }
+
+  static List<Map<String, dynamic>> _ensureMatchTree(
+      List<Map<String, dynamic>> match,
+      ) {
+    if (match.isNotEmpty) {
+      return _deepCopyMatch(match);
+    }
+
+    return [
+      {
+        'setNumber': 1,
+        'legs': [
+          {
+            'legNumber': 1,
+            'turns': <Map<String, dynamic>>[],
+          },
+        ],
+      },
+    ];
+  }
+
+  static List<Map<String, dynamic>> _deepCopyMatch(
+      List<Map<String, dynamic>> match,
+      ) {
+    final copied = <Map<String, dynamic>>[];
+
+    for (final rawSet in match) {
+      final set = Map<String, dynamic>.from(rawSet);
+      final rawLegs = List<Map<String, dynamic>>.from(set['legs'] ?? const []);
+      final copiedLegs = <Map<String, dynamic>>[];
+
+      for (final rawLeg in rawLegs) {
+        final leg = Map<String, dynamic>.from(rawLeg);
+        final rawTurns = List<Map<String, dynamic>>.from(leg['turns'] ?? const []);
+        final copiedTurns = <Map<String, dynamic>>[];
+
+        for (final rawTurn in rawTurns) {
+          copiedTurns.add(Map<String, dynamic>.from(rawTurn));
+        }
+
+        leg['turns'] = copiedTurns;
+        copiedLegs.add(leg);
+      }
+
+      set['legs'] = copiedLegs;
+      copied.add(set);
+    }
+
+    return copied;
   }
 
   static Map<String, dynamic>? _currentTurnPlayer(RoomData data) {
@@ -583,7 +601,7 @@ class RoomMatchEngineLogic {
     return result;
   }
 
-  static RoomData _winLeg(
+  static RoomData _advanceAfterCheckout(
       RoomData state,
       List<Map<String, dynamic>> players,
       int winnerIndex,
@@ -616,28 +634,72 @@ class RoomMatchEngineLogic {
       nextStarterOrder = (state.legStarterOrder + 1) % sorted.length;
     }
 
+    final winner = Map<String, dynamic>.from(players[winnerIndex]);
+    final winnerOrder = (winner['order'] ?? 0) as int;
+
+    final winningTeamStart = state.teamSize > 1
+        ? (winnerOrder ~/ state.teamSize) * state.teamSize
+        : winnerOrder;
+    final winningTeamEnd = state.teamSize > 1
+        ? winningTeamStart + state.teamSize
+        : winnerOrder + 1;
+
+    final isWinningTeamPlayer = (Map<String, dynamic> p) {
+      final order = (p['order'] ?? 0) as int;
+      return order >= winningTeamStart && order < winningTeamEnd;
+    };
+
+    int teamLegsBefore = 0;
+    int teamSetsBefore = 0;
+
+    if (state.teamSize > 1) {
+      for (final p in players) {
+        if (isWinningTeamPlayer(p)) {
+          teamLegsBefore = (p['legs'] as int?) ?? 0;
+          teamSetsBefore = (p['sets'] as int?) ?? 0;
+          break;
+        }
+      }
+    } else {
+      teamLegsBefore = (winner['legs'] as int?) ?? 0;
+      teamSetsBefore = (winner['sets'] as int?) ?? 0;
+    }
+
+    final winnerLegsAfter = teamLegsBefore + 1;
+    final setWon = winnerLegsAfter >= state.matchConfig.legsToWin;
+    final winnerSetsAfter = teamSetsBefore + (setWon ? 1 : 0);
+    final matchWon = winnerSetsAfter >= state.matchConfig.setsToWin;
+
     final updated = <Map<String, dynamic>>[];
 
     for (int i = 0; i < players.length; i++) {
       final p = Map<String, dynamic>.from(players[i]);
+      final belongsToWinningTeam = isWinningTeamPlayer(p);
 
-      if (i == winnerIndex) {
-        p['legs'] = ((p['legs'] as int?) ?? 0) + 1;
+      if (belongsToWinningTeam) {
+        if (setWon) {
+          p['sets'] = winnerSetsAfter;
+          p['legs'] = 0;
+        } else {
+          p['legs'] = winnerLegsAfter;
+        }
+      } else if (setWon) {
+        p['legs'] = 0;
       }
 
       p['score'] = state.game.startingScore ?? 501;
-      p['turn'] = (p['order'] ?? 0) == nextStarterOrder;
+      p['turn'] = matchWon ? false : (p['order'] ?? 0) == nextStarterOrder;
       p['throws'] = <int?>[];
       p['dart'] = 0;
       p['round'] = 1;
       p['turnStartScore'] = p['score'];
-
       updated.add(p);
     }
 
     return state.copyWith(
       players: updated,
       legStarterOrder: nextStarterOrder,
+      phase: RoomPhase.match,
     );
   }
 
@@ -649,7 +711,7 @@ class RoomMatchEngineLogic {
     final sorted = List<Map<String, dynamic>>.from(players)
       ..sort((a, b) => (a['order'] ?? 0).compareTo((b['order'] ?? 0)));
 
-    final List<Map<String, dynamic>> turnOrder = [];
+    final turnOrder = <Map<String, dynamic>>[];
 
     if (state.teamSize > 1) {
       final teams = <List<Map<String, dynamic>>>[];
@@ -690,13 +752,18 @@ class RoomMatchEngineLogic {
 
     for (final p in players) {
       final copy = Map<String, dynamic>.from(p);
+
       copy['turn'] = p['id'] == nextPlayerId;
+
+      if (p['id'] == nextPlayerId) {
+        copy['inputMode'] = copy['inputMode'] ?? 'dart';
+      }
+
       copy['throws'] = p['id'] == currentPlayer['id']
           ? <int?>[]
           : List<int?>.from(copy['throws'] ?? const <int?>[]);
-      copy['dart'] = p['id'] == currentPlayer['id']
-          ? 0
-          : ((copy['dart'] as int?) ?? 0);
+      copy['dart'] =
+      p['id'] == currentPlayer['id'] ? 0 : ((copy['dart'] as int?) ?? 0);
       updated.add(copy);
     }
 
