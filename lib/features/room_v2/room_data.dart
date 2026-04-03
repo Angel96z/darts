@@ -49,13 +49,9 @@ class RoomData {
     ];
   }
 
-  // =========================
-  // INIT MATCH
-  // =========================
   RoomData initMatch() {
     final isX01 = game.type == GameType.x01;
     final isCricket = game.type == GameType.cricket;
-
     final startScore = game.startingScore ?? 501;
 
     final ordered = List<Map<String, dynamic>>.from(players)
@@ -73,14 +69,29 @@ class RoomData {
         'isGuest': p['isGuest'],
         'order': i,
         'lastSeen': p['lastSeen'],
+        'legs': 0,
+        'sets': 0,
+        'turn': i == 0,
+        'round': 1,
+        'dart': 0,
+        'inputMode': 'dart',
+        'opened': false,
+        'throws': <Map<String, dynamic>>[],
+        'throwMeta': <String>[],
+        'lastThrowIntent': null,
+        'lastDartMultiplier': 1,
       };
 
       if (isX01) {
         base['score'] = startScore;
+        base['turnStartScore'] = startScore;
+      } else {
+        base['score'] = 0;
+        base['turnStartScore'] = 0;
       }
 
       if (isCricket) {
-        base['score'] = 0;
+        base['cricketScore'] = 0;
         base['cricket'] = {
           '20': 0,
           '19': 0,
@@ -91,17 +102,6 @@ class RoomData {
           '25': 0,
         };
       }
-
-      base['legs'] = 0;
-      base['sets'] = 0;
-      base['turn'] = i == 0;
-
-      base['throws'] = [];
-      base['round'] = 1;
-      base['dart'] = 0;
-      base['turnStartScore'] = base['score'];
-      base['inputMode'] = 'dart';
-      base['lastDartMultiplier'] = 1;
 
       updatedPlayers.add(base);
     }
@@ -115,9 +115,6 @@ class RoomData {
     );
   }
 
-  // =========================
-  // PLAYERS
-  // =========================
   RoomData addPlayer(dynamic player, String ownerId) {
     final String id = player is Map ? player['id'] : player.id;
     final Map<String, dynamic> playerMap =
@@ -138,7 +135,7 @@ class RoomData {
       ..['lastSeen'] = DateTime.now().millisecondsSinceEpoch
       ..['order'] = nextOrder;
 
-    return copyWith(players: List.from(players)..add(enriched));
+    return copyWith(players: List<Map<String, dynamic>>.from(players)..add(enriched));
   }
 
   List<List<Map<String, dynamic>>> buildTeams() {
@@ -197,9 +194,6 @@ class RoomData {
     return copyWith(adminIds: updatedAdmins.toList());
   }
 
-  // =========================
-  // COPY
-  // =========================
   RoomData copyWith({
     String? roomId,
     DateTime? createdAt,
@@ -230,9 +224,6 @@ class RoomData {
     );
   }
 
-  // =========================
-  // DB
-  // =========================
   Map<String, dynamic> toMap() => {
     'roomId': roomId,
     'createdAt': createdAt.toIso8601String(),
@@ -240,12 +231,33 @@ class RoomData {
     'phase': phase.name,
     'creatorId': creatorId,
     'adminIds': adminIds,
-    'players': players,
+    'players': players.map((p) {
+      final copy = Map<String, dynamic>.from(p);
+
+      copy['throws'] = List<Map<String, dynamic>>.from(
+        (copy['throws'] ?? const []).map(
+              (e) => Map<String, dynamic>.from(e as Map),
+        ),
+      );
+
+      copy['throwMeta'] = List<String>.from(copy['throwMeta'] ?? const []);
+
+      final lastThrowIntent = copy['lastThrowIntent'];
+      if (lastThrowIntent is Map) {
+        copy['lastThrowIntent'] = Map<String, dynamic>.from(lastThrowIntent);
+      }
+
+      return copy;
+    }).toList(),
     'teamSize': teamSize,
     'matchConfig': matchConfig.toMap(),
-    'history': history,
+    'history': history
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList(),
     'legStarterOrder': legStarterOrder,
-    'match': match,
+    'match': match
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList(),
   };
 
   factory RoomData.fromMap(Map<String, dynamic> map) {
@@ -262,7 +274,40 @@ class RoomData {
       adminIds:
       map['adminIds'] != null ? List<String>.from(map['adminIds']) : const [],
       players: map['players'] != null
-          ? List<Map<String, dynamic>>.from(map['players'])
+          ? List<Map<String, dynamic>>.from(map['players']).map((p) {
+        final copy = Map<String, dynamic>.from(p);
+
+        final rawThrows = List.from(copy['throws'] ?? const []);
+        copy['throws'] = rawThrows.map<Map<String, dynamic>>((e) {
+          if (e is Map) {
+            return Map<String, dynamic>.from(e);
+          }
+
+          if (e is int) {
+            return {
+              'type': 'legacy',
+              'value': e,
+            };
+          }
+
+          return {
+            'type': 'unknown',
+            'value': e,
+          };
+        }).toList();
+
+        copy['throwMeta'] =
+        List<String>.from(copy['throwMeta'] ?? const []);
+
+        final lastThrowIntent = copy['lastThrowIntent'];
+        if (lastThrowIntent is Map) {
+          copy['lastThrowIntent'] = Map<String, dynamic>.from(lastThrowIntent);
+        } else {
+          copy['lastThrowIntent'] = null;
+        }
+
+        return copy;
+      }).toList()
           : const [],
       teamSize: map['teamSize'] ?? 0,
       matchConfig: map['matchConfig'] != null
@@ -276,10 +321,14 @@ class RoomData {
       ),
       history: map['history'] != null
           ? List<Map<String, dynamic>>.from(map['history'])
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList()
           : const [],
       legStarterOrder: map['legStarterOrder'] ?? 0,
       match: map['match'] != null
           ? List<Map<String, dynamic>>.from(map['match'])
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList()
           : const [],
     );
   }

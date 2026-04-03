@@ -65,7 +65,7 @@ class RoomMatchEngineView extends StatelessWidget {
                         ElevatedButton(
                           onPressed: () async {
                             final newState =
-                            RoomMatchEngineLogic.undo(data);
+                            RoomMatchEngineLogic.undoLastThrow(data);
                             await repo.update(newState);
                           },
                           child: const Text('Undo'),
@@ -129,7 +129,7 @@ class RoomMatchEngineView extends StatelessWidget {
                         ElevatedButton(
                           onPressed: () async {
                             final newState =
-                            RoomMatchEngineLogic.undo(data);
+                            RoomMatchEngineLogic.undoLastThrow(data);
                             await repo.update(newState);
                           },
                           child: const Text('Undo'),
@@ -209,9 +209,11 @@ class RoomMatchEngineView extends StatelessWidget {
           final isTurn = p['turn'] == true;
 
           final throws = p['throws'] is List
-              ? List<int?>.from(p['throws'])
-              : <int?>[];
-
+              ? List<Map<String, dynamic>>.from(p['throws'])
+              : <Map<String, dynamic>>[];
+          final meta = p['throwMeta'] is List
+              ? List<String?>.from(p['throwMeta'])
+              : <String?>[];
 // NUOVO STORICO TURNI
           final historyTurns = data.history is List
               ? data.history
@@ -220,9 +222,32 @@ class RoomMatchEngineView extends StatelessWidget {
               : [];
 
 // DERIVATO: darts flat dai turni
-          final historyDarts = historyTurns
-              .expand((t) => List<int?>.from(t['throws'] ?? []))
-              .toList();
+          final historyDarts = historyTurns.expand((t) {
+            final values = List.from(t['throws'] ?? const []);
+
+            return values.map((e) {
+              if (e is Map) {
+                final number = e['number'];
+                final multiplier = e['multiplier'] ?? 1;
+                final isMiss = e['isMiss'] == true;
+
+                if (isMiss) return 'MISS';
+                if (number == null) return '-';
+
+                final prefix = multiplier == 3
+                    ? 'T'
+                    : multiplier == 2
+                    ? 'D'
+                    : 'S';
+
+                return '$prefix$number';
+              }
+
+              if (e is int) return e.toString();
+
+              return '-';
+            });
+          }).toList();
 
           return Card(
             child: Padding(
@@ -238,13 +263,37 @@ class RoomMatchEngineView extends StatelessWidget {
 
                   const SizedBox(height: 6),
                   Text(
-                    'Current throws: ${throws.map((e) => e?.toString() ?? "null").join(", ")}',
+                    'Current throws: ${throws.map((t) {
+                      final number = t['number'];
+                      final multiplier = t['multiplier'] ?? 1;
+                      final isMiss = t['isMiss'] == true;
+
+                      if (isMiss) return 'MISS';
+
+                      if (number == null) return '-';
+
+                      final prefix = multiplier == 3
+                          ? 'T'
+                          : multiplier == 2
+                          ? 'D'
+                          : 'S';
+
+                      return '$prefix$number';
+                    }).join(", ")}',
                   ),
 
                   const SizedBox(height: 6),
                   Text(
-                    'Darts history: ${historyDarts.map((e) => e?.toString() ?? "null").join(", ")}',
+                    'Darts history: ${historyDarts.join(", ")}',
+
                   ),
+                  const SizedBox(height: 10),
+
+                  if (data.game.type == GameType.cricket)
+                    _CricketPlayerStats(
+                      player: p,
+                      allPlayers: data.players,
+                    ),
 
                   const SizedBox(height: 6),
                   Text(
@@ -309,3 +358,86 @@ class RoomMatchEngineView extends StatelessWidget {
 
 }
 
+class _CricketPlayerStats extends StatelessWidget {
+  final Map<String, dynamic> player;
+  final List<Map<String, dynamic>> allPlayers;
+
+  const _CricketPlayerStats({
+    required this.player,
+    required this.allPlayers,
+  });
+
+  static const targets = ['20', '19', '18', '17', '16', '15', '25'];
+
+  @override
+  Widget build(BuildContext context) {
+    final cricket = Map<String, dynamic>.from(player['cricket'] ?? {});
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('CRICKET'),
+
+        const SizedBox(height: 6),
+
+        ...targets.map((t) {
+          final value = (cricket[t] as int?) ?? 0;
+
+          final isOpened = value >= 3;
+
+          final allOpened = allPlayers.every((p) {
+            final c = Map<String, dynamic>.from(p['cricket'] ?? {});
+            return (c[t] as int? ?? 0) >= 3;
+          });
+
+          final isClosed = allOpened;
+
+          final canScore = isOpened && !isClosed;
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 30,
+                  child: Text(t),
+                ),
+
+                const SizedBox(width: 6),
+
+                _marks(value),
+
+                const SizedBox(width: 8),
+
+                if (isClosed)
+                  const Text('CLOSED', style: TextStyle(color: Colors.grey))
+                else if (canScore)
+                  const Text('SCORING', style: TextStyle(color: Colors.green)),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _marks(int value) {
+    final marks = List.generate(
+      value.clamp(0, 3),
+          (i) => const Text('X'),
+    );
+
+    while (marks.length < 3) {
+      marks.add(const Text('-'));
+    }
+
+    return Row(
+      children: marks
+          .map((w) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: w,
+      ))
+          .toList(),
+    );
+  }
+}

@@ -12,21 +12,259 @@ class RoomMatchEngineLogic {
     return applyTurn(state, playerId, points);
   }
 
+  static RoomData applyIntent(
+      RoomData state,
+      String playerId,
+      Map<String, dynamic> intent,
+      ) {
+    if (state.game.type == GameType.x01) {
+      return _applyX01Intent(state, playerId, intent);
+    }
+
+    if (state.game.type == GameType.cricket) {
+      return _applyCricketIntent(state, playerId, intent);
+    }
+
+    return state;
+  }
+
   static RoomData applyThrow(
       RoomData data,
       String playerId,
-      int value,
+      dynamic rawIntent,
+      ) {
+    final intent = _normalizeThrowIntent(rawIntent);
+    if (intent == null) return data;
+
+    if (data.game.type == GameType.x01) {
+      return _applyX01Throw(data, playerId, intent);
+    }
+
+    if (data.game.type == GameType.cricket) {
+      return _applyCricketThrow(data, playerId, intent);
+    }
+
+    return data;
+  }
+
+  static RoomData applyTurn(
+      RoomData data,
+      String playerId,
+      int total, {
+        bool isBust = false,
+      }) {
+    if (data.game.type == GameType.x01) {
+      return _applyX01TotalTurn(
+        data,
+        playerId,
+        total,
+        isBust: isBust,
+      );
+    }
+
+    return data;
+  }
+
+  static RoomData undo(RoomData state) {
+    return undoLastThrow(state);
+  }
+
+  static RoomData undoLastThrow(RoomData state) {
+    final livePlayer = _findPlayerWithLiveThrows(state);
+
+    if (livePlayer != null) {
+      return _undoLiveThrow(state, livePlayer);
+    }
+
+    final last = _peekLastClosedTurn(state.match);
+    if (last == null) return state;
+
+    final lastTurn = Map<String, dynamic>.from(last);
+    final inputMode = (lastTurn['inputMode'] as String?) ?? 'dart';
+
+    if (inputMode != 'dart') {
+      final nextMatch = _removeLastClosedTurnFromMatch(state.match);
+      return _rebuildStateFromMatch(
+        state.copyWith(
+          match: nextMatch,
+          history: _flattenMatchToHistory(nextMatch),
+        ),
+        nextMatch,
+      );
+    }
+
+    final originalThrows = _normalizeStoredThrows(lastTurn['throws']);
+    final originalMeta = _normalizeMeta(lastTurn['throwMeta']);
+
+    if (originalThrows.isEmpty) {
+      final nextMatch = _removeLastClosedTurnFromMatch(state.match);
+      return _rebuildStateFromMatch(
+        state.copyWith(
+          match: nextMatch,
+          history: _flattenMatchToHistory(nextMatch),
+        ),
+        nextMatch,
+      );
+    }
+
+    final reopenedThrows = List<Map<String, dynamic>>.from(originalThrows)
+      ..removeLast();
+    final reopenedMeta = List<String>.from(originalMeta);
+    if (reopenedMeta.isNotEmpty) {
+      reopenedMeta.removeLast();
+    }
+
+    final nextMatch = _removeLastClosedTurnFromMatch(state.match);
+
+    RoomData rebuilt = _rebuildStateFromMatch(
+      state.copyWith(
+        match: nextMatch,
+        history: _flattenMatchToHistory(nextMatch),
+      ),
+      nextMatch,
+    );
+
+    if (reopenedThrows.isEmpty) {
+      return rebuilt;
+    }
+
+    final reopenedPlayerId = lastTurn['playerId'];
+    final players = List<Map<String, dynamic>>.from(rebuilt.players);
+    final index = players.indexWhere((p) => p['id'] == reopenedPlayerId);
+    if (index == -1) return rebuilt;
+
+    for (int i = 0; i < players.length; i++) {
+      final p = Map<String, dynamic>.from(players[i]);
+      p['turn'] = i == index;
+      players[i] = p;
+    }
+
+    final player = Map<String, dynamic>.from(players[index]);
+    final startScore = (lastTurn['startScore'] as int?) ??
+        ((player['turnStartScore'] as int?) ?? 0);
+
+    player['throws'] = reopenedThrows;
+    player['throwMeta'] = reopenedMeta;
+    player['dart'] = reopenedThrows.length;
+    player['inputMode'] = 'dart';
+
+    if (rebuilt.game.type == GameType.x01) {
+      final reopenedTotal = reopenedThrows.fold<int>(
+        0,
+            (sum, item) => sum + _throwAppliedValue(item),
+      );
+      player['score'] = startScore - reopenedTotal;
+      player['turnStartScore'] = startScore;
+      player['opened'] = _hasPlayerOpened(
+        rebuilt,
+        reopenedPlayerId,
+        liveThrows: reopenedThrows,
+      );
+    }
+    if (rebuilt.game.type == GameType.cricket) {
+      final liveState = _buildCricketLiveState(
+        rebuilt,
+        reopenedPlayerId,
+        reopenedThrows,
+      );
+
+      player['cricket'] = Map<String, dynamic>.from(liveState['cricket']);
+      player['cricketScore'] = liveState['cricketScore'];
+      player['score'] = liveState['score'];
+    }
+    players[index] = player;
+    return rebuilt.copyWith(players: players);
+  }
+
+  static RoomData _applyX01Intent(
+      RoomData state,
+      String playerId,
+      Map<String, dynamic> intent,
+      ) {
+    switch (intent['type']) {
+      case 'total':
+        return _applyX01TotalTurn(
+          state,
+          playerId,
+          (intent['value'] as int?) ?? 0,
+        );
+      case 'checkout':
+        final current = _playerById(state, playerId);
+        if (current == null) return state;
+        return _applyX01TotalTurn(
+          state,
+          playerId,
+          (current['score'] as int?) ?? 0,
+        );
+      case 'miss':
+        return _applyX01TotalTurn(state, playerId, 0);
+      case 'bust':
+        return _applyX01TotalTurn(state, playerId, 0, isBust: true);
+      default:
+        return state;
+    }
+  }
+
+  static RoomData _applyCricketIntent(
+      RoomData state,
+      String playerId,
+      Map<String, dynamic> intent,
+      ) {
+    switch (intent['type']) {
+      case 'miss':
+        return _closeCricketTurn(state, playerId, const []);
+      case 'bust':
+        return _closeCricketTurn(state, playerId, const []);
+      default:
+        return state;
+    }
+  }
+
+  static RoomData _applyX01Throw(
+      RoomData data,
+      String playerId,
+      Map<String, dynamic> intent,
       ) {
     final currentPlayer = _currentTurnPlayer(data);
     if (currentPlayer == null) return data;
     if (currentPlayer['id'] != playerId) return data;
 
-    final liveThrows = List<int?>.from(currentPlayer['throws'] ?? const <int?>[]);
+    final liveThrows = _normalizeStoredThrows(currentPlayer['throws']);
+    final liveMeta = _normalizeMeta(currentPlayer['throwMeta']);
+
     if (liveThrows.length >= 3) return data;
 
     final currentScore = (currentPlayer['score'] as int?) ?? 0;
-    final nextThrows = List<int?>.from(liveThrows)..add(value);
-    final newScore = currentScore - value;
+    final hasOpened = _hasPlayerOpened(
+      data,
+      playerId,
+      liveThrows: liveThrows,
+    );
+    final requiresDoubleIn = data.game.doubleIn == true;
+    final isMiss = intent['isMiss'] == true;
+    final multiplier = (intent['multiplier'] as int?) ?? 1;
+    final isDouble = multiplier == 2;
+
+    int appliedValue = _throwBaseValue(intent);
+    bool willOpen = false;
+
+    if (requiresDoubleIn && !hasOpened) {
+      if (!isMiss && isDouble) {
+        willOpen = true;
+      } else {
+        appliedValue = 0;
+      }
+    }
+
+    final storedThrow = Map<String, dynamic>.from(intent)
+      ..['appliedValue'] = appliedValue
+      ..['label'] = _throwLabel(intent);
+
+    final nextThrows = List<Map<String, dynamic>>.from(liveThrows)
+      ..add(storedThrow);
+    final nextMeta = List<String>.from(liveMeta)..add(_throwLabel(intent));
+
+    final newScore = currentScore - appliedValue;
 
     final players = List<Map<String, dynamic>>.from(data.players);
     final index = players.indexWhere((p) => p['id'] == playerId);
@@ -34,23 +272,30 @@ class RoomMatchEngineLogic {
 
     final player = Map<String, dynamic>.from(players[index]);
     player['throws'] = nextThrows;
+    player['throwMeta'] = nextMeta;
     player['dart'] = nextThrows.length;
     player['score'] = newScore;
     player['inputMode'] = 'dart';
+    if (willOpen) {
+      player['opened'] = true;
+    }
     players[index] = player;
 
     bool isEnd = false;
     String endKind = 'normal';
 
-    if (newScore < 0) {
+    if (newScore < 0 || newScore == 1) {
       isEnd = true;
       endKind = 'bust';
     } else if (newScore == 0) {
+      final valid = _validateCheckout(
+        data,
+        nextMeta.isEmpty ? null : nextMeta.last,
+      );
       isEnd = true;
-      endKind = 'checkout';
+      endKind = valid ? 'checkout' : 'bust';
     } else if (nextThrows.length == 3) {
       isEnd = true;
-      endKind = 'normal';
     }
 
     if (!isEnd) {
@@ -61,7 +306,8 @@ class RoomMatchEngineLogic {
       'playerId': playerId,
       'startScore': (player['turnStartScore'] as int?) ?? currentScore,
       'throws': nextThrows,
-      'total': nextThrows.fold<int>(0, (sum, e) => sum + (e ?? 0)),
+      'throwMeta': nextMeta,
+      'total': nextThrows.fold<int>(0, (s, e) => s + _throwAppliedValue(e)),
       'inputMode': 'dart',
       'endKind': endKind,
     };
@@ -82,11 +328,137 @@ class RoomMatchEngineLogic {
     );
   }
 
-  static RoomData applyTurn(
+  static RoomData _applyCricketThrow(
       RoomData data,
       String playerId,
-      int total,
+      Map<String, dynamic> intent,
       ) {
+    final currentPlayer = _currentTurnPlayer(data);
+    if (currentPlayer == null) return data;
+    if (currentPlayer['id'] != playerId) return data;
+
+    final liveThrows = _normalizeStoredThrows(currentPlayer['throws']);
+    final liveMeta = _normalizeMeta(currentPlayer['throwMeta']);
+
+    if (liveThrows.length >= 3) return data;
+
+    final players = List<Map<String, dynamic>>.from(data.players);
+    final index = players.indexWhere((p) => p['id'] == playerId);
+    if (index == -1) return data;
+
+    final storedThrow = Map<String, dynamic>.from(intent)
+      ..['label'] = _throwLabel(intent)
+      ..['marks'] = _cricketMarks(intent);
+
+    final nextThrows = List<Map<String, dynamic>>.from(liveThrows)
+      ..add(storedThrow);
+
+    final nextMeta = List<String>.from(liveMeta)
+      ..add(_throwLabel(intent));
+
+    final player = Map<String, dynamic>.from(players[index]);
+    final liveState = _buildCricketLiveState(
+      data,
+      playerId,
+      nextThrows,
+    );
+
+    player['throws'] = nextThrows;
+    player['throwMeta'] = nextMeta;
+    player['dart'] = nextThrows.length;
+    player['inputMode'] = 'dart';
+    player['cricket'] = Map<String, dynamic>.from(liveState['cricket']);
+    player['cricketScore'] = liveState['cricketScore'];
+    player['score'] = liveState['score'];
+
+    players[index] = player;
+
+    final updated = data.copyWith(players: players);
+
+    if (nextThrows.length < 3) {
+      return updated;
+    }
+
+    return _closeCricketTurn(
+      updated,
+      playerId,
+      nextThrows,
+    );
+  }
+  static Map<String, dynamic> _buildCricketLiveState(
+      RoomData data,
+      String playerId,
+      List<Map<String, dynamic>> liveThrows,
+      ) {
+    final rebuilt = _rebuildStateFromMatch(
+      data.copyWith(
+        players: _resetPlayers(data),
+      ),
+      data.match,
+    );
+
+    final rebuiltPlayer = _playerById(rebuilt, playerId);
+    if (rebuiltPlayer == null) {
+      return {
+        'cricket': {
+          '20': 0,
+          '19': 0,
+          '18': 0,
+          '17': 0,
+          '16': 0,
+          '15': 0,
+          '25': 0,
+        },
+        'cricketScore': 0,
+        'score': 0,
+      };
+    }
+
+    final cricket = Map<String, dynamic>.from(rebuiltPlayer['cricket'] ?? {
+      '20': 0,
+      '19': 0,
+      '18': 0,
+      '17': 0,
+      '16': 0,
+      '15': 0,
+      '25': 0,
+    });
+
+    int cricketScore = (rebuiltPlayer['cricketScore'] as int?) ?? 0;
+
+    for (final t in liveThrows) {
+      final target = _cricketTargetKey(t);
+      final marks = (t['marks'] as int?) ?? _cricketMarks(t);
+
+      if (target == null || marks == 0) continue;
+
+      final current = (cricket[target] as int?) ?? 0;
+      final next = current + marks;
+
+      final prevOverflow = current > 3 ? current - 3 : 0;
+      final nextOverflow = next > 3 ? next - 3 : 0;
+      final gained = nextOverflow - prevOverflow;
+
+      if (gained > 0 &&
+          !_allOpponentsClosedTarget(rebuilt, playerId, target)) {
+        cricketScore += _cricketNumberValue(target) * gained;
+      }
+
+      cricket[target] = next;
+    }
+
+    return {
+      'cricket': cricket,
+      'cricketScore': cricketScore,
+      'score': cricketScore,
+    };
+  }
+  static RoomData _applyX01TotalTurn(
+      RoomData data,
+      String playerId,
+      int total, {
+        bool isBust = false,
+      }) {
     final currentPlayer = _currentTurnPlayer(data);
     if (currentPlayer == null) return data;
     if (currentPlayer['id'] != playerId) return data;
@@ -95,7 +467,10 @@ class RoomMatchEngineLogic {
     final newScore = currentScore - total;
 
     String endKind = 'normal';
-    if (newScore < 0) {
+
+    if (isBust) {
+      endKind = 'bust';
+    } else if (newScore < 0 || newScore == 1) {
       endKind = 'bust';
     } else if (newScore == 0) {
       endKind = 'checkout';
@@ -112,7 +487,8 @@ class RoomMatchEngineLogic {
     final turn = <String, dynamic>{
       'playerId': playerId,
       'startScore': (currentPlayer['turnStartScore'] as int?) ?? currentScore,
-      'throws': <int?>[null, null, null],
+      'throws': <Map<String, dynamic>>[],
+      'throwMeta': <String>[],
       'total': total,
       'inputMode': 'total',
       'endKind': endKind,
@@ -134,101 +510,138 @@ class RoomMatchEngineLogic {
     );
   }
 
-  static RoomData undo(RoomData state) {
-    final currentPlayer = _currentTurnPlayer(state);
+  static RoomData _closeCricketTurn(
+      RoomData data,
+      String playerId,
+      List<Map<String, dynamic>> throws,
+      ) {
+    final players = List<Map<String, dynamic>>.from(data.players);
+    final index = players.indexWhere((p) => p['id'] == playerId);
+    if (index == -1) return data;
 
-    // =========================
-    // 1. UNDO DART LIVE
-    // =========================
-    if (currentPlayer != null) {
-      final throws = List<int?>.from(currentPlayer['throws'] ?? const <int?>[]);
-      if (throws.isNotEmpty) {
-        final players = List<Map<String, dynamic>>.from(state.players);
-        final index = players.indexWhere((p) => p['id'] == currentPlayer['id']);
-        if (index == -1) return state;
-
-        final player = Map<String, dynamic>.from(players[index]);
-        final turnStart = (player['turnStartScore'] as int?) ?? 0;
-
-        throws.removeLast();
-
-        final newTotal = throws.fold<int>(0, (sum, e) => sum + (e ?? 0));
-
-        player['throws'] = throws;
-        player['dart'] = throws.length;
-        player['score'] = turnStart - newTotal;
-
-        players[index] = player;
-
-        return state.copyWith(players: players);
-      }
-    }
-
-    // =========================
-    // 2. UNDO ULTIMO INPUT CHIUSO
-    // mantiene la logica attuale:
-    // dart chiuso -> ripristina il turno live senza ultima freccetta
-    // total chiuso -> ripristina inizio turno
-    // checkout -> ripristina correttamente punteggi/turni di TUTTI
-    // =========================
-    final last = _peekLastClosedTurn(state.match);
-    if (last == null) return state;
-
-    final nextMatch = _removeLastClosedTurnFromMatch(state.match);
-
-    RoomData rebuilt = _rebuildStateFromMatch(
-      state.copyWith(
-        match: nextMatch,
-        history: _flattenMatchToHistory(nextMatch),
-        phase: RoomPhase.match,
+    final turn = <String, dynamic>{
+      'playerId': playerId,
+      'startScore': 0,
+      'throws': throws,
+      'throwMeta': throws.map(_throwLabel).toList(),
+      'total': throws.fold<int>(
+        0,
+            (sum, t) => sum + ((t['marks'] as int?) ?? _cricketMarks(t)),
       ),
-      nextMatch,
+      'inputMode': 'dart',
+      'endKind': _cricketTurnEndKind(
+        data.copyWith(players: players),
+        playerId,
+        throws,
+      ),
+    };
+
+    final updatedMatch = _appendTurnToMatch(
+      data.copyWith(players: players),
+      turn,
+      winnerIndex: index,
+      endKind: turn['endKind'],
     );
 
-    final playerId = last['playerId'];
-    final inputMode = last['inputMode'] ?? 'total';
-    final startScore = (last['startScore'] as int?) ?? 0;
-    final lastThrows = List<int?>.from(last['throws'] ?? const <int?>[]);
+    return _rebuildStateFromMatch(
+      data.copyWith(
+        match: updatedMatch,
+        history: _flattenMatchToHistory(updatedMatch),
+      ),
+      updatedMatch,
+    );
+  }
 
-    final players = List<Map<String, dynamic>>.from(rebuilt.players);
-    final index = players.indexWhere((p) => p['id'] == playerId);
-    if (index == -1) return rebuilt;
 
-    for (int i = 0; i < players.length; i++) {
-      final copy = Map<String, dynamic>.from(players[i]);
-      copy['turn'] = i == index;
-      players[i] = copy;
-    }
+  static String _cricketTurnEndKind(
+      RoomData data,
+      String playerId,
+      List<Map<String, dynamic>> throws,
+      ) {
+    return _isCricketWinner(data, playerId) ? 'checkout' : 'normal';
+  }
+
+
+  static bool _validateCheckout(RoomData data, String? lastMeta) {
+    if (lastMeta == null) return true;
+
+    final isDouble = lastMeta.startsWith('D');
+    final isTriple = lastMeta.startsWith('T');
+    final config = data.game;
+
+    if (config.doubleOut == true) return isDouble;
+    if (config.tripleOut == true) return isDouble || isTriple;
+
+    return true;
+  }
+
+  static RoomData _undoLiveThrow(
+      RoomData state,
+      Map<String, dynamic> livePlayer,
+      ) {
+    final throws = _normalizeStoredThrows(livePlayer['throws']);
+    final meta = _normalizeMeta(livePlayer['throwMeta']);
+    if (throws.isEmpty) return state;
+
+    final lastThrow = throws.last;
+
+    final players = List<Map<String, dynamic>>.from(state.players);
+    final index = players.indexWhere((p) => p['id'] == livePlayer['id']);
+    if (index == -1) return state;
 
     final player = Map<String, dynamic>.from(players[index]);
-    player['inputMode'] = inputMode;
-    player['turnStartScore'] = startScore;
 
-    if (inputMode == 'dart') {
-      final restored = List<int?>.from(lastThrows);
-      if (restored.isNotEmpty) {
-        restored.removeLast();
-      }
+    final turnStart = (player['turnStartScore'] as int?) ??
+        (player['score'] as int?) ??
+        0;
 
-      final partialTotal = restored.fold<int>(0, (sum, e) => sum + (e ?? 0));
+    // rimuovi ultimo throw
+    throws.removeLast();
+    if (meta.isNotEmpty) {
+      meta.removeLast();
+    }
 
-      player['throws'] = restored;
-      player['dart'] = restored.length;
-      player['score'] = startScore - partialTotal;
-    } else {
-      player['throws'] = <int?>[];
-      player['dart'] = 0;
-      player['score'] = startScore;
+    player['throws'] = throws;
+    player['throwMeta'] = meta;
+    player['dart'] = throws.length;
+    player['turn'] = true;
+    player['inputMode'] = 'dart';
+
+    // ===== X01 (immutato)
+    if (state.game.type == GameType.x01) {
+      final newTotal = throws.fold<int>(0, (s, e) => s + _throwAppliedValue(e));
+      player['score'] = turnStart - newTotal;
+      player['opened'] = _hasPlayerOpened(
+        state,
+        player['id'],
+        liveThrows: throws,
+      );
+    }
+
+    // ===== CRICKET FIX
+    if (state.game.type == GameType.cricket) {
+      final liveState = _buildCricketLiveState(
+        state,
+        player['id'],
+        throws,
+      );
+
+      player['cricket'] = Map<String, dynamic>.from(liveState['cricket']);
+      player['cricketScore'] = liveState['cricketScore'];
+      player['score'] = liveState['score'];
     }
 
     players[index] = player;
 
-    return rebuilt.copyWith(
-      players: players,
-      history: _flattenMatchToHistory(nextMatch),
-      match: nextMatch,
-      phase: RoomPhase.match,
-    );
+    // set turn corretto
+    for (int i = 0; i < players.length; i++) {
+      if (i == index) continue;
+      final other = Map<String, dynamic>.from(players[i]);
+      other['turn'] = false;
+      players[i] = other;
+    }
+
+    return state.copyWith(players: players);
   }
 
   static RoomData _rebuildStateFromMatch(
@@ -261,6 +674,21 @@ class RoomMatchEngineLogic {
       RoomData state,
       Map<String, dynamic> turn,
       ) {
+    if (state.game.type == GameType.x01) {
+      return _applyClosedX01Turn(state, turn);
+    }
+
+    if (state.game.type == GameType.cricket) {
+      return _applyClosedCricketTurn(state, turn);
+    }
+
+    return state;
+  }
+
+  static RoomData _applyClosedX01Turn(
+      RoomData state,
+      Map<String, dynamic> turn,
+      ) {
     final playerId = turn['playerId'];
     final startScore = (turn['startScore'] as int?) ?? 0;
     final total = (turn['total'] as int?) ?? 0;
@@ -272,9 +700,11 @@ class RoomMatchEngineLogic {
 
     final player = Map<String, dynamic>.from(players[index]);
     player['inputMode'] = turn['inputMode'] ?? 'dart';
+
     if (endKind == 'bust') {
       player['score'] = startScore;
-      player['throws'] = <int?>[];
+      player['throws'] = <Map<String, dynamic>>[];
+      player['throwMeta'] = <String>[];
       player['dart'] = 0;
       player['round'] = ((player['round'] as int?) ?? 1) + 1;
       players[index] = player;
@@ -285,18 +715,86 @@ class RoomMatchEngineLogic {
 
     if (endKind == 'checkout') {
       player['score'] = 0;
-      player['throws'] = <int?>[];
+      player['throws'] = <Map<String, dynamic>>[];
+      player['throwMeta'] = <String>[];
       player['dart'] = 0;
       players[index] = player;
 
-      return _advanceAfterCheckout(state, players, index);
+      return _advanceAfterLegWin(state, players, index);
     }
 
     player['score'] = startScore - total;
-    player['throws'] = <int?>[];
+    player['throws'] = <Map<String, dynamic>>[];
+    player['throwMeta'] = <String>[];
     player['dart'] = 0;
     player['round'] = ((player['round'] as int?) ?? 1) + 1;
     players[index] = player;
+
+    final moved = _nextTurn(state, players, index);
+    return _syncTurnStartScoreFromCurrentScore(moved);
+  }
+
+  static RoomData _applyClosedCricketTurn(
+      RoomData state,
+      Map<String, dynamic> turn,
+      ) {
+    final playerId = turn['playerId'];
+    final throws = _normalizeStoredThrows(turn['throws']);
+    final endKind = (turn['endKind'] as String?) ?? 'normal';
+
+    final players = List<Map<String, dynamic>>.from(state.players);
+    final index = players.indexWhere((p) => p['id'] == playerId);
+    if (index == -1) return state;
+
+    final player = Map<String, dynamic>.from(players[index]);
+
+    final cricket = Map<String, dynamic>.from(player['cricket'] ?? {
+      '20': 0,
+      '19': 0,
+      '18': 0,
+      '17': 0,
+      '16': 0,
+      '15': 0,
+      '25': 0,
+    });
+
+    int cricketScore = (player['cricketScore'] as int?) ?? 0;
+
+    for (final t in throws) {
+      final target = _cricketTargetKey(t);
+      final marks = (t['marks'] as int?) ?? _cricketMarks(t);
+
+      if (target == null || marks == 0) continue;
+
+      final current = (cricket[target] as int?) ?? 0;
+      final next = current + marks;
+
+      final prevOverflow = current > 3 ? current - 3 : 0;
+      final nextOverflow = next > 3 ? next - 3 : 0;
+      final gained = nextOverflow - prevOverflow;
+
+      if (gained > 0 &&
+          !_allOpponentsClosedTarget(state, playerId, target)) {
+        cricketScore += _cricketNumberValue(target) * gained;
+      }
+
+      cricket[target] = next;
+    }
+
+    player['cricket'] = cricket;
+    player['cricketScore'] = cricketScore;
+    player['score'] = cricketScore;
+    player['throws'] = <Map<String, dynamic>>[];
+    player['throwMeta'] = <String>[];
+    player['dart'] = 0;
+    player['round'] = ((player['round'] as int?) ?? 1) + 1;
+    player['inputMode'] = 'dart';
+
+    players[index] = player;
+
+    if (endKind == 'checkout') {
+      return _advanceAfterLegWin(state, players, index);
+    }
 
     final moved = _nextTurn(state, players, index);
     return _syncTurnStartScoreFromCurrentScore(moved);
@@ -343,8 +841,7 @@ class RoomMatchEngineLogic {
     final winner = Map<String, dynamic>.from(data.players[winnerIndex]);
     final winnerLegsAfter = ((winner['legs'] as int?) ?? 0) + 1;
     final setWon = winnerLegsAfter >= data.matchConfig.legsToWin;
-    final winnerSetsAfter =
-        ((winner['sets'] as int?) ?? 0) + (setWon ? 1 : 0);
+    final winnerSetsAfter = ((winner['sets'] as int?) ?? 0) + (setWon ? 1 : 0);
     final matchWon = winnerSetsAfter >= data.matchConfig.setsToWin;
 
     if (matchWon) {
@@ -505,11 +1002,15 @@ class RoomMatchEngineLogic {
 
       for (final rawLeg in rawLegs) {
         final leg = Map<String, dynamic>.from(rawLeg);
-        final rawTurns = List<Map<String, dynamic>>.from(leg['turns'] ?? const []);
+        final rawTurns =
+        List<Map<String, dynamic>>.from(leg['turns'] ?? const []);
         final copiedTurns = <Map<String, dynamic>>[];
 
         for (final rawTurn in rawTurns) {
-          copiedTurns.add(Map<String, dynamic>.from(rawTurn));
+          final turn = Map<String, dynamic>.from(rawTurn);
+          turn['throws'] = _normalizeStoredThrows(turn['throws']);
+          turn['throwMeta'] = _normalizeMeta(turn['throwMeta']);
+          copiedTurns.add(turn);
         }
 
         leg['turns'] = copiedTurns;
@@ -527,6 +1028,21 @@ class RoomMatchEngineLogic {
     for (final p in data.players) {
       if (p['turn'] == true) return p;
     }
+    return null;
+  }
+
+  static Map<String, dynamic>? _findPlayerWithLiveThrows(RoomData data) {
+    final current = _currentTurnPlayer(data);
+    if (current != null && _normalizeStoredThrows(current['throws']).isNotEmpty) {
+      return current;
+    }
+
+    for (final raw in data.players) {
+      if (_normalizeStoredThrows(raw['throws']).isNotEmpty) {
+        return raw;
+      }
+    }
+
     return null;
   }
 
@@ -569,11 +1085,14 @@ class RoomMatchEngineLogic {
         'legs': 0,
         'sets': 0,
         'turn': i == 0,
-        'throws': <int?>[],
+        'throws': <Map<String, dynamic>>[],
+        'throwMeta': <String>[],
         'round': 1,
         'dart': 0,
         'inputMode': 'dart',
         'lastDartMultiplier': 1,
+        'lastThrowIntent': null,
+        'opened': false,
       };
 
       if (isX01) {
@@ -584,6 +1103,7 @@ class RoomMatchEngineLogic {
       if (isCricket) {
         base['score'] = 0;
         base['turnStartScore'] = 0;
+        base['cricketScore'] = 0;
         base['cricket'] = {
           '20': 0,
           '19': 0,
@@ -601,7 +1121,7 @@ class RoomMatchEngineLogic {
     return result;
   }
 
-  static RoomData _advanceAfterCheckout(
+  static RoomData _advanceAfterLegWin(
       RoomData state,
       List<Map<String, dynamic>> players,
       int winnerIndex,
@@ -640,14 +1160,13 @@ class RoomMatchEngineLogic {
     final winningTeamStart = state.teamSize > 1
         ? (winnerOrder ~/ state.teamSize) * state.teamSize
         : winnerOrder;
-    final winningTeamEnd = state.teamSize > 1
-        ? winningTeamStart + state.teamSize
-        : winnerOrder + 1;
+    final winningTeamEnd =
+    state.teamSize > 1 ? winningTeamStart + state.teamSize : winnerOrder + 1;
 
-    final isWinningTeamPlayer = (Map<String, dynamic> p) {
+    bool isWinningTeamPlayer(Map<String, dynamic> p) {
       final order = (p['order'] ?? 0) as int;
       return order >= winningTeamStart && order < winningTeamEnd;
-    };
+    }
 
     int teamLegsBefore = 0;
     int teamSetsBefore = 0;
@@ -687,12 +1206,31 @@ class RoomMatchEngineLogic {
         p['legs'] = 0;
       }
 
-      p['score'] = state.game.startingScore ?? 501;
+      if (state.game.type == GameType.x01) {
+        p['score'] = state.game.startingScore ?? 501;
+        p['turnStartScore'] = p['score'];
+      } else if (state.game.type == GameType.cricket) {
+        p['score'] = 0;
+        p['turnStartScore'] = 0;
+        p['cricketScore'] = 0;
+        p['cricket'] = {
+          '20': 0,
+          '19': 0,
+          '18': 0,
+          '17': 0,
+          '16': 0,
+          '15': 0,
+          '25': 0,
+        };
+      }
+
       p['turn'] = matchWon ? false : (p['order'] ?? 0) == nextStarterOrder;
-      p['throws'] = <int?>[];
+      p['throws'] = <Map<String, dynamic>>[];
+      p['throwMeta'] = <String>[];
       p['dart'] = 0;
       p['round'] = 1;
-      p['turnStartScore'] = p['score'];
+      p['inputMode'] = 'dart';
+      p['opened'] = false;
       updated.add(p);
     }
 
@@ -752,21 +1290,314 @@ class RoomMatchEngineLogic {
 
     for (final p in players) {
       final copy = Map<String, dynamic>.from(p);
+      final isCurrent = p['id'] == currentPlayer['id'];
+      final isNext = p['id'] == nextPlayerId;
 
-      copy['turn'] = p['id'] == nextPlayerId;
-
-      if (p['id'] == nextPlayerId) {
+      copy['turn'] = isNext;
+      if (isNext) {
         copy['inputMode'] = copy['inputMode'] ?? 'dart';
       }
 
-      copy['throws'] = p['id'] == currentPlayer['id']
-          ? <int?>[]
-          : List<int?>.from(copy['throws'] ?? const <int?>[]);
-      copy['dart'] =
-      p['id'] == currentPlayer['id'] ? 0 : ((copy['dart'] as int?) ?? 0);
+      copy['throws'] =
+      isCurrent ? <Map<String, dynamic>>[] : _normalizeStoredThrows(copy['throws']);
+      copy['throwMeta'] =
+      isCurrent ? <String>[] : _normalizeMeta(copy['throwMeta']);
+      copy['dart'] = isCurrent ? 0 : ((copy['dart'] as int?) ?? 0);
+
       updated.add(copy);
     }
 
     return state.copyWith(players: updated);
+  }
+
+  static List<Map<String, dynamic>> appendTurnToMatchPublic(
+      RoomData data,
+      Map<String, dynamic> turn, {
+        required int winnerIndex,
+        required String endKind,
+      }) {
+    return _appendTurnToMatch(
+      data,
+      turn,
+      winnerIndex: winnerIndex,
+      endKind: endKind,
+    );
+  }
+
+  static RoomData rebuildStateFromMatchPublic(
+      RoomData base,
+      List<Map<String, dynamic>> match,
+      ) {
+    return _rebuildStateFromMatch(base, match);
+  }
+
+  static List<Map<String, dynamic>> flattenMatchToHistoryPublic(
+      List<Map<String, dynamic>> match,
+      ) {
+    return _flattenMatchToHistory(match);
+  }
+
+  static Map<String, dynamic>? _normalizeThrowIntent(dynamic rawIntent) {
+    if (rawIntent is Map) {
+      final map = Map<String, dynamic>.from(rawIntent);
+      final isMiss = map['isMiss'] == true;
+      final number = map['number'];
+      final multiplier = (map['multiplier'] as int?) ?? (isMiss ? 0 : 1);
+
+      return {
+        'type': 'dart',
+        'number': isMiss ? null : number,
+        'multiplier': isMiss ? 0 : multiplier,
+        'isMiss': isMiss,
+      };
+    }
+
+    if (rawIntent is int) {
+      if (rawIntent == 0) {
+        return {
+          'type': 'dart',
+          'number': null,
+          'multiplier': 0,
+          'isMiss': true,
+        };
+      }
+
+      return {
+        'type': 'dart',
+        'number': rawIntent,
+        'multiplier': 1,
+        'isMiss': false,
+      };
+    }
+
+    return null;
+  }
+
+  static List<Map<String, dynamic>> _normalizeStoredThrows(dynamic rawThrows) {
+    final items = List.from(rawThrows ?? const []);
+
+    return items.map<Map<String, dynamic>>((e) {
+      if (e is Map) {
+        return Map<String, dynamic>.from(e);
+      }
+
+      if (e is int) {
+        return {
+          'type': 'legacy',
+          'value': e,
+          'appliedValue': e,
+        };
+      }
+
+      return {
+        'type': 'unknown',
+        'value': e,
+        'appliedValue': 0,
+      };
+    }).toList();
+  }
+
+  static List<String> _normalizeMeta(dynamic rawMeta) {
+    return List<String>.from(rawMeta ?? const []);
+  }
+
+  static int _throwBaseValue(Map<String, dynamic> intent) {
+    if (intent['isMiss'] == true) return 0;
+    final number = intent['number'];
+    final multiplier = (intent['multiplier'] as int?) ?? 1;
+    if (number == null) return 0;
+    return (number as int) * multiplier;
+  }
+
+  static int _throwAppliedValue(Map<String, dynamic> item) {
+    final explicit = item['appliedValue'];
+    if (explicit is int) return explicit;
+
+    if (item['value'] is int && item['type'] == 'legacy') {
+      return item['value'] as int;
+    }
+
+    return _throwBaseValue(item);
+  }
+
+  static String _throwLabel(Map<String, dynamic> intent) {
+    if (intent['isMiss'] == true) return 'MISS';
+
+    final number = intent['number'];
+    final multiplier = (intent['multiplier'] as int?) ?? 1;
+    if (number == null) return 'MISS';
+
+    if (number == 25) {
+      if (multiplier == 2) return 'D25';
+      return 'S25';
+    }
+
+    final prefix = multiplier == 3
+        ? 'T'
+        : multiplier == 2
+        ? 'D'
+        : 'S';
+
+    return '$prefix$number';
+  }
+
+  static Map<String, dynamic>? _playerById(RoomData data, String playerId) {
+    for (final p in data.players) {
+      if (p['id'] == playerId) return p;
+    }
+    return null;
+  }
+
+  static bool _hasPlayerOpened(
+      RoomData state,
+      String playerId, {
+        List<Map<String, dynamic>> liveThrows = const [],
+      }) {
+    if (state.game.doubleIn != true) return true;
+
+    bool isOpeningThrow(Map<String, dynamic> item) {
+      final label = item['label'];
+      return label is String && label.startsWith('D');
+    }
+
+    // 🔑 SOLO LEG CORRENTE
+    final turns = _currentLegTurns(state.match);
+
+    for (final turn in turns) {
+      if (turn['playerId'] != playerId) continue;
+
+      final throws = _normalizeStoredThrows(turn['throws']);
+      for (final item in throws) {
+        if (isOpeningThrow(item)) return true;
+      }
+    }
+
+    // live throws (turno in corso)
+    for (final item in liveThrows) {
+      if (isOpeningThrow(item)) return true;
+    }
+
+    return false;
+  }
+  static List<Map<String, dynamic>> _currentLegTurns(
+      List<Map<String, dynamic>> match,
+      ) {
+    if (match.isEmpty) return const [];
+
+    final lastSet = Map<String, dynamic>.from(match.last);
+    final legs = List<Map<String, dynamic>>.from(lastSet['legs'] ?? const []);
+
+    if (legs.isEmpty) return const [];
+
+    final lastLeg = Map<String, dynamic>.from(legs.last);
+    return List<Map<String, dynamic>>.from(lastLeg['turns'] ?? const []);
+  }
+
+  static String? _cricketTargetKey(Map<String, dynamic> intent) {
+    if (intent['isMiss'] == true) return null;
+    final number = intent['number'];
+    if (number == null) return null;
+
+    final value = number as int;
+    if (value == 25) return '25';
+    if (value >= 15 && value <= 20) return '$value';
+
+    return null;
+  }
+
+  static int _cricketMarks(Map<String, dynamic> intent) {
+    if (intent['isMiss'] == true) return 0;
+
+    final multiplier = (intent['multiplier'] as int?) ?? 1;
+    final number = intent['number'];
+
+    if (number == 25 && multiplier == 3) {
+      return 0;
+    }
+
+    if (multiplier <= 0) return 0;
+    if (multiplier >= 3) return 3;
+    return multiplier;
+  }
+
+  static int _cricketNumberValue(String target) {
+    return int.tryParse(target) ?? 0;
+  }
+
+  static bool _allOpponentsClosedTarget(
+      RoomData state,
+      String playerId,
+      String target,
+      ) {
+    final player = _playerById(state, playerId);
+    if (player == null) return true;
+    final playerOrder = (player['order'] ?? 0) as int;
+
+    if (state.teamSize > 1) {
+      final teamStart = (playerOrder ~/ state.teamSize) * state.teamSize;
+      final teamEnd = teamStart + state.teamSize;
+
+      for (final p in state.players) {
+        final order = (p['order'] ?? 0) as int;
+        final sameTeam = order >= teamStart && order < teamEnd;
+        if (sameTeam) continue;
+
+        final cricket = Map<String, dynamic>.from(p['cricket'] ?? const {});
+        if ((cricket[target] as int? ?? 0) < 3) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    for (final p in state.players) {
+      if (p['id'] == playerId) continue;
+      final cricket = Map<String, dynamic>.from(p['cricket'] ?? const {});
+      if ((cricket[target] as int? ?? 0) < 3) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  static bool _isCricketWinner(
+      RoomData state,
+      String playerId, {
+        Map<String, dynamic>? overrideCricket,
+        int? overrideScore,
+      }) {
+    final player = _playerById(state, playerId);
+    if (player == null) return false;
+
+    final cricket =
+        overrideCricket ?? Map<String, dynamic>.from(player['cricket'] ?? const {});
+    final score = overrideScore ?? (player['cricketScore'] as int?) ?? 0;
+
+    const targets = ['20', '19', '18', '17', '16', '15', '25'];
+    final allClosed = targets.every((t) => (cricket[t] as int? ?? 0) >= 3);
+    if (!allClosed) return false;
+
+    final playerOrder = (player['order'] ?? 0) as int;
+    final playerTeamStart =
+    state.teamSize > 1 ? (playerOrder ~/ state.teamSize) * state.teamSize : playerOrder;
+    final playerTeamEnd =
+    state.teamSize > 1 ? playerTeamStart + state.teamSize : playerOrder + 1;
+
+    int bestOpponentScore = 0;
+
+    for (final p in state.players) {
+      final order = (p['order'] ?? 0) as int;
+      final sameTeam = order >= playerTeamStart && order < playerTeamEnd;
+      if (sameTeam) continue;
+
+      final opponentScore = (p['cricketScore'] as int?) ?? 0;
+      if (opponentScore > bestOpponentScore) {
+        bestOpponentScore = opponentScore;
+      }
+    }
+
+    return score >= bestOpponentScore;
   }
 }

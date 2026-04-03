@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'games_darts.dart';
 import 'room_data.dart';
 import 'room_match_engine_logic.dart';
 import 'room_repository.dart';
@@ -37,10 +38,10 @@ class RoomInputKeyboard extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final mode = player['inputMode'] ?? 'dart';
     final currentMode = player['inputMode'] ?? 'dart';
-    final throws = List<int>.from(player['throws'] ?? []);
+    final throws = List.from(player['throws'] ?? []);
     final canSwitch = throws.isEmpty;
+
     return Column(
       children: [
         const Divider(),
@@ -51,42 +52,41 @@ class RoomInputKeyboard extends StatelessWidget {
             ButtonSegment(value: 'total', label: Text('TOTAL')),
           ],
           selected: {currentMode},
-          onSelectionChanged: canSwitch ? (set) async {
+          onSelectionChanged: canSwitch
+              ? (set) async {
             final newMode = set.first;
 
-            final players = List<Map<String, dynamic>>.from(data.players);
-            final index = players.indexWhere((p) => p['id'] == player['id']);
+            final players =
+            List<Map<String, dynamic>>.from(data.players);
+            final index =
+            players.indexWhere((p) => p['id'] == player['id']);
             if (index == -1) return;
 
-            final updated = Map<String, dynamic>.from(players[index]);
+            final updated =
+            Map<String, dynamic>.from(players[index]);
             updated['inputMode'] = newMode;
 
             players[index] = updated;
 
             await repo.update(data.copyWith(players: players));
-          } : null,
+          }
+              : null,
         ),
         const SizedBox(height: 8),
-
-        if (mode == 'dart')
-          _DartKeyboard(
-            data: data,
-            repo: repo,
-            player: player,
-          ),
-
-        if (mode == 'total')
-          _TotalKeyboard(
-            data: data,
-            repo: repo,
-            player: player,
-          ),
+        if (data.game.type == GameType.cricket) ...[
+          _CricketKeyboard(data: data, repo: repo, player: player),
+        ] else ...[
+          if (currentMode == 'dart')
+            _DartKeyboard(data: data, repo: repo, player: player),
+          if (currentMode == 'total')
+            _TotalKeyboard(data: data, repo: repo, player: player),
+        ]
       ],
     );
   }
 }
 
-class _DartKeyboard extends StatelessWidget {
+class _DartKeyboard extends StatefulWidget {
   final RoomData data;
   final RoomRepository repo;
   final Map<String, dynamic> player;
@@ -98,33 +98,70 @@ class _DartKeyboard extends StatelessWidget {
   });
 
   @override
+  State<_DartKeyboard> createState() => _DartKeyboardState();
+}
+
+class _DartKeyboardState extends State<_DartKeyboard> {
+  int multiplier = 1;
+
+  @override
   Widget build(BuildContext context) {
-    final currentPlayer = player;
-    final liveThrows = List<int>.from(currentPlayer['throws'] ?? []);
-    final canUndo = data.history.isNotEmpty || liveThrows.isNotEmpty;
-    final throws = List<int>.from(player['throws'] ?? []);
+    final throws = List.from(widget.player['throws'] ?? []);
+    final canUndo =
+        widget.data.history.isNotEmpty || throws.isNotEmpty;
 
     return Column(
       children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: multiplier == 2 ? Colors.blue : null,
+              ),
+              onPressed: () {
+                setState(() {
+                  multiplier = (multiplier == 2) ? 1 : 2;
+                });
+              },
+              child: const Text('D'),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: multiplier == 3 ? Colors.blue : null,
+              ),
+              onPressed: () {
+                setState(() {
+                  multiplier = (multiplier == 3) ? 1 : 3;
+                });
+              },
+              child: const Text('T'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
         Wrap(
           spacing: 6,
           children: List.generate(21, (i) {
-            final value = i == 20 ? 25 : i + 1;
+            final base = i == 20 ? 25 : i + 1;
+            final isDisabled = (multiplier == 3 && base == 25);
 
             return ElevatedButton(
-              onPressed: () => _addThrow(value),
-              child: Text('$value'),
+              onPressed: isDisabled ? null : () => _addThrow(base),
+              child: Text('$base'),
             );
           }),
         ),
-
         const SizedBox(height: 8),
-
-        Text('Throws: ${throws.join(", ")}'),
-        Text('History: ${data.history.length}'),
-
         Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            ElevatedButton(
+              onPressed: () => _addThrow(0),
+              child: const Text('MISS'),
+            ),
+            const SizedBox(width: 8),
             ElevatedButton(
               onPressed: canUndo ? _undo : null,
               child: const Text('Undo'),
@@ -135,14 +172,135 @@ class _DartKeyboard extends StatelessWidget {
     );
   }
 
-  void _addThrow(int value) async {
-    await repo.enqueue(() async {
+  void _addThrow(int base) async {
+    await widget.repo.enqueue(() async {
+      final current = widget.repo.current!;
+
+      final intent = {
+        'type': 'dart',
+        'number': base == 0 ? null : base,
+        'multiplier': base == 0 ? 0 : multiplier,
+        'isMiss': base == 0,
+      };
+
       final newState = RoomMatchEngineLogic.applyThrow(
-        repo.current!,
-        player['id'],
-        value,
+        current,
+        widget.player['id'],
+        intent,
       );
 
+      await widget.repo.update(newState);
+    });
+
+    setState(() {
+      multiplier = 1;
+    });
+  }
+
+  void _undo() async {
+    await widget.repo.enqueue(() async {
+      final newState =
+      RoomMatchEngineLogic.undoLastThrow(widget.repo.current!);
+      await widget.repo.update(newState);
+    });
+  }
+}
+class _CricketKeyboard extends StatelessWidget {
+  final RoomData data;
+  final RoomRepository repo;
+  final Map<String, dynamic> player;
+
+  const _CricketKeyboard({
+    required this.data,
+    required this.repo,
+    required this.player,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final targets = [20, 19, 18, 17, 16, 15, 25];
+
+    final throws = List.from(player['throws'] ?? []);
+    final canUndo =
+        data.history.isNotEmpty || throws.isNotEmpty;
+
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+
+        ...targets.map((t) {
+          final isBull = t == 25;
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 40,
+                  child: Text(
+                    '$t',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+
+                const SizedBox(width: 8),
+
+                _btn(t, 1, 'S'),
+                const SizedBox(width: 6),
+                _btn(t, 2, 'D'),
+                if (!isBull) ...[
+                  const SizedBox(width: 6),
+                  _btn(t, 3, 'T'),
+                ],
+              ],
+            ),
+          );
+        }),
+
+        const SizedBox(height: 12),
+
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: () => _addThrow(null, 0, true),
+              child: const Text('MISS'),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              onPressed: canUndo ? _undo : null,
+              child: const Text('UNDO'),
+            ),
+          ],
+        )
+      ],
+    );
+  }
+
+  Widget _btn(int number, int multiplier, String label) {
+    return ElevatedButton(
+      onPressed: () => _addThrow(number, multiplier, false),
+      child: Text(label),
+    );
+  }
+
+  void _addThrow(int? number, int multiplier, bool isMiss) async {
+    await repo.enqueue(() async {
+      final current = repo.current!;
+
+      final intent = {
+        'type': 'dart',
+        'number': number,
+        'multiplier': multiplier,
+        'isMiss': isMiss,
+      };
+
+      final newState = RoomMatchEngineLogic.applyThrow(
+        current,
+        player['id'],
+        intent,
+      );
 
       await repo.update(newState);
     });
@@ -150,9 +308,8 @@ class _DartKeyboard extends StatelessWidget {
 
   void _undo() async {
     await repo.enqueue(() async {
-      final newState = RoomMatchEngineLogic.undo(repo.current!);
-
-
+      final newState =
+      RoomMatchEngineLogic.undoLastThrow(repo.current!);
       await repo.update(newState);
     });
   }
@@ -183,46 +340,29 @@ class _TotalKeyboardState extends State<_TotalKeyboard> {
     return Column(
       children: [
         Text('Input: $input'),
-
         const SizedBox(height: 8),
-
         Wrap(
           spacing: 6,
-          children: [
-            ...List.generate(10, (i) {
-              return ElevatedButton(
-                onPressed: () => _add(i),
-                child: Text('$i'),
-              );
-            }),
-          ],
+          children: List.generate(10, (i) {
+            return ElevatedButton(
+              onPressed: () => _add(i),
+              child: Text('$i'),
+            );
+          }),
         ),
-
         const SizedBox(height: 8),
-
         Wrap(
           spacing: 6,
           children: [
+            ElevatedButton(onPressed: _clear, child: const Text('C')),
+            ElevatedButton(onPressed: _submit, child: const Text('OK')),
             ElevatedButton(
-              onPressed: _clear,
-              child: const Text('C'),
-            ),
+                onPressed: _checkout, child: const Text('CHECKOUT')),
+            ElevatedButton(onPressed: _miss, child: const Text('MISS')),
+            ElevatedButton(onPressed: _bust, child: const Text('BUST')),
             ElevatedButton(
-              onPressed: _submit,
-              child: const Text('OK'),
-            ),
-            ElevatedButton(
-              onPressed: _miss,
-              child: const Text('MISS'),
-            ),
-            ElevatedButton(
-              onPressed: _bust,
-              child: const Text('BUST'),
-            ),
-            ElevatedButton(
-              onPressed: canUndo ? _undo : null,
-              child: const Text('UNDO'),
-            ),
+                onPressed: canUndo ? _undo : null,
+                child: const Text('UNDO')),
           ],
         )
       ],
@@ -230,12 +370,39 @@ class _TotalKeyboardState extends State<_TotalKeyboard> {
   }
 
   void _add(int n) {
-    setState(() {
-      input += '$n';
-    });
+    if (input.length >= 3) return;
+
+    final next = input + '$n';
+    final parsed = int.tryParse(next);
+
+    if (parsed != null && parsed <= 180) {
+      setState(() {
+        input = next;
+      });
+    }
   }
 
   void _clear() {
+    setState(() {
+      input = '';
+    });
+  }
+
+  void _checkout() async {
+    await widget.repo.enqueue(() async {
+      final intent = {
+        'type': 'checkout',
+      };
+
+      final newState = RoomMatchEngineLogic.applyIntent(
+        widget.repo.current!,
+        widget.player['id'],
+        intent,
+      );
+
+      await widget.repo.update(newState);
+    });
+
     setState(() {
       input = '';
     });
@@ -246,12 +413,16 @@ class _TotalKeyboardState extends State<_TotalKeyboard> {
     if (value == null) return;
 
     await widget.repo.enqueue(() async {
-      final newState = RoomMatchEngineLogic.applyTurn(
+      final intent = {
+        'type': 'total',
+        'value': value,
+      };
+
+      final newState = RoomMatchEngineLogic.applyIntent(
         widget.repo.current!,
         widget.player['id'],
-        value,
+        intent,
       );
-
 
       await widget.repo.update(newState);
     });
@@ -263,12 +434,13 @@ class _TotalKeyboardState extends State<_TotalKeyboard> {
 
   void _miss() async {
     await widget.repo.enqueue(() async {
-      final newState = RoomMatchEngineLogic.applyTurn(
+      final intent = {'type': 'miss'};
+
+      final newState = RoomMatchEngineLogic.applyIntent(
         widget.repo.current!,
         widget.player['id'],
-        0,
+        intent,
       );
-
 
       await widget.repo.update(newState);
     });
@@ -276,19 +448,21 @@ class _TotalKeyboardState extends State<_TotalKeyboard> {
 
   void _bust() async {
     await widget.repo.enqueue(() async {
-      final newState = RoomMatchEngineLogic.applyTurn(
+      final intent = {'type': 'bust'};
+
+      final newState = RoomMatchEngineLogic.applyIntent(
         widget.repo.current!,
         widget.player['id'],
-        999,
+        intent,
       );
-
 
       await widget.repo.update(newState);
     });
   }
 
   void _undo() async {
-    final newState = RoomMatchEngineLogic.undo(widget.data);
+    final newState =
+    RoomMatchEngineLogic.undoLastThrow(widget.data);
     await widget.repo.update(newState);
   }
 }
