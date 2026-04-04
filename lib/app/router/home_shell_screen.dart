@@ -10,7 +10,7 @@ import '../../features/game/presentation/pages/gioca_screen.dart';
 import '../../features/players/presentation/widgets/profile_panel.dart';
 import '../../features/game/presentation/pages/tornei_screen.dart';
 import '../../app/link/app_link_state.dart';
-import '../../features/darts_match/presentation/lobby/pages/room_lobby_shell_page.dart';
+
 enum AppSection {
   allenamento,
   gioca,
@@ -57,14 +57,6 @@ class _HomeScreenState extends State<HomeScreen> {
         await Future.delayed(const Duration(milliseconds: 100));
 
         if (!mounted) return;
-
-        Navigator.push(
-          context,
-          /// Funzione: descrive in modo semplice questo blocco di logica.
-          MaterialPageRoute(
-            builder: (_) => const RoomLobbyShellPage(forceNewRoom: true),
-          ),
-        );
       }
     });
   }

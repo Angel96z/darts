@@ -2,8 +2,28 @@
 
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../../features/darts_match/application/usecases/providers.dart';
+final backendConnectionServiceProvider =
+Provider<_BackendConnectionService>((ref) {
+  return _BackendConnectionService();
+});
+
+class _BackendConnectionService {
+  Future<bool> checkBackendConnection() async {
+    try {
+      // Verifica reale: ping Firestore (backend reale usato dall'app)
+      await FirebaseFirestore.instance
+          .collection('_healthcheck')
+          .limit(1)
+          .get(const GetOptions(source: Source.server));
+
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+}
 
 final offlineControllerProvider =
 StateNotifierProvider<OfflineController, bool>(
@@ -11,26 +31,22 @@ StateNotifierProvider<OfflineController, bool>(
 );
 
 class OfflineController extends StateNotifier<bool> {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  OfflineController(this._ref) : super(false) {
+  OfflineController(this._ref) : super(true) {
     _start();
   }
 
   final Ref _ref;
   Timer? _timer;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _start() {
     _check();
 
     _timer = Timer.periodic(
-      /// Funzione: descrive in modo semplice questo blocco di logica.
       const Duration(seconds: 8),
           (_) => _check(),
     );
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _check() async {
     try {
       final online = await _ref
@@ -44,7 +60,6 @@ class OfflineController extends StateNotifier<bool> {
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void dispose() {
     _timer?.cancel();
     super.dispose();

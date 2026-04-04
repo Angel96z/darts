@@ -123,6 +123,8 @@ class AppLinkCoordinator extends StateNotifier<AppLinkState> {
     final params = uri.queryParameters;
 
     final raw = params['roomId'];
+    final rawFrom = params['from'];
+    final rawGame = params['game'];
     final rawWatch = params['watchRoomId'];
 
     if ((raw == null || raw.isEmpty) &&

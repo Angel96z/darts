@@ -15,6 +15,7 @@ class RoomData {
   final List<Map<String, dynamic>> history;
   final int legStarterOrder;
   final List<Map<String, dynamic>> match;
+  final String? matchId;
 
   const RoomData({
     required this.roomId,
@@ -33,6 +34,7 @@ class RoomData {
     this.history = const [],
     this.legStarterOrder = 0,
     this.match = const [],
+    this.matchId,
   });
 
   List<Map<String, dynamic>> _createInitialMatchTree() {
@@ -112,6 +114,7 @@ class RoomData {
       history: const [],
       legStarterOrder: 0,
       match: _createInitialMatchTree(),
+      clearMatchId: true,
     );
   }
 
@@ -207,6 +210,9 @@ class RoomData {
     List<Map<String, dynamic>>? history,
     int? legStarterOrder,
     List<Map<String, dynamic>>? match,
+    String? matchId,
+    bool clearMatchId = false,
+
   }) {
     return RoomData(
       roomId: roomId ?? this.roomId,
@@ -221,6 +227,7 @@ class RoomData {
       history: history ?? this.history,
       legStarterOrder: legStarterOrder ?? this.legStarterOrder,
       match: match ?? this.match,
+      matchId: clearMatchId ? null : (matchId ?? this.matchId),
     );
   }
 
@@ -258,6 +265,7 @@ class RoomData {
     'match': match
         .map((e) => Map<String, dynamic>.from(e))
         .toList(),
+    'matchId': matchId,
   };
 
   factory RoomData.fromMap(Map<String, dynamic> map) {
@@ -330,6 +338,7 @@ class RoomData {
           .map((e) => Map<String, dynamic>.from(e))
           .toList()
           : const [],
+      matchId: map['matchId'],
     );
   }
 }

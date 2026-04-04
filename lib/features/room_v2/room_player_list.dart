@@ -7,7 +7,123 @@ import 'room_current_user.dart';
 import 'room_players.dart';
 import 'user_room_repository.dart';
 
-class RoomPlayerList extends StatefulWidget {
+class RoomPlayerListController {
+  final RoomRepository repo;
+
+  RoomPlayerListController(this.repo);
+
+  List<Map<String, dynamic>> sortPlayers(List<Map<String, dynamic>> players) {
+    final list = List<Map<String, dynamic>>.from(players);
+    list.sort((a, b) => (a['order'] ?? 0).compareTo(b['order'] ?? 0));
+    return list;
+  }
+
+  Future<void> reorder(
+      RoomData data,
+      List<Map<String, dynamic>> players,
+      int oldIndex,
+      int newIndex,
+      ) async {
+    if (newIndex > oldIndex) newIndex -= 1;
+
+    final updated = List<Map<String, dynamic>>.from(players);
+    final item = updated.removeAt(oldIndex);
+    updated.insert(newIndex, item);
+
+    _normalizeOrder(updated);
+
+    await repo.update(data.copyWith(players: updated));
+  }
+
+  Future<void> moveUp(
+      RoomData data,
+      List<Map<String, dynamic>> players,
+      int index,
+      ) async {
+    if (index <= 0) return;
+
+    final updated = List<Map<String, dynamic>>.from(players);
+    final temp = updated[index - 1];
+    updated[index - 1] = updated[index];
+    updated[index] = temp;
+
+    _normalizeOrder(updated);
+
+    await repo.update(data.copyWith(players: updated));
+  }
+
+  Future<void> moveDown(
+      RoomData data,
+      List<Map<String, dynamic>> players,
+      int index,
+      ) async {
+    if (index >= players.length - 1) return;
+
+    final updated = List<Map<String, dynamic>>.from(players);
+    final temp = updated[index + 1];
+    updated[index + 1] = updated[index];
+    updated[index] = temp;
+
+    _normalizeOrder(updated);
+
+    await repo.update(data.copyWith(players: updated));
+  }
+
+  Future<void> changeTeamSize(RoomData data, int value) async {
+    await repo.update(data.copyWith(teamSize: value));
+  }
+
+  Future<void> addPlayer(RoomData data, dynamic player) async {
+    final uid = RoomCurrentUser.current.uid;
+
+    final updated =
+    data.addPlayer(player, uid).syncAdminsFromPlayers();
+
+    await repo.update(updated);
+
+    if (!player.isGuest && updated.roomId != null) {
+      await UserRoomRepository(FirebaseFirestore.instance)
+          .setCurrentRoom(player.id, updated.roomId!);
+    }
+  }
+
+  Future<void> removePlayer(
+      RoomData data,
+      Map<String, dynamic> player,
+      ) async {
+    final uid = RoomCurrentUser.current.uid;
+
+    final targetId = player['id'];
+    final targetOwner = player['ownerId'];
+
+    final isAdmin = data.adminIds.contains(uid);
+
+    final canRemove =
+        isAdmin || targetId == uid || targetOwner == uid;
+
+    if (!canRemove) return;
+
+    final updated =
+    data.removePlayerAndReorder(targetId);
+
+    await repo.update(updated);
+
+    final isGuest = player['isGuest'] == true;
+
+    if (!isGuest && targetId != null) {
+      await UserRoomRepository(FirebaseFirestore.instance)
+          .clearCurrentRoom(targetId);
+    }
+  }
+
+  void _normalizeOrder(List<Map<String, dynamic>> players) {
+    for (int i = 0; i < players.length; i++) {
+      players[i]['order'] = i;
+    }
+  }
+}
+
+class RoomPlayerList extends StatelessWidget {
   final RoomData data;
   final RoomRepository repo;
 
@@ -18,100 +134,47 @@ class RoomPlayerList extends StatefulWidget {
   });
 
   @override
-  State<RoomPlayerList> createState() => _RoomPlayerListState();
+  Widget build(BuildContext context) {
+    final controller = RoomPlayerListController(repo);
+
+    final players = controller.sortPlayers(data.players);
+
+    final currentUserId = RoomCurrentUser.current.uid;
+    final isAdmin = data.adminIds.contains(currentUserId);
+    final teamSize = data.teamSize;
+    final isTeamMode = teamSize > 1;
+
+    return _RoomPlayerListView(
+      data: data,
+      players: players,
+      controller: controller,
+      currentUserId: currentUserId,
+      isAdmin: isAdmin,
+      isTeamMode: isTeamMode,
+    );
+  }
 }
 
-class _RoomPlayerListState extends State<RoomPlayerList> {
-  late List<Map<String, dynamic>> _players;
+class _RoomPlayerListView extends StatelessWidget {
+  final RoomData data;
+  final List<Map<String, dynamic>> players;
+  final RoomPlayerListController controller;
+  final String currentUserId;
+  final bool isAdmin;
+  final bool isTeamMode;
 
-  @override
-  void initState() {
-    super.initState();
-    _syncFromRemote();
-  }
+  const _RoomPlayerListView({
+    required this.data,
+    required this.players,
+    required this.controller,
+    required this.currentUserId,
+    required this.isAdmin,
+    required this.isTeamMode,
+  });
 
-  @override
-  void didUpdateWidget(covariant RoomPlayerList oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    final oldHash = _hash(oldWidget.data.players);
-    final newHash = _hash(widget.data.players);
-
-    if (oldHash != newHash) {
-      _syncFromRemote();
-    }
-  }
-
-  String _hash(List players) {
-    return players.map((e) => '${e['id']}-${e['order']}').join('|');
-  }
-
-  void _syncFromRemote() {
-    _players = List<Map<String, dynamic>>.from(widget.data.players)
-      ..sort((a, b) => (a['order'] ?? 0).compareTo(b['order'] ?? 0));
-  }
-
-  Future<void> _reorder(int oldIndex, int newIndex) async {
-    if (newIndex > oldIndex) newIndex -= 1;
-
-    final updated = List<Map<String, dynamic>>.from(_players);
-    final item = updated.removeAt(oldIndex);
-    updated.insert(newIndex, item);
-
-    for (int i = 0; i < updated.length; i++) {
-      updated[i]['order'] = i;
-    }
-
-    setState(() {
-      _players = updated;
-    });
-
-    await widget.repo.update(widget.data.copyWith(players: updated));
-  }
-
-  Future<void> _moveUp(int index) async {
-    if (index <= 0) return;
-
-    final updated = List<Map<String, dynamic>>.from(_players);
-    final temp = updated[index - 1];
-    updated[index - 1] = updated[index];
-    updated[index] = temp;
-
-    for (int i = 0; i < updated.length; i++) {
-      updated[i]['order'] = i;
-    }
-
-    setState(() {
-      _players = updated;
-    });
-
-    await widget.repo.update(widget.data.copyWith(players: updated));
-  }
-
-  Future<void> _moveDown(int index) async {
-    if (index >= _players.length - 1) return;
-
-    final updated = List<Map<String, dynamic>>.from(_players);
-    final temp = updated[index + 1];
-    updated[index + 1] = updated[index];
-    updated[index] = temp;
-
-    for (int i = 0; i < updated.length; i++) {
-      updated[i]['order'] = i;
-    }
-
-    setState(() {
-      _players = updated;
-    });
-
-    await widget.repo.update(widget.data.copyWith(players: updated));
-  }
   @override
   Widget build(BuildContext context) {
-    final currentUserId = RoomCurrentUser.current.uid;
-    final isAdmin = widget.data.adminIds.contains(currentUserId);
-    final teamSize = widget.data.teamSize;
-    final isTeamMode = teamSize > 1;
+    final teamSize = data.teamSize;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,7 +184,7 @@ class _RoomPlayerListState extends State<RoomPlayerList> {
             const Text('Mode:'),
             const SizedBox(width: 8),
             DropdownButton<int>(
-              value: widget.data.teamSize,
+              value: teamSize,
               underline: const SizedBox(),
               items: const [
                 DropdownMenuItem(value: 0, child: Text('FFA')),
@@ -129,74 +192,60 @@ class _RoomPlayerListState extends State<RoomPlayerList> {
                 DropdownMenuItem(value: 3, child: Text('3v3')),
                 DropdownMenuItem(value: 4, child: Text('4v4')),
               ],
-              onChanged: (v) async {
+              onChanged: (v) {
                 if (v == null) return;
-                await widget.repo.update(widget.data.copyWith(teamSize: v));
+                controller.changeTeamSize(data, v);
               },
             ),
             const SizedBox(width: 12),
-            if (!widget.data.isValidTeamSetup())
+            if (!data.isValidTeamSetup())
               const Text(
                 'Team non validi',
                 style: TextStyle(color: Colors.red, fontSize: 12),
               ),
           ],
         ),
-
         const SizedBox(height: 8),
-
         RoomPlayersView(
           players: const [],
           currentUserId: currentUserId,
-          adminIds: widget.data.adminIds,
-          onAddPlayer: (player) async {
-            final updated = widget.data
-                .addPlayer(player, currentUserId)
-                .syncAdminsFromPlayers();
-
-            await widget.repo.update(updated);
-
-            if (!player.isGuest && updated.roomId != null) {
-              await UserRoomRepository(FirebaseFirestore.instance)
-                  .setCurrentRoom(player.id, updated.roomId!);
-            }
-          },
+          adminIds: data.adminIds,
+          onAddPlayer: (player) =>
+              controller.addPlayer(data, player),
           onRemovePlayer: (_) {},
         ),
-
         const SizedBox(height: 8),
-
         ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: _players.length,
+          itemCount: players.length,
           itemBuilder: (context, index) {
-            final player = _players[index];
+            final player = players[index];
             final id = player['id'];
             final name = player['name'] ?? id;
 
-            final teamSize = widget.data.teamSize;
-            final isTeamMode = teamSize > 1;
-
-            final teamIndex = isTeamMode ? (index ~/ teamSize) + 1 : null;
-            final isFirstOfTeam = isTeamMode ? index % teamSize == 0 : false;
+            final teamIndex =
+            isTeamMode ? (index ~/ teamSize) + 1 : null;
+            final isFirstOfTeam =
+            isTeamMode ? index % teamSize == 0 : false;
 
             return Column(
               key: ValueKey(id),
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (isFirstOfTeam)
                   Padding(
-                    padding: const EdgeInsets.only(top: 12, bottom: 6, left: 4),
+                    padding: const EdgeInsets.only(
+                        top: 12, bottom: 6, left: 4),
                     child: Text(
                       'TEAM $teamIndex',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
-
                 Card(
-                  margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 0),
+                  margin: const EdgeInsets.symmetric(
+                      vertical: 4, horizontal: 0),
                   child: ListTile(
                     title: Text(name),
                     subtitle: Text(
@@ -207,48 +256,38 @@ class _RoomPlayerListState extends State<RoomPlayerList> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.arrow_upward, size: 18),
+                          icon: const Icon(Icons.arrow_upward,
+                              size: 18),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
-                          onPressed: index == 0 ? null : () => _moveUp(index),
+                          onPressed: index == 0
+                              ? null
+                              : () => controller.moveUp(
+                            data,
+                            players,
+                            index,
+                          ),
                         ),
                         const SizedBox(width: 4),
                         IconButton(
-                          icon: const Icon(Icons.arrow_downward, size: 18),
+                          icon: const Icon(Icons.arrow_downward,
+                              size: 18),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
-                          onPressed: index == _players.length - 1
+                          onPressed: index == players.length - 1
                               ? null
-                              : () => _moveDown(index),
+                              : () => controller.moveDown(
+                            data,
+                            players,
+                            index,
+                          ),
                         ),
                       ],
                     ),
                     trailing: IconButton(
                       icon: const Icon(Icons.delete),
-                      onPressed: () async {
-                        final uid = currentUserId;
-                        final targetId = player['id'];
-                        final targetOwner = player['ownerId'];
-
-                        final canRemove = isAdmin ||
-                            targetId == uid ||
-                            targetOwner == uid;
-
-                        if (!canRemove) return;
-
-                        final updated =
-                        widget.data.removePlayerAndReorder(targetId);
-
-                        await widget.repo.update(updated);
-
-                        final isGuest = player['isGuest'] == true;
-
-                        if (!isGuest && targetId != null) {
-                          await UserRoomRepository(
-                            FirebaseFirestore.instance,
-                          ).clearCurrentRoom(targetId);
-                        }
-                      },
+                      onPressed: () =>
+                          controller.removePlayer(data, player),
                     ),
                   ),
                 ),

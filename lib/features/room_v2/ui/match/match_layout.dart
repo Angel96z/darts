@@ -17,10 +17,12 @@ class RoomMatchEngineView extends StatelessWidget {
     required this.data,
     required this.repo,
   });
+
   Widget? _buildWinnerOverlay(BuildContext context) {
     final uid = RoomCurrentUser.current.uid;
     final winner = buildWinnerOverlayData(data, uid);
     if (winner == null) return null;
+
     final title = winner['title'] as String? ?? '';
     final name = winner['name'] as String? ?? '-';
 
@@ -43,7 +45,8 @@ class RoomMatchEngineView extends StatelessWidget {
                     children: [
                       ElevatedButton(
                         onPressed: () async {
-                          final newState = RoomMatchEngineLogic.undoLastThrow(data);
+                          final newState =
+                          RoomMatchEngineLogic.undoLastThrow(data);
                           await repo.update(newState);
                         },
                         child: const Text('Undo'),
@@ -51,14 +54,23 @@ class RoomMatchEngineView extends StatelessWidget {
                       const SizedBox(width: 12),
                       ElevatedButton(
                         onPressed: () async {
+                          await repo.saveMatchResults(data);
+
+// ⚠️ NON fare update a result (già fatto dentro saveMatchResults)
+
+// delay solo UI
+                          await Future.delayed(const Duration(milliseconds: 800));
+
+// torna lobby SENZA perdere matchId
                           await repo.update(
-                            data.copyWith(phase: RoomPhase.result),
-                          );
-                        },
+                            repo.current!.copyWith(
+                              phase: RoomPhase.lobby,
+                            ),
+                          );                        },
                         child: const Text('Vai ai risultati'),
                       ),
                     ],
-                  )
+                  ),
                 ],
               ),
             ),
@@ -70,15 +82,6 @@ class RoomMatchEngineView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // AUTO NAVIGAZIONE A RISULTATI
-    if (data.phase == RoomPhase.result) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) {
-          Navigator.of(context).pop(); // esce dal match
-        }
-      });
-    }
-    // NON ATTIVO SOLO IN LOBBY
     if (data.phase == RoomPhase.lobby) {
       return const Center(
         child: Text('ENGINE NON ATTIVO'),
@@ -86,129 +89,108 @@ class RoomMatchEngineView extends StatelessWidget {
     }
 
     final winnerOverlay = _buildWinnerOverlay(context);
-    // ATTIVO
+
     return Stack(
-        children: [
-    ListView(
-    padding: const EdgeInsets.all(16),
-    children: [
-        const Text(
-          'MATCH ENGINE',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-
-        const SizedBox(height: 12),
-
-        Text('Game: ${data.game.type.name}'),
-        Text('Mode: ${data.matchConfig.mode.name}'),
-        Text('Sets: ${data.matchConfig.setCount}'),
-        Text('Legs per set: ${data.matchConfig.legCount}'),
-
-        Text('→ Win sets: ${data.matchConfig.setsToWin}'),
-        Text('→ Win legs: ${data.matchConfig.legsToWin}'),
-        const SizedBox(height: 16),
-
-        const Text('PLAYERS'),
-
-        const SizedBox(height: 8),
-
-        ...data.players.map((p) {
-          final name = p['name'] ?? '-';
-          final id = p['id'] ?? '-';
-          final order = p['order'] ?? 0;
-          final score = p['score'] ?? '-';
-          final legs = p['legs'] ?? 0;
-          final sets = p['sets'] ?? 0;
-          final isTurn = p['turn'] == true;
-
-          final currentThrows = buildCurrentThrowLabels(p);
-          final historyDarts = buildPlayerHistoryDartLabels(data, id);
-          final turnsHistory = buildTurnHistoryLabels(data, id);
-
-          return Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('$name (${isTurn ? "TURN" : ""})'),
-                  Text('ID: $id'),
-                  Text('Order: $order'),
-                  Text('Score: $score'),
-                  Text('Legs: $legs | Sets: $sets'),
-
-                  const SizedBox(height: 6),
-                  Text(
-                    'Current throws: ${currentThrows.join(", ")}',
-                  ),
-
-                  const SizedBox(height: 6),
-                  Text(
-                    'Darts history: ${historyDarts.join(", ")}',
-
-                  ),
-                  const SizedBox(height: 10),
-
-                  if (data.game.type == GameType.cricket)
-                    _CricketPlayerStats(
-                      player: p,
-                      allPlayers: data.players,
-                    ),
-
-                  const SizedBox(height: 6),
-                  Text(
-                    'Turns history: ${turnsHistory.join(", ")}',
-                  ),
-                ],
-              ),
+      children: [
+        ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            const Text(
+              'MATCH ENGINE',
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
-          );
-        }),
+            const SizedBox(height: 12),
+            Text('Game: ${data.game.type.name}'),
+            Text('Mode: ${data.matchConfig.mode.name}'),
+            Text('Sets: ${data.matchConfig.setCount}'),
+            Text('Legs per set: ${data.matchConfig.legCount}'),
+            Text('→ Win sets: ${data.matchConfig.setsToWin}'),
+            Text('→ Win legs: ${data.matchConfig.legsToWin}'),
+            const SizedBox(height: 16),
+            const Text('PLAYERS'),
+            const SizedBox(height: 8),
+            ...data.players.map((p) {
+              final name = p['name'] ?? '-';
+              final id = p['id'] ?? '-';
+              final order = p['order'] ?? 0;
+              final score = p['score'] ?? '-';
+              final legs = p['legs'] ?? 0;
+              final sets = p['sets'] ?? 0;
+              final isTurn = p['turn'] == true;
 
-        const SizedBox(height: 16),
+              final currentThrows = buildCurrentThrowLabels(p);
+              final historyDarts = buildPlayerHistoryDartLabels(data, id);
+              final turnsHistory = buildTurnHistoryLabels(data, id);
 
-        if (data.teamSize > 1) ...[
-          const Text('TEAMS'),
-
-          const SizedBox(height: 8),
-
-          ...buildTeamScoreRows(data).map((entry) {
-            final index = (entry['index'] as int?) ?? 0;
-            final teamPlayers = List<Map<String, dynamic>>.from(
-              entry['players'] ?? const [],
-            );
-            final teamScore = (entry['score'] as int?) ?? 0;
-
-            return Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Team ${index + 1}'),
-                    Text('Score: $teamScore'),
-
-                    const SizedBox(height: 8),
-
-                    ...teamPlayers.map((p) {
-                      return Text(
-                        '- ${p['name']} (${p['score']})',
-                      );
-                    }),
-                  ],
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('$name (${isTurn ? "TURN" : ""})'),
+                      Text('ID: $id'),
+                      Text('Order: $order'),
+                      Text('Score: $score'),
+                      Text('Legs: $legs | Sets: $sets'),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Current throws: ${currentThrows.join(", ")}',
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Darts history: ${historyDarts.join(", ")}',
+                      ),
+                      const SizedBox(height: 10),
+                      if (data.game.type == GameType.cricket)
+                        _CricketPlayerStats(
+                          player: p,
+                          allPlayers: data.players,
+                        ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Turns history: ${turnsHistory.join(", ")}',
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          }),
-        ],
-    ],
-    ),
-          if (winnerOverlay != null) winnerOverlay,
-        ],
+              );
+            }),
+            const SizedBox(height: 16),
+            if (data.teamSize > 1) ...[
+              const Text('TEAMS'),
+              const SizedBox(height: 8),
+              ...buildTeamScoreRows(data).map((entry) {
+                final index = (entry['index'] as int?) ?? 0;
+                final teamPlayers = List<Map<String, dynamic>>.from(
+                  entry['players'] ?? const [],
+                );
+                final teamScore = (entry['score'] as int?) ?? 0;
+
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Team ${index + 1}'),
+                        Text('Score: $teamScore'),
+                        const SizedBox(height: 8),
+                        ...teamPlayers.map((p) {
+                          return Text('- ${p['name']} (${p['score']})');
+                        }),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ],
+        ),
+        if (winnerOverlay != null) winnerOverlay,
+      ],
     );
   }
-
-
 }
 
 class _CricketPlayerStats extends StatelessWidget {
@@ -228,19 +210,18 @@ class _CricketPlayerStats extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('CRICKET'),
-
         const SizedBox(height: 6),
-
         ...targets.map((t) {
           final state = buildCricketRowState(
             allPlayers,
             player,
             t,
           );
-          final value = state['value'] as int? ?? 0;
           final isClosed = state['isClosed'] == true;
           final canScore = state['canScore'] == true;
-          final marksDisplay = List<String>.from(state['marksDisplay'] ?? const []);
+          final marksDisplay = List<String>.from(
+            state['marksDisplay'] ?? const [],
+          );
 
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 2),
@@ -250,17 +231,19 @@ class _CricketPlayerStats extends StatelessWidget {
                   width: 30,
                   child: Text(t),
                 ),
-
                 const SizedBox(width: 6),
-
                 _marks(marksDisplay),
-
                 const SizedBox(width: 8),
-
                 if (isClosed)
-                  const Text('CLOSED', style: TextStyle(color: Colors.grey))
+                  const Text(
+                    'CLOSED',
+                    style: TextStyle(color: Colors.grey),
+                  )
                 else if (canScore)
-                  const Text('SCORING', style: TextStyle(color: Colors.green)),
+                  const Text(
+                    'SCORING',
+                    style: TextStyle(color: Colors.green),
+                  ),
               ],
             ),
           );
@@ -272,10 +255,12 @@ class _CricketPlayerStats extends StatelessWidget {
   Widget _marks(List<String> marks) {
     return Row(
       children: marks
-          .map((w) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        child: Text(w),
-      ))
+          .map(
+            (w) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Text(w),
+        ),
+      )
           .toList(),
     );
   }

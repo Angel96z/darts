@@ -8,9 +8,42 @@ class RoomPlayer {
   final String name;
   final bool isGuest;
 
-  const RoomPlayer({required this.id, required this.name, required this.isGuest});
+  const RoomPlayer({
+    required this.id,
+    required this.name,
+    required this.isGuest,
+  });
 
-  Map<String, dynamic> toMap() => {'id': id, 'name': name, 'isGuest': isGuest};
+  Map<String, dynamic> toMap() =>
+      {'id': id, 'name': name, 'isGuest': isGuest};
+}
+
+/// CONTROLLER
+class RoomPlayersController {
+  final String currentUserId;
+  final List<String> adminIds;
+
+  RoomPlayersController({
+    required this.currentUserId,
+    required this.adminIds,
+  });
+
+  bool canRemove(Map<String, dynamic> player) {
+    final isAdmin = adminIds.contains(currentUserId);
+    if (isAdmin) return true;
+
+    final ownerId = player['ownerId'];
+    final id = player['id'];
+
+    return ownerId == currentUserId || id == currentUserId;
+  }
+
+  Future<RoomPlayer?> openAddDialog(BuildContext context) async {
+    return await showDialog<RoomPlayer>(
+      context: context,
+      builder: (_) => const _AddPlayerOverlay(),
+    );
+  }
 }
 
 /// ISTANZA ISOLATA PER LOGIN SENZA LOGOUT
@@ -20,7 +53,10 @@ Future<FirebaseAuth> _getSecondaryAuth() async {
   try {
     app = Firebase.app(name);
   } catch (_) {
-    app = await Firebase.initializeApp(name: name, options: Firebase.app().options);
+    app = await Firebase.initializeApp(
+      name: name,
+      options: Firebase.app().options,
+    );
   }
   return FirebaseAuth.instanceFor(app: app);
 }
@@ -41,31 +77,52 @@ class RoomPlayersView extends StatelessWidget {
     required this.adminIds,
   });
 
-  bool _canRemove(Map<String, dynamic> player) {
-    final isAdmin = adminIds.contains(currentUserId);
-    if (isAdmin) return true;
+  @override
+  Widget build(BuildContext context) {
+    final controller = RoomPlayersController(
+      currentUserId: currentUserId,
+      adminIds: adminIds,
+    );
 
-    final ownerId = player['ownerId'];
-    final id = player['id'];
-
-    return ownerId == currentUserId || id == currentUserId;
-
+    return _RoomPlayersViewUI(
+      players: players,
+      controller: controller,
+      onAddPlayer: onAddPlayer,
+      onRemovePlayer: onRemovePlayer,
+    );
   }
+}
+
+class _RoomPlayersViewUI extends StatelessWidget {
+  final List<Map<String, dynamic>> players;
+  final RoomPlayersController controller;
+  final Function(RoomPlayer) onAddPlayer;
+  final Function(Map<String, dynamic>) onRemovePlayer;
+
+  const _RoomPlayersViewUI({
+    required this.players,
+    required this.controller,
+    required this.onAddPlayer,
+    required this.onRemovePlayer,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('GIOCATORI', style: TextStyle(fontWeight: FontWeight.bold)),
+        const Text('GIOCATORI',
+            style: TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         ...players.map((p) {
-          final canRemove = _canRemove(p);
+          final canRemove = controller.canRemove(p);
 
           return ListTile(
-            leading: Icon(p['isGuest'] ? Icons.person_outline : Icons.verified),
+            leading: Icon(
+                p['isGuest'] ? Icons.person_outline : Icons.verified),
             title: Text(p['name']),
-            subtitle: Text(p['id'], style: const TextStyle(fontSize: 10)),
+            subtitle:
+            Text(p['id'], style: const TextStyle(fontSize: 10)),
             trailing: canRemove
                 ? IconButton(
               icon: const Icon(Icons.close, color: Colors.red),
@@ -76,28 +133,25 @@ class RoomPlayersView extends StatelessWidget {
         }),
         const SizedBox(height: 8),
         ElevatedButton.icon(
-          onPressed: () => showAddDialog(context),
+          onPressed: () async {
+            final player =
+            await controller.openAddDialog(context);
+            if (player != null) onAddPlayer(player);
+          },
           icon: const Icon(Icons.person_add),
           label: const Text('Aggiungi giocatore'),
         ),
       ],
     );
-
-  }
-
-  void showAddDialog(BuildContext context) async {
-    final player = await showDialog<RoomPlayer>(
-      context: context,
-      builder: (_) => const _AddPlayerOverlay(),
-    );
-    if (player != null) onAddPlayer(player);
   }
 }
 
 class _AddPlayerOverlay extends StatefulWidget {
   const _AddPlayerOverlay();
+
   @override
-  State<_AddPlayerOverlay> createState() => _AddPlayerOverlayState();
+  State<_AddPlayerOverlay> createState() =>
+      _AddPlayerOverlayState();
 }
 
 class _AddPlayerOverlayState extends State<_AddPlayerOverlay> {
@@ -111,7 +165,6 @@ class _AddPlayerOverlayState extends State<_AddPlayerOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    // Recuperiamo l'utente attualmente loggato nell'app principale
     final currentUser = FirebaseAuth.instance.currentUser;
 
     return AlertDialog(
@@ -121,13 +174,15 @@ class _AddPlayerOverlayState extends State<_AddPlayerOverlay> {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (error != null)
-              Text(error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+              Text(error!,
+                  style: const TextStyle(
+                      color: Colors.red, fontSize: 13)),
 
-            /// 1. MODALITÀ: PARTECIPA COME UTENTE ATTUALE
             if (currentUser != null && !isLoginMode) ...[
               const SizedBox(height: 8),
               ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade50),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue.shade50),
                 onPressed: () {
                   final p = RoomPlayer(
                     id: currentUser.uid,
@@ -136,54 +191,72 @@ class _AddPlayerOverlayState extends State<_AddPlayerOverlay> {
                   );
                   Navigator.pop(context, p);
                 },
-                child: Text('Partecipa come ${currentUser.email ?? "me"}'),
+                child: Text(
+                    'Partecipa come ${currentUser.email ?? "me"}'),
               ),
               const SizedBox(height: 16),
             ],
 
-            /// SWITCH PER ALTRO ACCOUNT
             TextButton(
               onPressed: () => setState(() {
                 isLoginMode = !isLoginMode;
                 error = null;
               }),
-              child: Text(isLoginMode ? "Torna indietro" : "Accedi con altro account"),
+              child: Text(isLoginMode
+                  ? "Torna indietro"
+                  : "Accedi con altro account"),
             ),
 
-            /// 2. MODALITÀ: LOGIN ISOLATO (SECONDARY AUTH)
             if (isLoginMode) ...[
-              TextField(controller: _email, decoration: const InputDecoration(labelText: 'Email')),
-              TextField(controller: _pass, obscureText: true, decoration: const InputDecoration(labelText: 'Password')),
+              TextField(
+                  controller: _email,
+                  decoration:
+                  const InputDecoration(labelText: 'Email')),
+              TextField(
+                  controller: _pass,
+                  obscureText: true,
+                  decoration:
+                  const InputDecoration(labelText: 'Password')),
               const SizedBox(height: 12),
               ElevatedButton(
                 onPressed: loading ? null : _handleSecondaryLogin,
                 child: loading
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2))
                     : const Text('Verifica login'),
               ),
             ],
 
             const Divider(height: 32),
 
-            /// 3. MODALITÀ: GUEST
-            const Text("Oppure aggiungi un ospite", style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const Text("Oppure aggiungi un ospite",
+                style:
+                TextStyle(fontSize: 12, color: Colors.grey)),
             TextField(
               controller: _guest,
-              decoration: const InputDecoration(labelText: 'Nome guest'),
+              decoration:
+              const InputDecoration(labelText: 'Nome guest'),
             ),
             const SizedBox(height: 8),
             ElevatedButton(
               onPressed: () {
                 final name = _guest.text.trim();
                 if (name.isEmpty) {
-                  setState(() => error = "Inserisci un nome per il guest");
+                  setState(() =>
+                  error = "Inserisci un nome per il guest");
                   return;
                 }
-                Navigator.pop(context, RoomPlayer(
-                  id: 'guest_${DateTime.now().millisecondsSinceEpoch}',
-                  name: name,
-                  isGuest: true,
-                ));
+                Navigator.pop(
+                    context,
+                    RoomPlayer(
+                      id:
+                      'guest_${DateTime.now().millisecondsSinceEpoch}',
+                      name: name,
+                      isGuest: true,
+                    ));
               },
               child: const Text('Aggiungi Guest'),
             ),
@@ -191,7 +264,9 @@ class _AddPlayerOverlayState extends State<_AddPlayerOverlay> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Chiudi')),
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Chiudi')),
       ],
     );
   }
@@ -202,25 +277,30 @@ class _AddPlayerOverlayState extends State<_AddPlayerOverlay> {
       return;
     }
 
-    setState(() { loading = true; error = null; });
+    setState(() {
+      loading = true;
+      error = null;
+    });
+
     try {
       final auth = await _getSecondaryAuth();
       final cred = await auth.signInWithEmailAndPassword(
-          email: _email.text.trim(),
-          password: _pass.text.trim()
+        email: _email.text.trim(),
+        password: _pass.text.trim(),
       );
 
       if (cred.user != null) {
         final p = RoomPlayer(
-            id: cred.user!.uid,
-            name: cred.user!.email!,
-            isGuest: false
+          id: cred.user!.uid,
+          name: cred.user!.email!,
+          isGuest: false,
         );
-        // Fondamentale: slogghiamo l'istanza secondaria subito
+
         await auth.signOut();
+
         if (mounted) Navigator.pop(context, p);
       }
-    } catch (e) {
+    } catch (_) {
       setState(() {
         error = "Credenziali non valide";
         loading = false;

@@ -6,18 +6,18 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_theme.dart';
-import '../features/darts_match/presentation/lobby/controllers/lobby_controller.dart';
-import '../features/darts_match/presentation/lobby/pages/room_lobby_shell_page_wrapper.dart';
 import 'link/app_link_state.dart';
 import 'router/home_shell_screen.dart';
 import '../features/players/presentation/pages/login_screen.dart';
 import 'web_url_cleaner.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:darts/features/room_v2/room_repository.dart';
+
 
 class _AppBootstrap extends ConsumerStatefulWidget {
   const _AppBootstrap();
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   ConsumerState<_AppBootstrap> createState() => _AppBootstrapState();
 }
 
@@ -26,18 +26,15 @@ class _AppBootstrapState extends ConsumerState<_AppBootstrap> {
   bool _loading = false;
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void initState() {
     super.initState();
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     Future.microtask(() {
       ref.read(appLinkCoordinatorProvider.notifier).init();
     });
   }
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     ref.listen<AppLinkState>(
       appLinkCoordinatorProvider,
@@ -65,12 +62,10 @@ class _AppBootstrapState extends ConsumerState<_AppBootstrap> {
     return const HomeScreen();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _handleLink(AppLinkState linkState) async {
     if (_processing) return;
 
     _processing = true;
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     setState(() => _loading = true);
 
     final coordinator = ref.read(appLinkCoordinatorProvider.notifier);
@@ -79,58 +74,36 @@ class _AppBootstrapState extends ConsumerState<_AppBootstrap> {
     final watchId = linkState.pendingWatchRoomId;
 
     try {
-      if (watchId != null && watchId.isNotEmpty) {
-        await ref
-            .read(lobbyControllerProvider.notifier)
-            .joinAsSpectator(watchId);
-      } else {
-        await ref
-            .read(lobbyControllerProvider.notifier)
-            .joinFromLink(roomId!);
+      if (roomId != null && roomId.isNotEmpty) {
+        if (!mounted) return;
 
-        final vm = ref.read(lobbyControllerProvider);
+        final accept = await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Invito'),
+            content: const Text('Vuoi entrare nella partita?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('No'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Si'),
+              ),
+            ],
+          ),
+        );
 
-        if (vm.roomId == null) {
-          /// Funzione: descrive in modo semplice questo blocco di logica.
-          setState(() => _loading = false);
+        if (accept == true) {
+          final repo = RoomRepository(FirebaseFirestore.instance);
 
-          if (!mounted) return;
-
-          /// Funzione: descrive in modo semplice questo blocco di logica.
-          await showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (_) => AlertDialog(
-              title: const Text('Room non disponibile'),
-              content: const Text('La room non esiste più o è stata chiusa'),
-              actions: [
-                /// Funzione: descrive in modo semplice questo blocco di logica.
-                FilledButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
+          await repo.joinRoom(
+            roomId,
+            FirebaseAuth.instance.currentUser!.uid,
           );
-
-          if (!mounted) return;
-
-          await coordinator.consumeRoomId();
-
-          Navigator.of(context).pushAndRemoveUntil(
-            /// Funzione: descrive in modo semplice questo blocco di logica.
-            MaterialPageRoute(builder: (_) => const HomeScreen()),
-                (route) => false,
-          );
-
-          _processing = false;
-          return;
         }
-      }
 
-      final vmAfterJoin = ref.read(lobbyControllerProvider);
-
-      if (vmAfterJoin.roomId != null) {
         await coordinator.consumeRoomId();
       }
 
@@ -138,17 +111,12 @@ class _AppBootstrapState extends ConsumerState<_AppBootstrap> {
 
       if (!mounted) return;
 
-      Navigator.of(context).pushReplacement(
-        /// Funzione: descrive in modo semplice questo blocco di logica.
-        MaterialPageRoute(
-          builder: (_) => RoomLobbyShellPageWrapper(
-            roomId: watchId ?? roomId!,
-          ),
-        ),
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+            (route) => false,
       );
     } catch (_) {
       if (!mounted) return;
-      /// Funzione: descrive in modo semplice questo blocco di logica.
       setState(() => _loading = false);
     } finally {
       _processing = false;
@@ -156,18 +124,14 @@ class _AppBootstrapState extends ConsumerState<_AppBootstrap> {
   }
 }
 
-
 class DartsApp extends ConsumerWidget {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const DartsApp({super.key});
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context, WidgetRef ref) {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: ThemeController.themeMode,
       builder: (context, mode, _) {
-        /// Funzione: descrive in modo semplice questo blocco di logica.
         return MaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'Darts',
@@ -188,12 +152,10 @@ class DartsApp extends ConsumerWidget {
               }
 
               return const _AppBootstrap();
-
             },
           ),
         );
       },
     );
-
   }
 }
