@@ -159,8 +159,18 @@ class RoomData {
   }
 
   bool isValidTeamSetup() {
+    // FFA sempre valido
     if (teamSize <= 1) return true;
-    return players.length % teamSize == 0;
+
+    final totalPlayers = players.length;
+
+    // almeno 2 team completi
+    if (totalPlayers < teamSize * 2) return false;
+
+    // deve essere multiplo perfetto
+    if (totalPlayers % teamSize != 0) return false;
+
+    return true;
   }
 
   RoomData removePlayerAndReorder(String playerId) {
@@ -262,9 +272,20 @@ class RoomData {
         .map((e) => Map<String, dynamic>.from(e))
         .toList(),
     'legStarterOrder': legStarterOrder,
-    'match': match
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList(),
+    'match': match.map((set) {
+      final s = Map<String, dynamic>.from(set);
+      final legs = List<Map<String, dynamic>>.from(s['legs'] ?? []);
+
+      s['legs'] = legs.map((leg) {
+        final l = Map<String, dynamic>.from(leg);
+        final turns = List<Map<String, dynamic>>.from(l['turns'] ?? []);
+
+        l['turns'] = turns.map((t) => Map<String, dynamic>.from(t)).toList();
+        return l;
+      }).toList();
+
+      return s;
+    }).toList(),
     'matchId': matchId,
   };
 

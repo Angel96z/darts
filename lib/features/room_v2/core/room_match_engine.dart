@@ -27,6 +27,135 @@ class RoomMatchEngineLogic {
 
     return state;
   }
+  static bool wouldCheckoutDart(
+      RoomData state,
+      String playerId,
+      Map<String, dynamic> intent,
+      ) {
+    if (state.game.type != GameType.x01) return false;
+
+    final player = _playerById(state, playerId);
+    if (player == null) return false;
+
+    final currentScore = (player['score'] as int?) ?? 0;
+
+    final hasOpened = _hasPlayerOpened(
+      state,
+      playerId,
+      liveThrows: _normalizeStoredThrows(player['throws']),
+    );
+
+    final requiresDoubleIn = state.game.doubleIn == true;
+    final isMiss = intent['isMiss'] == true;
+    final multiplier = (intent['multiplier'] as int?) ?? 1;
+    final isDouble = multiplier == 2;
+
+    int appliedValue = _throwBaseValue(intent);
+
+    // double in
+    if (requiresDoubleIn && !hasOpened) {
+      if (!isMiss && isDouble) {
+        // ok
+      } else {
+        appliedValue = 0;
+      }
+    }
+
+    final newScore = currentScore - appliedValue;
+
+    if (newScore != 0) return false;
+
+    final label = _throwLabel(intent);
+
+    return _validateCheckout(state, label);
+  }
+
+
+  static bool wouldCheckout(
+      RoomData state,
+      String playerId,
+      Map<String, dynamic> intent,
+      ) {
+    if (state.game.type != GameType.x01) return false;
+
+    final player = _playerById(state, playerId);
+    if (player == null) return false;
+
+    final startScore =
+        (player['turnStartScore'] as int?) ??
+            (player['score'] as int?) ??
+            0;
+
+    int total = 0;
+
+    switch (intent['type']) {
+      case 'total':
+        total = (intent['value'] as int?) ?? 0;
+        break;
+      case 'checkout':
+        total = startScore;
+        break;
+      case 'miss':
+      case 'bust':
+        total = 0;
+        break;
+      default:
+        return false;
+    }
+
+    final newScore = startScore - total;
+
+    if (newScore != 0) return false;
+
+    final simulatedPlayers =
+    List<Map<String, dynamic>>.from(state.players);
+
+    final index =
+    simulatedPlayers.indexWhere((p) => p['id'] == playerId);
+
+    if (index == -1) return false;
+
+    final simulatedPlayer =
+    Map<String, dynamic>.from(simulatedPlayers[index]);
+
+    simulatedPlayer['score'] = 0;
+    simulatedPlayers[index] = simulatedPlayer;
+
+    final simulatedState =
+    state.copyWith(players: simulatedPlayers);
+
+    return _canCheckoutForTeam(simulatedState, playerId);
+  }
+
+
+
+
+
+
+
+  static bool wouldWinCricket(
+      RoomData state,
+      String playerId,
+      Map<String, dynamic> intent,
+      ) {
+    if (state.game.type != GameType.cricket) return false;
+
+    final simulated = _applyCricketThrow(state, playerId, intent);
+
+    return _isCricketWinner(simulated, playerId);
+  }
+
+
+
+
+
+
+
+
+
+
+
+
 
   static RoomData applyThrow(
       RoomData data,
@@ -212,14 +341,13 @@ class RoomMatchEngineLogic {
       ) {
     switch (intent['type']) {
       case 'miss':
-        return _closeCricketTurn(state, playerId, const []);
       case 'bust':
-        return _closeCricketTurn(state, playerId, const []);
+        return commitTurn(state, playerId);
+
       default:
         return state;
     }
   }
-
   static RoomData _applyX01Throw(
       RoomData data,
       String playerId,
@@ -240,6 +368,7 @@ class RoomMatchEngineLogic {
       playerId,
       liveThrows: liveThrows,
     );
+
     final requiresDoubleIn = data.game.doubleIn == true;
     final isMiss = intent['isMiss'] == true;
     final multiplier = (intent['multiplier'] as int?) ?? 1;
@@ -271,63 +400,33 @@ class RoomMatchEngineLogic {
     if (index == -1) return data;
 
     final player = Map<String, dynamic>.from(players[index]);
+
+    // 👉 SIMULAZIONE STATO POST-TIRO
+    final simulatedPlayers = List<Map<String, dynamic>>.from(players);
+    final simulatedPlayer = Map<String, dynamic>.from(player);
+    simulatedPlayer['score'] = newScore;
+    simulatedPlayers[index] = simulatedPlayer;
+
+    final simulatedState = data.copyWith(players: simulatedPlayers);
+
     player['throws'] = nextThrows;
     player['throwMeta'] = nextMeta;
     player['dart'] = nextThrows.length;
     player['score'] = newScore;
-    player['inputMode'] = 'dart';
+    final isTryingCheckout = newScore <= 0;
+
+    player['cannotCheckout'] = isTryingCheckout
+        ? !_canCheckoutForTeam(simulatedState, playerId)
+        : false;    player['inputMode'] = 'dart';
+
     if (willOpen) {
       player['opened'] = true;
     }
+
     players[index] = player;
 
-    bool isEnd = false;
-    String endKind = 'normal';
-
-    if (newScore < 0 || newScore == 1) {
-      isEnd = true;
-      endKind = 'bust';
-    } else if (newScore == 0) {
-      final valid = _validateCheckout(
-        data,
-        nextMeta.isEmpty ? null : nextMeta.last,
-      );
-      isEnd = true;
-      endKind = valid ? 'checkout' : 'bust';
-    } else if (nextThrows.length == 3) {
-      isEnd = true;
-    }
-
-    if (!isEnd) {
-      return data.copyWith(players: players);
-    }
-
-    final turn = <String, dynamic>{
-      'playerId': playerId,
-      'startScore': (player['turnStartScore'] as int?) ?? currentScore,
-      'throws': nextThrows,
-      'throwMeta': nextMeta,
-      'total': nextThrows.fold<int>(0, (s, e) => s + _throwAppliedValue(e)),
-      'inputMode': 'dart',
-      'endKind': endKind,
-    };
-
-    final updatedMatch = _appendTurnToMatch(
-      data,
-      turn,
-      winnerIndex: index,
-      endKind: endKind,
-    );
-
-    return _rebuildStateFromMatch(
-      data.copyWith(
-        match: updatedMatch,
-        history: _flattenMatchToHistory(updatedMatch),
-      ),
-      updatedMatch,
-    );
+    return data.copyWith(players: players);
   }
-
   static RoomData _applyCricketThrow(
       RoomData data,
       String playerId,
@@ -356,35 +455,28 @@ class RoomMatchEngineLogic {
     final nextMeta = List<String>.from(liveMeta)
       ..add(_throwLabel(intent));
 
-    final player = Map<String, dynamic>.from(players[index]);
     final liveState = _buildCricketLiveState(
       data,
       playerId,
       nextThrows,
     );
 
+    final updatedPlayers =
+    List<Map<String, dynamic>>.from(liveState['players'] ?? players);
+
+    final player = Map<String, dynamic>.from(updatedPlayers[index]);
+
     player['throws'] = nextThrows;
     player['throwMeta'] = nextMeta;
     player['dart'] = nextThrows.length;
     player['inputMode'] = 'dart';
-    player['cricket'] = Map<String, dynamic>.from(liveState['cricket']);
-    player['cricketScore'] = liveState['cricketScore'];
-    player['score'] = liveState['score'];
 
-    players[index] = player;
+    updatedPlayers[index] = player;
 
-    final updated = data.copyWith(players: players);
-
-    if (nextThrows.length < 3) {
-      return updated;
-    }
-
-    return _closeCricketTurn(
-      updated,
-      playerId,
-      nextThrows,
-    );
+    return data.copyWith(players: updatedPlayers);
   }
+
+
   static Map<String, dynamic> _buildCricketLiveState(
       RoomData data,
       String playerId,
@@ -397,8 +489,11 @@ class RoomMatchEngineLogic {
       data.match,
     );
 
-    final rebuiltPlayer = _playerById(rebuilt, playerId);
-    if (rebuiltPlayer == null) {
+    final players = List<Map<String, dynamic>>.from(rebuilt.players);
+
+    final playerIndex =
+    players.indexWhere((p) => p['id'] == playerId);
+    if (playerIndex == -1) {
       return {
         'cricket': {
           '20': 0,
@@ -414,7 +509,9 @@ class RoomMatchEngineLogic {
       };
     }
 
-    final cricket = Map<String, dynamic>.from(rebuiltPlayer['cricket'] ?? {
+    final player = Map<String, dynamic>.from(players[playerIndex]);
+
+    final cricket = Map<String, dynamic>.from(player['cricket'] ?? {
       '20': 0,
       '19': 0,
       '18': 0,
@@ -424,7 +521,19 @@ class RoomMatchEngineLogic {
       '25': 0,
     });
 
-    int cricketScore = (rebuiltPlayer['cricketScore'] as int?) ?? 0;
+    int cricketScore = (player['cricketScore'] as int?) ?? 0;
+
+    final isCutThroat = data.game.cutThroat == true;
+
+    final playerOrder = (player['order'] ?? 0) as int;
+
+    final teamStart = data.teamSize > 1
+        ? (playerOrder ~/ data.teamSize) * data.teamSize
+        : playerOrder;
+
+    final teamEnd = data.teamSize > 1
+        ? teamStart + data.teamSize
+        : playerOrder + 1;
 
     for (final t in liveThrows) {
       final target = _cricketTargetKey(t);
@@ -441,18 +550,44 @@ class RoomMatchEngineLogic {
 
       if (gained > 0 &&
           !_allOpponentsClosedTarget(rebuilt, playerId, target)) {
-        cricketScore += _cricketNumberValue(target) * gained;
+
+        final value = _cricketNumberValue(target) * gained;
+
+        if (!isCutThroat) {
+          cricketScore += value;
+        } else {
+          for (int i = 0; i < players.length; i++) {
+            final p = Map<String, dynamic>.from(players[i]);
+            final order = (p['order'] ?? 0) as int;
+
+            final sameTeam = order >= teamStart && order < teamEnd;
+            if (sameTeam) continue;
+
+            final s = (p['cricketScore'] as int?) ?? 0;
+            p['cricketScore'] = s + value;
+            p['score'] = p['cricketScore'];
+
+            players[i] = p;
+          }
+        }
       }
 
       cricket[target] = next;
     }
 
+    player['cricket'] = cricket;
+    player['cricketScore'] = cricketScore;
+    player['score'] = cricketScore;
+    players[playerIndex] = player;
+
     return {
       'cricket': cricket,
       'cricketScore': cricketScore,
       'score': cricketScore,
+      'players': players,
     };
   }
+
   static RoomData _applyX01TotalTurn(
       RoomData data,
       String playerId,
@@ -463,104 +598,65 @@ class RoomMatchEngineLogic {
     if (currentPlayer == null) return data;
     if (currentPlayer['id'] != playerId) return data;
 
-    final currentScore = (currentPlayer['score'] as int?) ?? 0;
-    final newScore = currentScore - total;
-
-    String endKind = 'normal';
-
-    if (isBust) {
-      endKind = 'bust';
-    } else if (newScore < 0 || newScore == 1) {
-      endKind = 'bust';
-    } else if (newScore == 0) {
-      endKind = 'checkout';
-    }
-
     final players = List<Map<String, dynamic>>.from(data.players);
     final index = players.indexWhere((p) => p['id'] == playerId);
     if (index == -1) return data;
 
     final player = Map<String, dynamic>.from(players[index]);
+
+    final startScore =
+        (player['turnStartScore'] as int?) ??
+            (player['score'] as int?) ??
+            0;
+
+    final newScore = startScore - total;
+
+    final throwItem = {
+      'type': 'total',
+      'value': total,
+      'appliedValue': total,
+      'label': total.toString(),
+    };
+
+    // 👉 SIMULAZIONE STATO POST-TURNO
+    final simulatedPlayers = List<Map<String, dynamic>>.from(players);
+    final simulatedPlayer = Map<String, dynamic>.from(player);
+    simulatedPlayer['score'] = newScore;
+    simulatedPlayers[index] = simulatedPlayer;
+
+    final simulatedState = data.copyWith(players: simulatedPlayers);
+
+    player['throws'] = [throwItem];
+    player['throwMeta'] = [total.toString()];
+    player['dart'] = 1;
     player['inputMode'] = 'total';
+    player['score'] = newScore;
+
+    final isTryingCheckout = newScore <= 0;
+
+    player['cannotCheckout'] = isTryingCheckout
+        ? !_canCheckoutForTeam(simulatedState, playerId)
+        : false;
+
+    player['pendingCheckout'] = (newScore == 0) && !isBust;
+    player['pendingBust'] = isBust;
+
     players[index] = player;
 
-    final turn = <String, dynamic>{
-      'playerId': playerId,
-      'startScore': (currentPlayer['turnStartScore'] as int?) ?? currentScore,
-      'throws': <Map<String, dynamic>>[],
-      'throwMeta': <String>[],
-      'total': total,
-      'inputMode': 'total',
-      'endKind': endKind,
-    };
-
-    final updatedMatch = _appendTurnToMatch(
-      data.copyWith(players: players),
-      turn,
-      winnerIndex: index,
-      endKind: endKind,
-    );
-
-    return _rebuildStateFromMatch(
-      data.copyWith(
-        match: updatedMatch,
-        history: _flattenMatchToHistory(updatedMatch),
-      ),
-      updatedMatch,
-    );
+    return data.copyWith(players: players);
   }
-
-  static RoomData _closeCricketTurn(
-      RoomData data,
-      String playerId,
-      List<Map<String, dynamic>> throws,
-      ) {
-    final players = List<Map<String, dynamic>>.from(data.players);
-    final index = players.indexWhere((p) => p['id'] == playerId);
-    if (index == -1) return data;
-
-    final turn = <String, dynamic>{
-      'playerId': playerId,
-      'startScore': 0,
-      'throws': throws,
-      'throwMeta': throws.map(_throwLabel).toList(),
-      'total': throws.fold<int>(
-        0,
-            (sum, t) => sum + ((t['marks'] as int?) ?? _cricketMarks(t)),
-      ),
-      'inputMode': 'dart',
-      'endKind': _cricketTurnEndKind(
-        data.copyWith(players: players),
-        playerId,
-        throws,
-      ),
-    };
-
-    final updatedMatch = _appendTurnToMatch(
-      data.copyWith(players: players),
-      turn,
-      winnerIndex: index,
-      endKind: turn['endKind'],
-    );
-
-    return _rebuildStateFromMatch(
-      data.copyWith(
-        match: updatedMatch,
-        history: _flattenMatchToHistory(updatedMatch),
-      ),
-      updatedMatch,
-    );
-  }
-
 
   static String _cricketTurnEndKind(
       RoomData data,
       String playerId,
       List<Map<String, dynamic>> throws,
       ) {
-    return _isCricketWinner(data, playerId) ? 'checkout' : 'normal';
-  }
+    final simulated = _applyCricketThrow(data, playerId, {
+      'isMiss': false,
+    });
 
+    return _isCricketWinner(simulated, playerId) ? 'checkout' : 'normal';
+  }
 
   static bool _validateCheckout(RoomData data, String? lastMeta) {
     if (lastMeta == null) return true;
@@ -660,10 +756,35 @@ class RoomMatchEngineLogic {
     );
 
     for (final rawTurn in flatTurns) {
+
+
       final turn = Map<String, dynamic>.from(rawTurn);
       state = _applyClosedTurn(state, turn);
     }
+// 👉 CALCOLO cannotCheckout DOPO REBUILD COMPLETO
+    final players = List<Map<String, dynamic>>.from(state.players);
 
+    for (int i = 0; i < players.length; i++) {
+      final p = Map<String, dynamic>.from(players[i]);
+
+      if (p['turn'] == true) {
+        final simulatedPlayers = List<Map<String, dynamic>>.from(players);
+        final simulatedPlayer = Map<String, dynamic>.from(p);
+        simulatedPlayer['score'] = 0;
+        simulatedPlayers[i] = simulatedPlayer;
+
+        final simulatedState = state.copyWith(players: simulatedPlayers);
+
+        p['cannotCheckout'] =
+        !_canCheckoutForTeam(simulatedState, p['id']);
+      } else {
+        p['cannotCheckout'] = false;
+      }
+
+      players[i] = p;
+    }
+
+    state = state.copyWith(players: players);
     return state.copyWith(
       history: flatTurns,
       match: normalizedMatch,
@@ -742,6 +863,8 @@ class RoomMatchEngineLogic {
     final throws = _normalizeStoredThrows(turn['throws']);
     final endKind = (turn['endKind'] as String?) ?? 'normal';
 
+    final isCutThroat = state.game.cutThroat == true;
+
     final players = List<Map<String, dynamic>>.from(state.players);
     final index = players.indexWhere((p) => p['id'] == playerId);
     if (index == -1) return state;
@@ -760,6 +883,16 @@ class RoomMatchEngineLogic {
 
     int cricketScore = (player['cricketScore'] as int?) ?? 0;
 
+    final playerOrder = (player['order'] ?? 0) as int;
+
+    final teamStart = state.teamSize > 1
+        ? (playerOrder ~/ state.teamSize) * state.teamSize
+        : playerOrder;
+
+    final teamEnd = state.teamSize > 1
+        ? teamStart + state.teamSize
+        : playerOrder + 1;
+
     for (final t in throws) {
       final target = _cricketTargetKey(t);
       final marks = (t['marks'] as int?) ?? _cricketMarks(t);
@@ -775,7 +908,27 @@ class RoomMatchEngineLogic {
 
       if (gained > 0 &&
           !_allOpponentsClosedTarget(state, playerId, target)) {
-        cricketScore += _cricketNumberValue(target) * gained;
+
+        final value = _cricketNumberValue(target) * gained;
+
+        if (!isCutThroat) {
+          cricketScore += value;
+        } else {
+          // 👉 CUTTHROAT CORRETTO: assegna SOLO agli avversari
+          for (int i = 0; i < players.length; i++) {
+            final p = Map<String, dynamic>.from(players[i]);
+            final order = (p['order'] ?? 0) as int;
+
+            final sameTeam = order >= teamStart && order < teamEnd;
+            if (sameTeam) continue;
+
+            final s = (p['cricketScore'] as int?) ?? 0;
+            p['cricketScore'] = s + value;
+            p['score'] = p['cricketScore'];
+
+            players[i] = p;
+          }
+        }
       }
 
       cricket[target] = next;
@@ -1049,11 +1202,25 @@ class RoomMatchEngineLogic {
   static RoomData _syncTurnStartScoreFromCurrentScore(RoomData state) {
     final updated = <Map<String, dynamic>>[];
 
-    for (final raw in state.players) {
+    for (int i = 0; i < state.players.length; i++) {
+      final raw = state.players[i];
       final p = Map<String, dynamic>.from(raw);
 
       if (p['turn'] == true) {
         p['turnStartScore'] = p['score'];
+
+        // 👉 CALCOLO cannotCheckout ALL'INIZIO TURNO
+        final simulatedPlayers = List<Map<String, dynamic>>.from(state.players);
+        final simulatedPlayer = Map<String, dynamic>.from(p);
+        simulatedPlayer['score'] = 0;
+        simulatedPlayers[i] = simulatedPlayer;
+
+        final simulatedState = state.copyWith(players: simulatedPlayers);
+
+        p['cannotCheckout'] =
+        !_canCheckoutForTeam(simulatedState, p['id']);
+      } else {
+        p['cannotCheckout'] = false;
       }
 
       updated.add(p);
@@ -1089,7 +1256,10 @@ class RoomMatchEngineLogic {
         'throwMeta': <String>[],
         'round': 1,
         'dart': 0,
-        'inputMode': 'dart',
+
+        // ✅ NON RESETTARE
+        'inputMode': p['inputMode'] ?? 'dart',
+
         'lastDartMultiplier': 1,
         'lastThrowIntent': null,
         'opened': false,
@@ -1310,6 +1480,153 @@ class RoomMatchEngineLogic {
     return state.copyWith(players: updated);
   }
 
+
+  static bool isTurnEnded(Map<String, dynamic> player) {
+    final inputMode = player['inputMode'] ?? 'dart';
+
+    if (inputMode == 'total') return true;
+
+    final dart = player['dart'] ?? 0;
+    if (dart >= 3) return true;
+
+    final cricket = player['cricket'];
+    final isCricketPlayer = cricket is Map;
+
+    if (!isCricketPlayer) {
+      final score = player['score'] ?? 0;
+      if (score <= 1) return true;
+    }
+
+    return false;
+  }
+
+  static RoomData commitTurn(
+      RoomData data,
+      String playerId,
+      ) {
+    final player = _playerById(data, playerId);
+    if (player == null) return data;
+
+    final throws = _normalizeStoredThrows(player['throws']);
+    final meta = _normalizeMeta(player['throwMeta']);
+
+    if (throws.isEmpty) return data;
+
+    final players = List<Map<String, dynamic>>.from(data.players);
+    final index = players.indexWhere((p) => p['id'] == playerId);
+    if (index == -1) return data;
+
+    String endKind = 'normal';
+
+    // ===== CRICKET =====
+    if (data.game.type == GameType.cricket) {
+      final simulated = _applyCricketThrow(data, playerId, {
+        'isMiss': false,
+      });
+
+      if (_isCricketWinner(simulated, playerId)) {
+        endKind = 'checkout';
+      }
+
+      final turn = <String, dynamic>{
+        'playerId': playerId,
+        'startScore': 0,
+        'throws': throws,
+        'throwMeta': meta,
+        'total': throws.fold<int>(
+          0,
+              (s, e) => s + ((e['marks'] as int?) ?? 0),
+        ),
+        'inputMode': 'dart',
+        'endKind': endKind,
+      };
+
+      final updatedMatch = _appendTurnToMatch(
+        data,
+        turn,
+        winnerIndex: index,
+        endKind: endKind,
+      );
+
+      return _rebuildStateFromMatch(
+        data.copyWith(
+          match: updatedMatch,
+          history: _flattenMatchToHistory(updatedMatch),
+        ),
+        updatedMatch,
+      );
+    }
+
+    // ===== X01 =====
+    final currentScore = (player['turnStartScore'] as int?) ??
+        (player['score'] as int?) ??
+        0;
+
+    final total = throws.fold<int>(
+      0,
+          (s, e) => s + _throwAppliedValue(e),
+    );
+
+    int newScore = currentScore - total;
+
+    final pendingCheckout = player['pendingCheckout'] == true;
+    final pendingBust = player['pendingBust'] == true;
+    final inputMode = player['inputMode'] ?? 'dart';
+    final lastMeta = meta.isNotEmpty ? meta.last : null;
+
+    if (pendingBust || newScore < 0 || newScore == 1) {
+      endKind = 'bust';
+    } else if (pendingCheckout || newScore == 0) {
+      final validTeam = _canCheckoutForTeam(data, playerId);
+
+      bool validCheckout;
+
+      if (inputMode == 'total') {
+        validCheckout = true;
+      } else {
+        validCheckout = _validateCheckout(data, lastMeta);
+      }
+
+      if (validCheckout && validTeam) {
+        endKind = 'checkout';
+      } else {
+        endKind = 'bust';
+      }
+    }
+
+    final turn = <String, dynamic>{
+      'playerId': playerId,
+      'startScore': currentScore,
+      'throws': throws,
+      'throwMeta': meta,
+      'total': total,
+      'inputMode': player['inputMode'] ?? 'dart',
+      'endKind': endKind,
+    };
+
+    final updatedMatch = _appendTurnToMatch(
+      data,
+      turn,
+      winnerIndex: index,
+      endKind: endKind,
+    );
+
+    return _rebuildStateFromMatch(
+      data.copyWith(
+        match: updatedMatch,
+        history: _flattenMatchToHistory(updatedMatch),
+      ),
+      updatedMatch,
+    );
+  }
+
+
+  static bool cannotCheckoutForTeam(
+      RoomData state,
+      String playerId,
+      ) {
+    return !_canCheckoutForTeam(state, playerId);
+  }
   static List<Map<String, dynamic>> appendTurnToMatchPublic(
       RoomData data,
       Map<String, dynamic> turn, {
@@ -1579,25 +1896,79 @@ class RoomMatchEngineLogic {
     final allClosed = targets.every((t) => (cricket[t] as int? ?? 0) >= 3);
     if (!allClosed) return false;
 
-    final playerOrder = (player['order'] ?? 0) as int;
-    final playerTeamStart =
-    state.teamSize > 1 ? (playerOrder ~/ state.teamSize) * state.teamSize : playerOrder;
-    final playerTeamEnd =
-    state.teamSize > 1 ? playerTeamStart + state.teamSize : playerOrder + 1;
+    final isCutThroat = state.game.cutThroat == true;
 
-    int bestOpponentScore = 0;
+    final playerOrder = (player['order'] ?? 0) as int;
+    final teamStart =
+    state.teamSize > 1 ? (playerOrder ~/ state.teamSize) * state.teamSize : playerOrder;
+    final teamEnd =
+    state.teamSize > 1 ? teamStart + state.teamSize : playerOrder + 1;
+
+    int bestOpponentScore = isCutThroat ? 1 << 30 : 0;
 
     for (final p in state.players) {
       final order = (p['order'] ?? 0) as int;
-      final sameTeam = order >= playerTeamStart && order < playerTeamEnd;
+      final sameTeam = order >= teamStart && order < teamEnd;
       if (sameTeam) continue;
 
       final opponentScore = (p['cricketScore'] as int?) ?? 0;
-      if (opponentScore > bestOpponentScore) {
-        bestOpponentScore = opponentScore;
+
+      if (!isCutThroat) {
+        if (opponentScore > bestOpponentScore) {
+          bestOpponentScore = opponentScore;
+        }
+      } else {
+        if (opponentScore < bestOpponentScore) {
+          bestOpponentScore = opponentScore;
+        }
       }
     }
 
-    return score >= bestOpponentScore;
+    if (!isCutThroat) {
+      // STANDARD → devi avere >= punti
+      return score >= bestOpponentScore;
+    } else {
+      // CUTTHROAT → devi avere <= punti
+      return score <= bestOpponentScore;
+    }
+  }
+
+
+  static bool _canCheckoutForTeam(
+      RoomData state,
+      String playerId,
+      ) {
+    if (state.teamSize <= 1) return true;
+
+    final player = _playerById(state, playerId);
+    if (player == null) return true;
+
+    final playerOrder = (player['order'] ?? 0) as int;
+
+    final teamStart = (playerOrder ~/ state.teamSize) * state.teamSize;
+    final teamEnd = teamStart + state.teamSize;
+
+    int myTeamScore = 0;
+    int bestOpponentScore = 0;
+
+    for (final p in state.players) {
+      final score = (p['score'] as int?) ?? 0;
+      final order = (p['order'] ?? 0) as int;
+
+      final sameTeam = order >= teamStart && order < teamEnd;
+
+      if (sameTeam) {
+        if (p['id'] == playerId) {
+          // simulazione: player chiude → 0
+          myTeamScore += 0;
+        } else {
+          myTeamScore += score;
+        }
+      } else {
+        bestOpponentScore += score;
+      }
+    }
+
+    return myTeamScore <= bestOpponentScore;
   }
 }

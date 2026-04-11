@@ -28,14 +28,22 @@ List<String> buildCurrentThrowLabels(Map<String, dynamic> player) {
 }
 
 List<String> buildTurnHistoryLabels(
-  RoomData data,
-  dynamic playerId,
-) {
+    RoomData data,
+    dynamic playerId,
+    ) {
   final historyTurns = buildPlayerHistoryTurns(data, playerId);
   return historyTurns.map((t) {
-    final total = t['total'];
-    final kind = t['endKind'];
-    final mode = t['inputMode'];
-    return '$total ($mode/$kind)';
+    final total = t['total'] ?? 0;
+    final kind = t['endKind'] ?? '';
+    final mode = t['inputMode'] ?? '';
+
+    final modeLabel = mode.toString().toUpperCase();
+    final kindLabel = kind.toString().toUpperCase();
+
+    if (modeLabel.isEmpty && kindLabel.isEmpty) {
+      return '$total';
+    }
+
+    return '$total • $modeLabel / $kindLabel';
   }).toList();
 }

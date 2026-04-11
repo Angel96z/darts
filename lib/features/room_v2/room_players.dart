@@ -30,8 +30,11 @@ class RoomPlayersController {
 
   bool canRemove(Map<String, dynamic> player) {
     final isAdmin = adminIds.contains(currentUserId);
+
+    // ADMIN → può rimuovere sempre
     if (isAdmin) return true;
 
+    // NON ADMIN → solo se è il suo player
     final ownerId = player['ownerId'];
     final id = player['id'];
 
@@ -61,91 +64,6 @@ Future<FirebaseAuth> _getSecondaryAuth() async {
   return FirebaseAuth.instanceFor(app: app);
 }
 
-class RoomPlayersView extends StatelessWidget {
-  final List<Map<String, dynamic>> players;
-  final Function(RoomPlayer) onAddPlayer;
-  final Function(Map<String, dynamic>) onRemovePlayer;
-  final String currentUserId;
-  final List<String> adminIds;
-
-  const RoomPlayersView({
-    super.key,
-    required this.players,
-    required this.onAddPlayer,
-    required this.onRemovePlayer,
-    required this.currentUserId,
-    required this.adminIds,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = RoomPlayersController(
-      currentUserId: currentUserId,
-      adminIds: adminIds,
-    );
-
-    return _RoomPlayersViewUI(
-      players: players,
-      controller: controller,
-      onAddPlayer: onAddPlayer,
-      onRemovePlayer: onRemovePlayer,
-    );
-  }
-}
-
-class _RoomPlayersViewUI extends StatelessWidget {
-  final List<Map<String, dynamic>> players;
-  final RoomPlayersController controller;
-  final Function(RoomPlayer) onAddPlayer;
-  final Function(Map<String, dynamic>) onRemovePlayer;
-
-  const _RoomPlayersViewUI({
-    required this.players,
-    required this.controller,
-    required this.onAddPlayer,
-    required this.onRemovePlayer,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('GIOCATORI',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        ...players.map((p) {
-          final canRemove = controller.canRemove(p);
-
-          return ListTile(
-            leading: Icon(
-                p['isGuest'] ? Icons.person_outline : Icons.verified),
-            title: Text(p['name']),
-            subtitle:
-            Text(p['id'], style: const TextStyle(fontSize: 10)),
-            trailing: canRemove
-                ? IconButton(
-              icon: const Icon(Icons.close, color: Colors.red),
-              onPressed: () => onRemovePlayer(p),
-            )
-                : null,
-          );
-        }),
-        const SizedBox(height: 8),
-        ElevatedButton.icon(
-          onPressed: () async {
-            final player =
-            await controller.openAddDialog(context);
-            if (player != null) onAddPlayer(player);
-          },
-          icon: const Icon(Icons.person_add),
-          label: const Text('Aggiungi giocatore'),
-        ),
-      ],
-    );
-  }
-}
-
 class _AddPlayerOverlay extends StatefulWidget {
   const _AddPlayerOverlay();
 
@@ -167,107 +85,170 @@ class _AddPlayerOverlayState extends State<_AddPlayerOverlay> {
   Widget build(BuildContext context) {
     final currentUser = FirebaseAuth.instance.currentUser;
 
-    return AlertDialog(
-      title: const Text('Aggiungi player'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (error != null)
-              Text(error!,
-                  style: const TextStyle(
-                      color: Colors.red, fontSize: 13)),
-
-            if (currentUser != null && !isLoginMode) ...[
-              const SizedBox(height: 8),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade50),
-                onPressed: () {
-                  final p = RoomPlayer(
-                    id: currentUser.uid,
-                    name: currentUser.email ?? currentUser.uid,
-                    isGuest: false,
-                  );
-                  Navigator.pop(context, p);
-                },
-                child: Text(
-                    'Partecipa come ${currentUser.email ?? "me"}'),
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Aggiungi giocatore',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
+
               const SizedBox(height: 16),
-            ],
 
-            TextButton(
-              onPressed: () => setState(() {
-                isLoginMode = !isLoginMode;
-                error = null;
-              }),
-              child: Text(isLoginMode
-                  ? "Torna indietro"
-                  : "Accedi con altro account"),
-            ),
+              if (error != null)
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    color: Colors.red.withOpacity(0.08),
+                  ),
+                  child: Text(
+                    error!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
 
-            if (isLoginMode) ...[
-              TextField(
-                  controller: _email,
+              // BLOCCO PRINCIPALE (solo se NON login mode)
+              if (!isLoginMode) ...[
+                if (currentUser != null) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        final p = RoomPlayer(
+                          id: currentUser.uid,
+                          name: currentUser.email ?? currentUser.uid,
+                          isGuest: false,
+                        );
+                        Navigator.pop(context, p);
+                      },
+                      child: Text(
+                          'Partecipa come ${currentUser.email ?? "me"}'),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                TextButton(
+                  onPressed: () => setState(() {
+                    isLoginMode = true;
+                    error = null;
+                  }),
+                  child: const Text("Usa altro account"),
+                ),
+
+                const SizedBox(height: 16),
+                const Divider(),
+
+                const SizedBox(height: 12),
+
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Guest',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+
+                TextField(
+                  controller: _guest,
                   decoration:
-                  const InputDecoration(labelText: 'Email')),
-              TextField(
+                  const InputDecoration(labelText: 'Nome'),
+                ),
+
+                const SizedBox(height: 12),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      final name = _guest.text.trim();
+                      if (name.isEmpty) {
+                        setState(() =>
+                        error = "Inserisci un nome per il guest");
+                        return;
+                      }
+                      Navigator.pop(
+                        context,
+                        RoomPlayer(
+                          id:
+                          'guest_${DateTime.now().millisecondsSinceEpoch}',
+                          name: name,
+                          isGuest: true,
+                        ),
+                      );
+                    },
+                    child: const Text('Aggiungi Guest'),
+                  ),
+                ),
+              ],
+
+              // BLOCCO LOGIN (UI pulita)
+              if (isLoginMode) ...[
+                const SizedBox(height: 12),
+
+                TextField(
+                  controller: _email,
+                  decoration: const InputDecoration(labelText: 'Email'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
                   controller: _pass,
                   obscureText: true,
                   decoration:
-                  const InputDecoration(labelText: 'Password')),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: loading ? null : _handleSecondaryLogin,
-                child: loading
-                    ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2))
-                    : const Text('Verifica login'),
+                  const InputDecoration(labelText: 'Password'),
+                ),
+                const SizedBox(height: 12),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: loading ? null : _handleSecondaryLogin,
+                    child: loading
+                        ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2),
+                    )
+                        : const Text('Accedi'),
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                TextButton(
+                  onPressed: () => setState(() {
+                    isLoginMode = false;
+                    error = null;
+                  }),
+                  child: const Text('Annulla'),
+                ),
+              ],
+
+              const SizedBox(height: 8),
+
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Chiudi'),
               ),
             ],
-
-            const Divider(height: 32),
-
-            const Text("Oppure aggiungi un ospite",
-                style:
-                TextStyle(fontSize: 12, color: Colors.grey)),
-            TextField(
-              controller: _guest,
-              decoration:
-              const InputDecoration(labelText: 'Nome guest'),
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton(
-              onPressed: () {
-                final name = _guest.text.trim();
-                if (name.isEmpty) {
-                  setState(() =>
-                  error = "Inserisci un nome per il guest");
-                  return;
-                }
-                Navigator.pop(
-                    context,
-                    RoomPlayer(
-                      id:
-                      'guest_${DateTime.now().millisecondsSinceEpoch}',
-                      name: name,
-                      isGuest: true,
-                    ));
-              },
-              child: const Text('Aggiungi Guest'),
-            ),
-          ],
+          ),
         ),
       ),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Chiudi')),
-      ],
     );
   }
 

@@ -1,15 +1,14 @@
-/// File: home_shell_screen.dart. Contiene configurazione e avvio dell'applicazione.
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../app/link/app_link_state.dart';
 import '../../features/game/presentation/pages/allenamento_screen.dart';
 import '../../features/game/presentation/pages/campionati_screen.dart';
 import '../../features/stats/presentation/pages/classifiche_screen.dart';
 import '../../features/game/presentation/pages/gioca_screen.dart';
 import '../../features/players/presentation/widgets/profile_panel.dart';
 import '../../features/game/presentation/pages/tornei_screen.dart';
-import '../../app/link/app_link_state.dart';
 
 enum AppSection {
   allenamento,
@@ -19,8 +18,7 @@ enum AppSection {
   classifiche,
 }
 
-class HomeScreen extends StatefulWidget {
-  /// Funzione: descrive in modo semplice questo blocco di logica.
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({
     super.key,
     this.initialSection = AppSection.allenamento,
@@ -29,94 +27,55 @@ class HomeScreen extends StatefulWidget {
   final AppSection initialSection;
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   late AppSection current;
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void initState() {
     super.initState();
     current = widget.initialSection;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final container = ProviderScope.containerOf(context, listen: false);
-      final linkCoordinator = container.read(appLinkCoordinatorProvider.notifier);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final state = ref.read(appLinkCoordinatorProvider);
 
-      final roomId = await linkCoordinator.consumeRoomId();
+      final hasPendingRoom =
+          state.pendingRoomId != null && state.pendingRoomId!.isNotEmpty;
 
-      if (roomId != null && roomId.isNotEmpty) {
-        /// Funzione: descrive in modo semplice questo blocco di logica.
-        setState(() {
-          current = AppSection.gioca;
-        });
+      if (!mounted) return;
+      if (!hasPendingRoom) return;
+      if (current == AppSection.gioca) return;
 
-        await Future.delayed(const Duration(milliseconds: 100));
-
-        if (!mounted) return;
-      }
+      setState(() {
+        current = AppSection.gioca;
+      });
     });
   }
 
-  String get title {
-    switch (current) {
-      case AppSection.allenamento:
-        return "Allenamento";
-      case AppSection.gioca:
-        return "Gioca";
-      case AppSection.campionati:
-        return "Campionati";
-      case AppSection.tornei:
-        return "Tornei";
-      case AppSection.classifiche:
-        return "Classifiche";
-    }
-  }
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<AppLinkState>(
+      appLinkCoordinatorProvider,
+          (prev, next) {
+        final hasPendingRoom =
+            next.pendingRoomId != null && next.pendingRoomId!.isNotEmpty;
 
-  Widget get screen {
-    switch (current) {
-      case AppSection.allenamento:
-        return const AllenamentoScreen();
-      case AppSection.gioca:
-        return const GiocaScreen();
-      case AppSection.campionati:
-        return const CampionatiScreen();
-      case AppSection.tornei:
-        return const TorneiScreen();
-      case AppSection.classifiche:
-        return const ClassificheScreen();
-    }
-  }
+        final hadPendingRoom =
+            prev?.pendingRoomId != null && prev!.pendingRoomId!.isNotEmpty;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  Widget _menuItem(
-      AppSection section,
-      String text,
-      IconData icon,
-      ) {
-    final selected = current == section;
+        // 🔥 trigger SOLO su nuovo evento (no replay)
+        if (!hasPendingRoom || hadPendingRoom) return;
+        if (!mounted) return;
+        if (current == AppSection.gioca) return;
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(text),
-      selected: selected,
-      onTap: () {
-        Navigator.pop(context);
-        /// Funzione: descrive in modo semplice questo blocco di logica.
         setState(() {
-          current = section;
+          current = AppSection.gioca;
         });
       },
     );
-  }
 
-  @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  Widget build(BuildContext context) {
     return Scaffold(
       drawer: Drawer(
         child: SafeArea(
@@ -134,9 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _menuItem(AppSection.allenamento, "Allenamento", Icons.fitness_center),
               _menuItem(AppSection.gioca, "Gioca", Icons.sports_esports),
               _menuItem(AppSection.campionati, "Campionati", Icons.emoji_events),
-              /// Funzione: descrive in modo semplice questo blocco di logica.
               _menuItem(AppSection.tornei, "Tornei", Icons.emoji_events_outlined),
-              /// Funzione: descrive in modo semplice questo blocco di logica.
               _menuItem(AppSection.classifiche, "Classifiche", Icons.leaderboard),
             ],
           ),
@@ -144,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       endDrawer: const ProfilePanel(),
       appBar: AppBar(
-        title: Text(title),
+        title: Text(_title),
         actions: [
           StreamBuilder<User?>(
             stream: FirebaseAuth.instance.authStateChanges(),
@@ -154,7 +111,6 @@ class _HomeScreenState extends State<HomeScreen> {
               return Row(
                 children: [
                   if (user != null)
-                    /// Funzione: descrive in modo semplice questo blocco di logica.
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: Text(
@@ -163,7 +119,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                  /// Funzione: descrive in modo semplice questo blocco di logica.
                   IconButton(
                     icon: const Icon(Icons.account_circle),
                     onPressed: () {
@@ -176,7 +131,53 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: screen,
+      body: _screen,
+    );
+  }
+
+  String get _title {
+    switch (current) {
+      case AppSection.allenamento:
+        return "Allenamento";
+      case AppSection.gioca:
+        return "Gioca";
+      case AppSection.campionati:
+        return "Campionati";
+      case AppSection.tornei:
+        return "Tornei";
+      case AppSection.classifiche:
+        return "Classifiche";
+    }
+  }
+
+  Widget get _screen {
+    switch (current) {
+      case AppSection.allenamento:
+        return const AllenamentoScreen();
+      case AppSection.gioca:
+        return const GiocaScreen();
+      case AppSection.campionati:
+        return const CampionatiScreen();
+      case AppSection.tornei:
+        return const TorneiScreen();
+      case AppSection.classifiche:
+        return const ClassificheScreen();
+    }
+  }
+
+  Widget _menuItem(AppSection section, String text, IconData icon) {
+    final selected = current == section;
+
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(text),
+      selected: selected,
+      onTap: () {
+        Navigator.pop(context);
+        setState(() {
+          current = section;
+        });
+      },
     );
   }
 }

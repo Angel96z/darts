@@ -12,14 +12,32 @@ class UserRoomRepository {
   }
 
   Future<void> clearCurrentRoom(String uid) async {
-    await db.collection('users').doc(uid).set({
-      'currentRoomId': null,
-    }, SetOptions(merge: true));
+    await db.collection('users').doc(uid).update({
+      'currentRoomId': FieldValue.delete(),
+    });
   }
 
   Future<String?> getCurrentRoom(String uid) async {
     final doc = await db.collection('users').doc(uid).get();
     if (!doc.exists) return null;
-    return doc.data()?['currentRoomId'];
+
+    final roomId = doc.data()?['currentRoomId'];
+    if (roomId == null || roomId.toString().isEmpty) return null;
+
+    // 🔥 VALIDAZIONE ESISTENZA ROOM
+    try {
+      final roomDoc =
+      await db.collection('rooms').doc(roomId.toString()).get();
+
+      if (!roomDoc.exists) {
+        // 🔴 ROOM NON ESISTE → CLEAN IMMEDIATO
+        await clearCurrentRoom(uid);
+        return null;
+      }
+    } catch (_) {
+      return null;
+    }
+
+    return roomId.toString();
   }
 }

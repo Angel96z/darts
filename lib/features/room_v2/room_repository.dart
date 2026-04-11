@@ -10,16 +10,155 @@ import 'package:darts/features/room_v2/user_room_repository.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'room_data.dart';
 import 'match_leg_rebuilder.dart';
+
 class RoomRepository {
   final FirebaseFirestore db;
+
   final StreamController<RoomData> _controller =
   StreamController<RoomData>.broadcast();
 
   RoomData? _state;
   StreamSubscription<DocumentSnapshot>? _remoteSub;
+  Timer? _heartbeatTimer;
 
   RoomRepository(this.db);
-  Timer? _heartbeatTimer;
+// =========================
+// QUEUE SERIALIZZATA
+// =========================
+
+  final List<Future<void> Function()> _queue = [];
+  bool _isRunning = false;
+
+  Future<void> enqueue(Future<void> Function() job) async {
+    final completer = Completer<void>();
+
+    _queue.add(() async {
+      try {
+        await job();
+        if (!completer.isCompleted) {
+          completer.complete();
+        }
+      } catch (e, st) {
+        if (!completer.isCompleted) {
+          completer.completeError(e, st);
+        }
+      }
+    });
+
+    _runQueue();
+    await completer.future;
+  }
+
+  Future<void> _runQueue() async {
+    if (_isRunning) return;
+
+    _isRunning = true;
+
+    try {
+      while (_queue.isNotEmpty) {
+        final job = _queue.removeAt(0);
+        await job();
+      }
+    } finally {
+      _isRunning = false;
+
+      if (_queue.isNotEmpty) {
+        _runQueue();
+      }
+    }
+  }
+  // =========================
+  // CORE STATE
+  // =========================
+
+  Stream<RoomData> watch() => _controller.stream;
+
+  RoomData? get current => _state;
+
+  void initLocal(RoomData data) {
+    _state = data;
+    _controller.add(data);
+  }
+
+  Future<void> update(RoomData data, {bool delayTurnSwitch = false}) async {
+    Future<void> job() async {
+      _state = data;
+      _controller.add(data);
+
+      if (delayTurnSwitch) {
+        await Future.delayed(const Duration(seconds: 3));
+      }
+
+      if (data.roomId != null) {
+        await db.collection('rooms').doc(data.roomId).set(
+          data.toMap(),
+          SetOptions(merge: true),
+        );
+      }
+    };
+
+    await enqueue(job);
+  }
+
+  // =========================
+  // CONNECTION MANAGEMENT
+  // =========================
+
+  Future<void> connectToRoom(String roomId) async {
+    _stopHeartbeat();
+    await _remoteSub?.cancel();
+    _remoteSub = null;
+
+    final roomRef = db.collection('rooms').doc(roomId);
+
+    final firstSnap = await roomRef.get(const GetOptions(source: Source.serverAndCache));
+
+    if (!firstSnap.exists) {
+      clearLocal();
+      return;
+    }
+
+    final firstData = firstSnap.data();
+    if (firstData != null) {
+      final room = RoomData.fromMap(firstData);
+      _state = room;
+      _controller.add(room);
+    }
+
+    _remoteSub = roomRef.snapshots().listen(
+          (doc) {
+        if (!doc.exists) {
+          clearLocal();
+          return;
+        }
+
+        final raw = doc.data();
+        if (raw == null) return;
+
+        final room = RoomData.fromMap(raw);
+        _state = room;
+        _controller.add(room);
+      },
+      onError: (_, __) {},
+      cancelOnError: false,
+
+    );
+
+    _startHeartbeat();
+  }
+
+  void clearLocal() {
+    _stopHeartbeat();
+
+    _remoteSub?.cancel();
+    _remoteSub = null;
+
+    _state = null;
+  }
+
+  // =========================
+  // HEARTBEAT
+  // =========================
 
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
@@ -30,6 +169,11 @@ class RoomRepository {
     );
   }
 
+  void _stopHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+  }
+
   Future<void> _heartbeat() async {
     final state = _state;
     if (state == null) return;
@@ -37,122 +181,54 @@ class RoomRepository {
     final roomId = state.roomId;
     if (roomId == null) return;
 
-    final roomRef = db.collection('rooms').doc(roomId);
-    final doc = await roomRef.get();
-
-    if (!doc.exists) {
-      _stopHeartbeat();
-      _remoteSub?.cancel();
-      _remoteSub = null;
-      return;
-    }
-
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    final now = DateTime.now().millisecondsSinceEpoch;
-
-    final updatedPlayers = state.players.map((p) {
-      final owner = p['ownerId'];
-      final id = p['id'];
-
-      final isMine = owner == uid || id == uid;
-      if (!isMine) return p;
-
-      final updated = Map<String, dynamic>.from(p);
-      updated['lastSeen'] = now;
-      return updated;
-    }).toList();
-
-    final newData = state.copyWith(players: updatedPlayers);
-
-    _state = newData;
-    _controller.add(newData);
-
     try {
-      // ✅ NON tocca matchId, phase, match, ecc
-      await roomRef.update({
-        'players': updatedPlayers,
-      });
-    } catch (_) {}
-  }
+      final roomRef = db.collection('rooms').doc(roomId);
+      final doc = await roomRef.get(const GetOptions(source: Source.serverAndCache));
 
-  void _stopHeartbeat() {
-    _heartbeatTimer?.cancel();
-  }
-  Stream<RoomData> watch() => _controller.stream;
-
-  RoomData? get current => _state;
-
-// =========================
-// QUEUE SERIALIZZATA
-// =========================
-  final List<Future<void> Function()> _queue = [];
-  bool _isRunning = false;
-
-  Future<void> enqueue(Future<void> Function() job) async {
-    _queue.add(job);
-    _runQueue();
-  }
-
-  Future<void> _runQueue() async {
-    if (_isRunning) return;
-    _isRunning = true;
-
-    while (_queue.isNotEmpty) {
-      final job = _queue.removeAt(0);
-      await job();
-    }
-
-    _isRunning = false;
-  }
-
-
-  void initLocal(RoomData data) {
-    _state = data;
-    _controller.add(data);
-  }
-  Future<void> startMatch() async {
-    if (_state == null) return;
-
-    final updated = _state!.initMatch();
-    await update(updated);
-  }
-  Future<void> update(RoomData data) async {
-    _state = data;
-    _controller.add(data);
-
-    await db.collection('rooms').doc(data.roomId).set(
-      data.toMap(),
-      SetOptions(merge: true),
-    );
-  }
-
-  void connectToRoom(String roomId) {
-    _stopHeartbeat();
-    _remoteSub?.cancel();
-
-    _remoteSub = db.collection('rooms').doc(roomId).snapshots().listen((doc) {
-      // 🔴 ROOM ELIMINATA → STOP TOTALE
       if (!doc.exists) {
-        _stopHeartbeat();
-        _remoteSub?.cancel();
-        _remoteSub = null;
+        clearLocal();
         return;
       }
 
-      final room = RoomData.fromMap(doc.data() as Map<String, dynamic>);
-      _state = room;
-      _controller.add(room);
-    });
+      final now = DateTime.now().millisecondsSinceEpoch;
 
-    _startHeartbeat();
+      final updatedPlayers = state.players.map((p) {
+        final owner = p['ownerId'];
+        final id = p['id'];
+
+        final isMine = owner == uid || id == uid;
+        if (!isMine) return p;
+
+        final updated = Map<String, dynamic>.from(p);
+        updated['lastSeen'] = now;
+        return updated;
+      }).toList();
+
+      final newData = state.copyWith(players: updatedPlayers);
+
+      _state = newData;
+      _controller.add(newData);
+
+      await roomRef.update({
+        'players': updatedPlayers,
+      });
+
+    } catch (_) {}
   }
+  // =========================
+  // ONLINE FLOW
+  // =========================
 
   Future<String> createOnline() async {
-    if (_state?.roomId != null) {
-      return _state!.roomId!; // 🔥 NON creare nuova room
+    final currentRoomId = _state?.roomId;
+
+    if (currentRoomId != null && currentRoomId.isNotEmpty) {
+      return currentRoomId;
     }
+
     if (_state == null) {
       throw Exception('Errore: stato locale nullo');
     }
@@ -170,7 +246,6 @@ class RoomRepository {
       }.toList(),
     );
 
-// collega SEMPRE il creator alla room
     await UserRoomRepository(db).setCurrentRoom(uid, newId);
 
     await docRef.set(onlineData.toMap());
@@ -179,26 +254,17 @@ class RoomRepository {
     _controller.add(onlineData);
 
     connectToRoom(newId);
-    _startHeartbeat();
 
     return newId;
   }
 
-
-  Future<void> dispose() async {
-    _stopHeartbeat();
-    await _remoteSub?.cancel();
-    await _controller.close();
-  }
-
   Future<void> joinRoom(String roomId, String userId) async {
-    final doc = FirebaseFirestore.instance.collection('rooms').doc(roomId);
+    final doc = db.collection('rooms').doc(roomId);
 
     final snap = await doc.get();
     if (!snap.exists) return;
 
     final data = snap.data() as Map<String, dynamic>;
-
     final players = List<Map<String, dynamic>>.from(data['players'] ?? []);
 
     final already = players.any((p) => p['id'] == userId);
@@ -213,34 +279,36 @@ class RoomRepository {
 
     await doc.update({'players': players});
   }
+
+  // =========================
+  // MATCH RESULTS
+  // =========================
+
   Future<void> saveMatchResults(RoomData data) async {
+    final matchId = data.matchId ??
+        DateTime.now().millisecondsSinceEpoch.toString();
+
+    final updatedData = data.copyWith(matchId: matchId);
+
+    final rebuilt = MatchLegRebuilder.buildPerPlayer(updatedData);
+
+    LocalMatchStorage.save(matchId, {
+      'players': rebuilt,
+    });
+
+    final newState = updatedData.copyWith(phase: RoomPhase.result);
+    _state = newState;
+    _controller.add(newState);
+
     final roomId = data.roomId;
     if (roomId == null) return;
 
     final roomRef = db.collection('rooms').doc(roomId);
+    final snap = await roomRef.get();
+
+    if (!snap.exists) return;
 
     await db.runTransaction((tx) async {
-      final snap = await tx.get(roomRef);
-      if (!snap.exists) return;
-
-      final current = RoomData.fromMap(
-        snap.data() as Map<String, dynamic>,
-      );
-
-      if (current.phase == RoomPhase.result) return;
-
-      final matchId = current.matchId ??
-          DateTime.now().millisecondsSinceEpoch.toString();
-
-      final updatedData = current.copyWith(matchId: matchId);
-
-      final rebuilt = MatchLegRebuilder.buildPerPlayer(updatedData);
-
-      // ✅ LOCAL SAVE IMMEDIATO
-      LocalMatchStorage.save(matchId, {
-        'players': rebuilt,
-      });
-
       for (final p in updatedData.players) {
         final playerId = p['id']?.toString();
         final isGuest = p['isGuest'] == true;
@@ -251,7 +319,8 @@ class RoomRepository {
         if (playerData == null) continue;
 
         tx.set(
-          db.collection('users')
+          db
+              .collection('users')
               .doc(playerId)
               .collection('match_legs')
               .doc(matchId),
@@ -270,11 +339,19 @@ class RoomRepository {
 
       tx.set(
         roomRef,
-        updatedData.copyWith(
-          phase: RoomPhase.result,
-        ).toMap(),
+        newState.toMap(),
         SetOptions(merge: true),
       );
     });
+  }
+
+  // =========================
+  // DISPOSE
+  // =========================
+
+  Future<void> dispose() async {
+    _stopHeartbeat();
+    await _remoteSub?.cancel();
+    await _controller.close();
   }
 }

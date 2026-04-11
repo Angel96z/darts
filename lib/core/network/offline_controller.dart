@@ -65,3 +65,22 @@ class OfflineController extends StateNotifier<bool> {
     super.dispose();
   }
 }
+
+final inputGateProvider = Provider<bool>((ref) {
+  final isOnline = ref.watch(offlineControllerProvider);
+
+  // Se il match è locale (offline game) → input sempre abilitato
+  // Se il match è online → blocca solo se non c'è connessione
+
+  final isOnlineMatch = false; // placeholder: verrà deciso dalla room
+
+  if (!isOnlineMatch) {
+    return true;
+  }
+
+  if (!isOnline) {
+    return false;
+  }
+
+  return true;
+});

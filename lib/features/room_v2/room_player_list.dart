@@ -179,123 +179,245 @@ class _RoomPlayerListView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Mode:'),
-            const SizedBox(width: 8),
-            DropdownButton<int>(
-              value: teamSize,
-              underline: const SizedBox(),
-              items: const [
-                DropdownMenuItem(value: 0, child: Text('FFA')),
-                DropdownMenuItem(value: 2, child: Text('2v2')),
-                DropdownMenuItem(value: 3, child: Text('3v3')),
-                DropdownMenuItem(value: 4, child: Text('4v4')),
+            Row(
+              children: [
+                // TEAM
+                const Text('Team:'),
+                const SizedBox(width: 8),
+
+                DropdownButton<int>(
+                  value: teamSize,
+                  underline: const SizedBox(),
+                  items: const [
+                    DropdownMenuItem(value: 0, child: Text('No')),
+                    DropdownMenuItem(value: 2, child: Text('2v2')),
+                    DropdownMenuItem(value: 3, child: Text('3v3')),
+                    DropdownMenuItem(value: 4, child: Text('4v4')),
+                  ],
+                  onChanged: (v) {
+                    if (v == null) return;
+                    controller.changeTeamSize(data, v);
+                  },
+                ),
+
+                const SizedBox(width: 16),
+
+                // ADD BUTTON
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final player = await RoomPlayersController(
+                      currentUserId: currentUserId,
+                      adminIds: data.adminIds,
+                    ).openAddDialog(context);
+
+                    if (player != null) {
+                      controller.addPlayer(data, player);
+                    }
+                  },
+                  icon: const Icon(Icons.person_add),
+                  label: const Text('Aggiungi'),
+                ),
+
+                const SizedBox(width: 12),
+
+                // VALIDATION
+                if (!data.isValidTeamSetup())
+                  const Text(
+                    'Team non validi',
+                    style: TextStyle(color: Colors.red, fontSize: 12),
+                  ),
               ],
-              onChanged: (v) {
-                if (v == null) return;
-                controller.changeTeamSize(data, v);
-              },
             ),
-            const SizedBox(width: 12),
-            if (!data.isValidTeamSetup())
-              const Text(
-                'Team non validi',
-                style: TextStyle(color: Colors.red, fontSize: 12),
-              ),
           ],
         ),
-        const SizedBox(height: 8),
-        RoomPlayersView(
-          players: const [],
-          currentUserId: currentUserId,
-          adminIds: data.adminIds,
-          onAddPlayer: (player) =>
-              controller.addPlayer(data, player),
-          onRemovePlayer: (_) {},
-        ),
-        const SizedBox(height: 8),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: players.length,
-          itemBuilder: (context, index) {
-            final player = players[index];
-            final id = player['id'];
-            final name = player['name'] ?? id;
 
-            final teamIndex =
-            isTeamMode ? (index ~/ teamSize) + 1 : null;
-            final isFirstOfTeam =
-            isTeamMode ? index % teamSize == 0 : false;
+        const SizedBox(height: 8),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth > 700;
+            final teamSize = data.teamSize;
 
-            return Column(
-              key: ValueKey(id),
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (isFirstOfTeam)
-                  Padding(
-                    padding: const EdgeInsets.only(
-                        top: 12, bottom: 6, left: 4),
-                    child: Text(
-                      'TEAM $teamIndex',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold),
-                    ),
+            // FFA → lista semplice
+            if (!isTeamMode || teamSize <= 1) {
+              return Column(
+                children: players.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final player = entry.value;
+                  final name = player['name'] ?? player['id'];
+
+                  return _buildPlayerCard(
+                    context,
+                    data,
+                    players,
+                    controller,
+                    index,
+                    player,
+                    name,
+                  );
+                }).toList(),
+              );
+            }
+
+            // GROUP BY TEAM
+            final teams = <List<Map<String, dynamic>>>[];
+
+            for (int i = 0; i < players.length; i += teamSize) {
+              teams.add(
+                players.skip(i).take(teamSize).toList(),
+              );
+            }
+
+            return Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: teams.map((teamPlayers) {
+                final teamIndex = teams.indexOf(teamPlayers) + 1;
+
+                return SizedBox(
+                  width: isWide ? 260 : double.infinity,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'TEAM $teamIndex',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 6),
+
+                      ...teamPlayers.map((player) {
+                        final index = players.indexOf(player);
+                        final name = player['name'] ?? player['id'];
+
+                        return _buildPlayerCard(
+                          context,
+                          data,
+                          players,
+                          controller,
+                          index,
+                          player,
+                          name,
+                        );
+                      }),
+                    ],
                   ),
-                Card(
-                  margin: const EdgeInsets.symmetric(
-                      vertical: 4, horizontal: 0),
-                  child: ListTile(
-                    title: Text(name),
-                    subtitle: Text(
-                      'Order: ${player['order'] ?? index}'
-                          '${isTeamMode ? ' · TEAM $teamIndex' : ''}',
-                    ),
-                    leading: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.arrow_upward,
-                              size: 18),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: index == 0
-                              ? null
-                              : () => controller.moveUp(
-                            data,
-                            players,
-                            index,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        IconButton(
-                          icon: const Icon(Icons.arrow_downward,
-                              size: 18),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: index == players.length - 1
-                              ? null
-                              : () => controller.moveDown(
-                            data,
-                            players,
-                            index,
-                          ),
-                        ),
-                      ],
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete),
-                      onPressed: () =>
-                          controller.removePlayer(data, player),
-                    ),
-                  ),
-                ),
-              ],
+                );
+              }).toList(),
             );
           },
         )
       ],
     );
   }
+}
+
+Widget _buildPlayerCard(
+    BuildContext context,
+    RoomData data,
+    List<Map<String, dynamic>> players,
+    RoomPlayerListController controller,
+    int index,
+    Map<String, dynamic> player,
+    String name,
+    ) {
+  final currentUserId = RoomCurrentUser.current.uid;
+  final isAdmin = data.adminIds.contains(currentUserId);
+
+  final ownerId = player['ownerId'];
+  final playerId = player['id'];
+
+  final canRemove =
+      isAdmin || ownerId == currentUserId || playerId == currentUserId;
+
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: Theme.of(context)
+            .dividerColor
+            .withOpacity(0.15),
+      ),
+    ),
+    child: Row(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Theme.of(context)
+                .colorScheme
+                .primary
+                .withOpacity(0.1),
+          ),
+          child: const Icon(Icons.person, size: 20),
+        ),
+
+        const SizedBox(width: 12),
+
+        Expanded(
+          child: Text(
+            name,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+
+        // 🔼🔽 SOLO ADMIN
+        if (isAdmin)
+          Row(
+            children: [
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: index == 0
+                      ? null
+                      : () => controller.moveUp(
+                    data,
+                    players,
+                    index,
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(Icons.arrow_upward, size: 22),
+                  ),
+                ),
+              ),
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: index == players.length - 1
+                      ? null
+                      : () => controller.moveDown(
+                    data,
+                    players,
+                    index,
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(Icons.arrow_downward, size: 22),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+        // ❌ REMOVE (regole corrette)
+        if (canRemove)
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () =>
+                  controller.removePlayer(data, player),
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(Icons.close, size: 22, color: Colors.red),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
 }
