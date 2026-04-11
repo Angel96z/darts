@@ -4,11 +4,6 @@ import 'package:darts/features/room_v2/user_room_repository.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'local_match_storage.dart';
 import 'room_data.dart';
-import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:darts/features/room_v2/user_room_repository.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'room_data.dart';
 import 'match_leg_rebuilder.dart';
 class RoomRepository {
   final FirebaseFirestore db;
@@ -92,19 +87,22 @@ class RoomRepository {
 
   Future<void> enqueue(Future<void> Function() job) async {
     _queue.add(job);
-    _runQueue();
+    await _runQueue();
   }
 
   Future<void> _runQueue() async {
     if (_isRunning) return;
     _isRunning = true;
-
-    while (_queue.isNotEmpty) {
-      final job = _queue.removeAt(0);
-      await job();
+    try {
+      while (_queue.isNotEmpty) {
+        final job = _queue.removeAt(0);
+        try {
+          await job();
+        } catch (_) {}
+      }
+    } finally {
+      _isRunning = false;
     }
-
-    _isRunning = false;
   }
 
 
@@ -121,6 +119,8 @@ class RoomRepository {
   Future<void> update(RoomData data) async {
     _state = data;
     _controller.add(data);
+
+    if (data.roomId == null) return;
 
     await db.collection('rooms').doc(data.roomId).set(
       data.toMap(),
@@ -212,6 +212,19 @@ class RoomRepository {
     });
 
     await doc.update({'players': players});
+    await UserRoomRepository(db).setCurrentRoom(userId, roomId);
+  }
+
+  Future<void> leaveRoom(String userId) async {
+    final current = _state;
+    if (current == null) return;
+
+    final updatedPlayers = current.players
+        .where((p) => p['id'] != userId && p['ownerId'] != userId)
+        .toList();
+
+    await update(current.copyWith(players: updatedPlayers));
+    await UserRoomRepository(db).clearCurrentRoom(userId);
   }
   Future<void> saveMatchResults(RoomData data) async {
     final roomId = data.roomId;

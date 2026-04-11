@@ -106,13 +106,18 @@ class _AppBootstrapState extends ConsumerState<_AppBootstrap> {
 
         await coordinator.consumeRoomId();
       }
+      if (watchId != null && watchId.isNotEmpty) {
+        await coordinator.consumeWatchRoomId();
+      }
 
       cleanUrl();
 
       if (!mounted) return;
 
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(
+          builder: (_) => const HomeScreen(initialSection: AppSection.gioca),
+        ),
             (route) => false,
       );
     } catch (_) {
