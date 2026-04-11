@@ -1,6 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:darts/features/room_v2/room_current_user.dart';
-import 'package:darts/features/room_v2/user_room_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:darts/features/room_v2/room_data.dart';
 import 'package:darts/features/room_v2/ui/input/room_input_keyboard.dart';
@@ -55,21 +53,7 @@ class RoomMatchPage extends StatelessWidget {
         // il RoomGate reagirà al cambio di fase portando il creator in lobby.
         return false;
       } else {
-        // IL PARTECIPANTE si disconnette e basta
-        final ownedPlayers = data.players.where((p) {
-          final owner = p['ownerId'];
-          final id = p['id'];
-          return owner == uid || id == uid;
-        }).toList();
-
-        for (final p in ownedPlayers) {
-          final id = p['id'];
-          final isGuest = p['isGuest'] == true;
-          if (!isGuest && id != null) {
-            await UserRoomRepository(FirebaseFirestore.instance)
-                .clearCurrentRoom(id);
-          }
-        }
+        await repo.leaveRoom(uid);
         // Restituiamo true per dire al PopScope di eseguire il Navigator.pop
         return true;
       }

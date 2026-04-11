@@ -152,6 +152,12 @@ class _RoomBootstrapState extends State<_RoomBootstrap> {
   }
 
   @override
+  void dispose() {
+    widget.repo.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(

@@ -85,14 +85,7 @@ class RoomLobbyV2Controller {
       }
 
       // PLAYER → si rimuove
-      final updatedPlayers = current.players
-          .where((p) => p['id'] != uid && p['ownerId'] != uid)
-          .toList();
-
-      await repo.update(current.copyWith(players: updatedPlayers));
-
-      await UserRoomRepository(FirebaseFirestore.instance)
-          .clearCurrentRoom(uid);
+      await repo.leaveRoom(uid);
 
     } catch (_) {}
   }
