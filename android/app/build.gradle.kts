@@ -23,14 +23,15 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.az.darts"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        minSdk = flutter.minSdkVersion // Forza il minimo a 23 per evitare problemi con librerie vecchie
+        targetSdk = 34 // IMPORTANTE: Forza 34 (Android 14) invece di lasciare quello di Flutter
+
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // Aggiungi questa riga se non c'è, aiuta a gestire le dipendenze Firebase
+        multiDexEnabled = true
     }
 
     buildTypes {

@@ -12,7 +12,16 @@
           "package_name": "com.az.darts"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "795290115421-rfhggohcl6h0btgg2dtdl081aj52j4s4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.az.darts",
+            "certificate_hash": "3f897a259cce1b9f64fe94b8a327f2a51c2b4c21"
+          }
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyArsQKz2H_-7vN9cIZy8u1rm7qTZkdwwt0"

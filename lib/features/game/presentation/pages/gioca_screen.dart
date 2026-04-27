@@ -1,18 +1,60 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+// TARGET: Schermata principale "Gioca" - punto di ingresso per le room V4
+// LOGIC GOAL: Gestire deep link, inviti e auto-rejoin per la nuova room V4
+// REACTION: Navigazione verso RoomLobbyPage (V4) o gestione inviti
+// ERROR STRATEGY: Gestione offline e timeout per operazioni remote
+// ANTI-REGRESSION: Mantenere dialogo conferma invito, gestione offline, auto-rejoin
+
+// TARGET: Schermata principale "Gioca" - SOLO OFFLINE
+// LOGIC GOAL: Navigare direttamente alla Room V4 senza bootstrap/inviti/auto-rejoin
+// REACTION: Tap sul bottone → RoomLobbyPage
+// ERROR STRATEGY: N/A (tutto locale)
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../app/link/app_link_state.dart';
-import '../../../../core/network/offline_controller.dart';
-import '../../../room_v2/games_darts.dart';
-import '../../../room_v2/room_current_user.dart';
-import '../../../room_v2/room_data.dart';
-import '../../../room_v2/room_lobby_v2_page.dart';
-import '../../../room_v2/room_repository.dart';
-import '../../../room_v2/room_repository_provider.dart';
-import '../../../room_v2/room_user_flow.dart';
-import '../../../room_v2/user_room_repository.dart';
-import '../../../../app/web_url_cleaner.dart';
+import '../../../room_v4/presentation/room_lobby_page.dart';
+
+class GiocaScreen extends ConsumerWidget {
+  const GiocaScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Card(
+          color: Colors.green.shade50,
+          child: ListTile(
+            leading: const Icon(Icons.new_releases, color: Colors.green),
+            title: const Text('ROOM V4 (NUOVA ARCHITETTURA)'),
+            subtitle: const Text('Match completo X01/Cricket - Lobby + Partita'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RoomLobbyPage()),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+/*
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:darts/app/link/app_link_state.dart';
+import 'package:darts/app/web_url_cleaner.dart';
+import 'package:darts/core/network/offline_controller.dart';
+import 'package:darts/features/room_v2/application/room_notifier.dart';
+import 'package:darts/features/room_v2/room_current_user.dart';
+import 'package:darts/features/room_v2/room_gate.dart';
+import 'package:darts/features/room_v2/user_room_repository.dart';
+import 'package:darts/features/room_v4/presentation/room_lobby_page.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../string_test/presentation/string_test_page.dart';
 
 class GiocaScreen extends ConsumerStatefulWidget {
   const GiocaScreen({super.key});
@@ -23,11 +65,12 @@ class GiocaScreen extends ConsumerStatefulWidget {
 
 class _GiocaScreenState extends ConsumerState<GiocaScreen> {
   bool _handledPendingInvite = false;
+  bool _openingRoom = false;
+  bool _openingRoomV4 = false;
 
   @override
   void initState() {
     super.initState();
-
     Future.microtask(_handlePendingInvite);
   }
 
@@ -52,7 +95,7 @@ class _GiocaScreenState extends ConsumerState<GiocaScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Si'),
+            child: const Text('Sì'),
           ),
         ],
       ),
@@ -63,23 +106,12 @@ class _GiocaScreenState extends ConsumerState<GiocaScreen> {
 
     if (accept != true || !mounted) return;
 
-    final roomExists = await FirebaseFirestore.instance
-        .collection('rooms')
-        .doc(roomId)
-        .get()
-        .then((doc) => doc.exists)
-        .catchError((_) => false);
-
-    if (!roomExists || !mounted) return;
-
-    final repo = ref.read(roomRepositoryProvider);
     final isOnline = ref.read(offlineControllerProvider);
 
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => _RoomBootstrap(
-          repo: repo,
+        builder: (_) => _RoomBootstrapV4(
           isOnline: isOnline,
           incomingRoomId: roomId,
         ),
@@ -87,19 +119,24 @@ class _GiocaScreenState extends ConsumerState<GiocaScreen> {
     );
   }
 
-  void _openManualRoom() {
-    final repo = ref.read(roomRepositoryProvider);
+  Future<void> _openManualRoomV4() async {
+    if (_openingRoomV4) return;
+    _openingRoomV4 = true;
+
     final isOnline = ref.read(offlineControllerProvider);
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => _RoomBootstrap(
-          repo: repo,
-          isOnline: isOnline,
+    try {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => _RoomBootstrapV4(isOnline: isOnline),
         ),
-      ),
-    );
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _openingRoomV4 = false);
+      }
+    }
   }
 
   @override
@@ -108,12 +145,27 @@ class _GiocaScreenState extends ConsumerState<GiocaScreen> {
       padding: const EdgeInsets.all(16),
       children: [
         Card(
+          color: Colors.green.shade50,
           child: ListTile(
-            leading: const Icon(Icons.meeting_room),
-            title: const Text('Room online'),
-            subtitle: const Text('Apri la nuova sezione Gioca'),
+            leading: const Icon(Icons.new_releases, color: Colors.green),
+            title: const Text('ROOM V4 (NUOVA ARCHITETTURA)'),
+            subtitle: const Text('Match completo X01/Cricket - Lobby + Partita'),
             trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: _openManualRoom,
+            onTap: _openingRoomV4 ? null : _openManualRoomV4,
+          ),
+        ),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.text_fields, color: Colors.deepPurple),
+            title: const Text('Test Stringa Firestore'),
+            subtitle: const Text('Salva, carica, modifica e cancella una stringa'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const StringTestPage()),
+              );
+            },
           ),
         ),
       ],
@@ -121,167 +173,129 @@ class _GiocaScreenState extends ConsumerState<GiocaScreen> {
   }
 }
 
-class _RoomBootstrap extends StatefulWidget {
-  final RoomRepository repo;
+class _RoomBootstrapV4 extends ConsumerStatefulWidget {
   final bool isOnline;
   final String? incomingRoomId;
 
-  const _RoomBootstrap({
-    required this.repo,
-    required this.isOnline,
-    this.incomingRoomId,
-  });
+  const _RoomBootstrapV4({required this.isOnline, this.incomingRoomId});
 
   @override
-  State<_RoomBootstrap> createState() => _RoomBootstrapState();
+  ConsumerState<_RoomBootstrapV4> createState() => _RoomBootstrapV4State();
 }
 
-class _RoomBootstrapState extends State<_RoomBootstrap> {
-  bool _loading = true;
+class _RoomBootstrapV4State extends ConsumerState<_RoomBootstrapV4> {
+  bool _didStart = false;
+  bool _rejoinDialogOpen = false;
 
   @override
   void initState() {
     super.initState();
-    _init();
+    Future.microtask(_startBootstrap);
   }
 
-  Future<void> _init() async {
-    final repo = widget.repo;
+  Future<void> _startBootstrap() async {
+    if (_didStart) return;
+    _didStart = true;
+
     final incomingRoomId = widget.incomingRoomId;
 
-    repo.clearLocal();
-
+    // Se c'è un invito in arrivo, gestiscilo
     if (incomingRoomId != null && incomingRoomId.isNotEmpty) {
-      final incomingExists = await FirebaseFirestore.instance
-          .collection('rooms')
-          .doc(incomingRoomId)
-          .get()
-          .then((doc) => doc.exists)
-          .catchError((_) => false);
-
-      if (!incomingExists) {
-        if (mounted) {
-          setState(() => _loading = false);
-        }
-        return;
-      }
-
-      repo.connectToRoom(incomingRoomId);
-
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      await _handleIncomingInvite(incomingRoomId);
       return;
     }
 
-    repo.initLocal(
-      RoomData(
-        roomId: null,
-        createdAt: DateTime.now(),
-        game: GameConfig.x01(),
-        phase: RoomPhase.lobby,
-        creatorId: RoomCurrentUser.current.uid,
-        adminIds: [RoomCurrentUser.current.uid],
-        players: [],
-      ),
-    );
-
+    // Se non online, vai direttamente alla lobby locale
     if (!widget.isOnline) {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      _navigateToLobby();
       return;
     }
 
+    // Prova auto-rejoin
+    await _tryAutoRejoin();
+  }
+
+  Future<void> _handleIncomingInvite(String roomId) async {
+    // Verifica se la room esiste su Firestore
+    final roomExists = await FirebaseFirestore.instance
+        .collection('rooms_v4')
+        .doc(roomId)
+        .get()
+        .timeout(const Duration(seconds: 4))
+        .then((doc) => doc.exists)
+        .catchError((_) => false);
+
+    if (!roomExists) {
+      // Room non trovata, vai a lobby vuota
+      _navigateToLobby();
+      return;
+    }
+
+    // TODO: Implementare load della room V4 quando sarà online
+    // Per ora, naviga alla lobby vuota
+    _navigateToLobby();
+  }
+
+  Future<void> _tryAutoRejoin() async {
     final uid = RoomCurrentUser.current.uid;
     final userRepo = UserRoomRepository(FirebaseFirestore.instance);
 
     String? roomId;
-
     try {
-      roomId = await userRepo.getCurrentRoom(uid);
-    } catch (_) {}
-
-    if (roomId != null && roomId.isNotEmpty) {
-      final roomExists = await FirebaseFirestore.instance
-          .collection('rooms')
-          .doc(roomId)
-          .get()
-          .then((doc) => doc.exists)
-          .catchError((_) => false);
-
-      if (!roomExists) {
-        try {
-          await userRepo.clearCurrentRoom(uid);
-        } catch (_) {}
-
-        repo.clearLocal();
-        repo.initLocal(
-          RoomData(
-            roomId: null,
-            createdAt: DateTime.now(),
-            game: GameConfig.x01(),
-            phase: RoomPhase.lobby,
-            creatorId: RoomCurrentUser.current.uid,
-            adminIds: [RoomCurrentUser.current.uid],
-            players: [],
-          ),
-        );
-
-        if (mounted) {
-          setState(() => _loading = false);
-        }
-        return;
-      }
-
-      final shouldRejoin = await _askRejoin(context, roomId);
-
-      if (shouldRejoin) {
-        repo.connectToRoom(roomId);
-      } else {
-        try {
-          repo.connectToRoom(roomId);
-          await Future.delayed(const Duration(milliseconds: 200));
-          await RoomLobbyV2Controller(repo).exitRoom();
-        } catch (_) {}
-
-        repo.clearLocal();
-        repo.initLocal(
-          RoomData(
-            roomId: null,
-            createdAt: DateTime.now(),
-            game: GameConfig.x01(),
-            phase: RoomPhase.lobby,
-            creatorId: RoomCurrentUser.current.uid,
-            adminIds: [RoomCurrentUser.current.uid],
-            players: [],
-          ),
-        );
-      }
+      roomId = await userRepo
+          .getCurrentRoom(uid)
+          .timeout(const Duration(seconds: 3), onTimeout: () => null);
+    } catch (_) {
+      roomId = null;
     }
 
-    if (mounted) {
-      setState(() => _loading = false);
+    if (!mounted || roomId == null || roomId.isEmpty) {
+      _navigateToLobby();
+      return;
     }
+
+    final roomExists = await FirebaseFirestore.instance
+        .collection('rooms_v4')
+        .doc(roomId)
+        .get()
+        .timeout(const Duration(seconds: 3))
+        .then((doc) => doc.exists)
+        .catchError((_) => false);
+
+    if (!roomExists) {
+      try {
+        await userRepo.clearCurrentRoom(uid);
+      } catch (_) {}
+      _navigateToLobby();
+      return;
+    }
+
+    if (_rejoinDialogOpen || !mounted) return;
+    _rejoinDialogOpen = true;
+
+    final shouldRejoin = await _askRejoin(roomId);
+
+    _rejoinDialogOpen = false;
+    if (!mounted) return;
+
+    if (!shouldRejoin) {
+      try {
+        await userRepo.clearCurrentRoom(uid);
+      } catch (_) {}
+      _navigateToLobby();
+      return;
+    }
+
+    // TODO: Implementare load della room V4 quando sarà online
+    _navigateToLobby();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    return RoomGate(repo: widget.repo);
-  }
-
-  Future<bool> _askRejoin(BuildContext context, String roomId) async {
+  Future<bool> _askRejoin(String roomId) async {
     return await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Room trovata'),
-        content: Text('Vuoi rientrare nella room $roomId?'),
+        title: const Text('Partita trovata'),
+        content: Text('Vuoi rientrare nella partita $roomId?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -289,11 +303,30 @@ class _RoomBootstrapState extends State<_RoomBootstrap> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Si'),
+            child: const Text('Sì'),
           ),
         ],
       ),
     ) ??
         false;
   }
-}
+
+  void _navigateToLobby() {
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const RoomLobbyPage(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+  }
+}*/

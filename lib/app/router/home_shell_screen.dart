@@ -3,55 +3,64 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/link/app_link_state.dart';
-import '../../features/game/presentation/pages/allenamento_screen.dart';
-import '../../features/game/presentation/pages/campionati_screen.dart';
-import '../../features/stats/presentation/pages/classifiche_screen.dart';
 import '../../features/game/presentation/pages/gioca_screen.dart';
+import '../../features/room_v4/presentation/room_lobby_page.dart';
+import '../../features/stats/presentation/pages/training_screen.dart';
+import '../../features/stats/presentation/pages/training_stats_screen.dart';
+import '../../features/game/domain/entities/training_mode.dart';
 import '../../features/players/presentation/widgets/profile_panel.dart';
-import '../../features/game/presentation/pages/tornei_screen.dart';
-
-enum AppSection {
-  allenamento,
-  gioca,
-  campionati,
-  tornei,
-  classifiche,
-}
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({
-    super.key,
-    this.initialSection = AppSection.allenamento,
-  });
-
-  final AppSection initialSection;
+  const HomeScreen({super.key});
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  late AppSection current;
-
   @override
   void initState() {
     super.initState();
-    current = widget.initialSection;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final state = ref.read(appLinkCoordinatorProvider);
+      final hasPendingRoom = state.pendingRoomId != null && state.pendingRoomId!.isNotEmpty;
 
-      final hasPendingRoom =
-          state.pendingRoomId != null && state.pendingRoomId!.isNotEmpty;
-
-      if (!mounted) return;
-      if (!hasPendingRoom) return;
-      if (current == AppSection.gioca) return;
-
-      setState(() {
-        current = AppSection.gioca;
-      });
+      if (hasPendingRoom && mounted) {
+        _navigateToRoomLobby();
+      }
     });
+  }
+
+  void _navigateToTraining() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const TrainingScreen(
+          title: 'Rosa di tiro',
+          mode: TrainingMode.bull,
+        ),
+      ),
+    );
+  }
+
+  void _navigateToStats() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const TrainingStatsScreen(
+          title: 'Rosa di tiro',
+          mode: TrainingMode.bull,
+        ),
+      ),
+    );
+  }
+
+  void _navigateToRoomLobby() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const RoomLobbyPage()),
+    );
   }
 
   @override
@@ -59,49 +68,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ref.listen<AppLinkState>(
       appLinkCoordinatorProvider,
           (prev, next) {
-        final hasPendingRoom =
-            next.pendingRoomId != null && next.pendingRoomId!.isNotEmpty;
+        final hasPendingRoom = next.pendingRoomId != null && next.pendingRoomId!.isNotEmpty;
+        final hadPendingRoom = prev?.pendingRoomId != null && prev!.pendingRoomId!.isNotEmpty;
 
-        final hadPendingRoom =
-            prev?.pendingRoomId != null && prev!.pendingRoomId!.isNotEmpty;
-
-        // 🔥 trigger SOLO su nuovo evento (no replay)
-        if (!hasPendingRoom || hadPendingRoom) return;
-        if (!mounted) return;
-        if (current == AppSection.gioca) return;
-
-        setState(() {
-          current = AppSection.gioca;
-        });
+        if (hasPendingRoom && !hadPendingRoom && mounted) {
+          _navigateToRoomLobby();
+        }
       },
     );
 
     return Scaffold(
-      drawer: Drawer(
-        child: SafeArea(
-          child: Column(
-            children: [
-              const SizedBox(height: 16),
-              const Text(
-                "Menu",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const Divider(),
-              _menuItem(AppSection.allenamento, "Allenamento", Icons.fitness_center),
-              _menuItem(AppSection.gioca, "Gioca", Icons.sports_esports),
-              _menuItem(AppSection.campionati, "Campionati", Icons.emoji_events),
-              _menuItem(AppSection.tornei, "Tornei", Icons.emoji_events_outlined),
-              _menuItem(AppSection.classifiche, "Classifiche", Icons.leaderboard),
-            ],
-          ),
-        ),
-      ),
-      endDrawer: const ProfilePanel(),
       appBar: AppBar(
-        title: Text(_title),
+        title: const Text('Darts'),
+        centerTitle: true,
+        elevation: 2,
         actions: [
           StreamBuilder<User?>(
             stream: FirebaseAuth.instance.authStateChanges(),
@@ -131,53 +111,45 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
       ),
-      body: _screen,
-    );
-  }
-
-  String get _title {
-    switch (current) {
-      case AppSection.allenamento:
-        return "Allenamento";
-      case AppSection.gioca:
-        return "Gioca";
-      case AppSection.campionati:
-        return "Campionati";
-      case AppSection.tornei:
-        return "Tornei";
-      case AppSection.classifiche:
-        return "Classifiche";
-    }
-  }
-
-  Widget get _screen {
-    switch (current) {
-      case AppSection.allenamento:
-        return const AllenamentoScreen();
-      case AppSection.gioca:
-        return const GiocaScreen();
-      case AppSection.campionati:
-        return const CampionatiScreen();
-      case AppSection.tornei:
-        return const TorneiScreen();
-      case AppSection.classifiche:
-        return const ClassificheScreen();
-    }
-  }
-
-  Widget _menuItem(AppSection section, String text, IconData icon) {
-    final selected = current == section;
-
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(text),
-      selected: selected,
-      onTap: () {
-        Navigator.pop(context);
-        setState(() {
-          current = section;
-        });
-      },
+      endDrawer: const ProfilePanel(),
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Card Rosa di tiro (con pulsante statistiche)
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.fitness_center),
+                title: const Text('Rosa di tiro'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.bar_chart),
+                      onPressed: _navigateToStats,
+                    ),
+                    const Icon(Icons.arrow_forward_ios),
+                  ],
+                ),
+                onTap: _navigateToTraining,
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Card Room Lobby V4
+            Card(
+              color: Colors.green.shade50,
+              child: ListTile(
+                leading: const Icon(Icons.sports_esports, color: Colors.green),
+                title: const Text('ROOM V4 (NUOVA ARCHITETTURA)'),
+                subtitle: const Text('Match completo X01/Cricket - Lobby + Partita'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: _navigateToRoomLobby,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
