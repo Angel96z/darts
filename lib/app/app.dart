@@ -43,8 +43,10 @@ class DartsApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final themeModeNotifier = ValueNotifier<ThemeMode>(ThemeMode.system);
+
     return ValueListenableBuilder<ThemeMode>(
-      valueListenable: ThemeController.themeMode,
+      valueListenable: themeModeNotifier,
       builder: (context, mode, _) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
@@ -65,7 +67,6 @@ class DartsApp extends ConsumerWidget {
     );
   }
 }
-
 
 class ThemeController {
   static final ValueNotifier<ThemeMode> themeMode = ValueNotifier(ThemeMode.system);
