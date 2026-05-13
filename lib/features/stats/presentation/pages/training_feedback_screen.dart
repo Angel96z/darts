@@ -1,7 +1,9 @@
-/// File: training_feedback_screen.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
+/// File: training_feedback_screen.dart - Allineato al tema ufficiale AppTokens
+/// Con carousel per valori 1-5, commento in alto, e resizeToAvoidBottomInset
 
 import 'package:flutter/material.dart' hide OverlayState;
 
+import '../../../../app_theme.dart';
 import '../../../../core/widgets/blocking_overlay.dart';
 import '../../data/datasources/local_training_sync_service.dart';
 
@@ -13,7 +15,6 @@ class TrainingFeedbackData {
   final int? distrazioni;
   final String? commento;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TrainingFeedbackData({
     this.focus,
     this.stress,
@@ -30,7 +31,6 @@ class TrainingFeedbackResult {
   final TrainingFeedbackAction action;
   final String? savedSessionId;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TrainingFeedbackResult({
     required this.action,
     required this.savedSessionId,
@@ -38,17 +38,14 @@ class TrainingFeedbackResult {
 }
 
 class TrainingFeedbackScreen extends StatefulWidget {
-  final Future<LocalTrainingSaveResult> Function(TrainingFeedbackData feedback)
-  onSave;
+  final Future<LocalTrainingSaveResult> Function(TrainingFeedbackData feedback) onSave;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TrainingFeedbackScreen({
     super.key,
     required this.onSave,
   });
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   State<TrainingFeedbackScreen> createState() => _TrainingFeedbackScreenState();
 }
 
@@ -64,38 +61,72 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
   String? _savedSessionId;
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void dispose() {
     _commentoController.dispose();
     super.dispose();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  Widget _scoreField(String label, int? value, ValueChanged<int?> onChanged) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          Expanded(child: Text(label)),
-          DropdownButton<int?>(
-            value: value,
-            hint: const Text('—'),
-            items: const [
-              DropdownMenuItem<int?>(value: null, child: Text('—')),
-              DropdownMenuItem(value: 1, child: Text('1')),
-              DropdownMenuItem(value: 2, child: Text('2')),
-              DropdownMenuItem(value: 3, child: Text('3')),
-              DropdownMenuItem(value: 4, child: Text('4')),
-              DropdownMenuItem(value: 5, child: Text('5')),
-            ],
-            onChanged: onChanged,
+  /// Widget carousel per selezione valore 1-5
+  /// Widget carousel per selezione valore 1-10
+  Widget _ratingCarousel(String label, int? value, ValueChanged<int?> onChanged) {
+    final t = AppTokens.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: t.bodyBold(t.textSecondary),
+              ),
+            ),
+            Text(
+              value == null ? '—/10' : '$value/10',
+              style: t.bodyBold(value == null ? t.textMuted : t.accent),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: List.generate(10, (index) {
+              final ratingValue = index + 1;
+              final isSelected = value == ratingValue;
+
+              return GestureDetector(
+                onTap: () => onChanged(ratingValue),
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  margin: const EdgeInsets.only(right: 10),
+                  decoration: BoxDecoration(
+                    color: isSelected ? t.accent : t.surfaceHigh,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isSelected ? t.accent : t.border,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      ratingValue.toString(),
+                      style: t.numericMedium(
+                        isSelected ? t.accentFg : t.textPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 16),
+      ],
     );
   }
-
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _submit() async {
     if (_overlayState == OverlayState.loading) return;
 
@@ -110,133 +141,257 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
           : _commentoController.text.trim(),
     );
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     setState(() {
       _overlayState = OverlayState.loading;
-      _overlayMessage = 'Salvataggio in corso...';
+      _overlayMessage = 'Saving session...';
     });
 
     try {
       final saveResult = await widget.onSave(feedback);
       if (!mounted) return;
 
-      /// Funzione: descrive in modo semplice questo blocco di logica.
       setState(() {
         _savedSessionId = saveResult.localId;
         switch (saveResult.status) {
           case LocalTrainingSyncStatus.pending:
             _overlayState = OverlayState.pending;
-            _overlayMessage =
-            'Salvato offline. Verrà sincronizzato automaticamente';
+            _overlayMessage = 'Saved offline. It will sync automatically';
             break;
           case LocalTrainingSyncStatus.synced:
             _overlayState = OverlayState.success;
-            _overlayMessage = 'Sessione salvata correttamente';
+            _overlayMessage = 'Session saved successfully';
             break;
           case LocalTrainingSyncStatus.failed:
           case LocalTrainingSyncStatus.syncing:
             _overlayState = OverlayState.error;
-            _overlayMessage = 'Salvata. Sync non riuscita';
+            _overlayMessage = 'Saved. Sync failed';
             break;
         }
       });
     } catch (_) {
       if (!mounted) return;
-      /// Funzione: descrive in modo semplice questo blocco di logica.
       setState(() {
         _overlayState = OverlayState.error;
-        _overlayMessage = 'Salvata. Sync non riuscita';
+        _overlayMessage = 'Saved. Sync failed';
       });
     }
   }
 
-  @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  Widget build(BuildContext context) {
-    final showOverlay = _overlayState != null;
+  Widget _buildOverlay(BuildContext context) {
+    final t = AppTokens.of(context);
     final loading = _overlayState == OverlayState.loading;
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
+    return Container(
+      color: t.bg.withOpacity(0.95),
+      child: Center(
+        child: Card(
+          color: t.surface,
+          shape: RoundedRectangleBorder(borderRadius: AppTokens.r16),
+          margin: const EdgeInsets.all(24),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Icona in base allo stato
+                if (_overlayState == OverlayState.loading)
+                  SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: CircularProgressIndicator(
+                      color: t.accent,
+                      strokeWidth: 3,
+                    ),
+                  ),
+                if (_overlayState == OverlayState.success)
+                  Icon(Icons.check_circle, color: t.green, size: 48),
+                if (_overlayState == OverlayState.error)
+                  Icon(Icons.error_outline, color: t.red, size: 48),
+                if (_overlayState == OverlayState.pending)
+                  Icon(Icons.sync, color: t.accent, size: 48),
+
+                const SizedBox(height: 16),
+
+                // Messaggio
+                Text(
+                  _overlayMessage ?? '',
+                  style: t.bodyBold(t.textPrimary),
+                  textAlign: TextAlign.center,
+                ),
+
+                const SizedBox(height: 24),
+
+                // Bottoni
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: loading
+                            ? null
+                            : () => Navigator.pop(
+                          context,
+                          TrainingFeedbackResult(
+                            action: TrainingFeedbackAction.goHome,
+                            savedSessionId: _savedSessionId,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: t.border),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: AppTokens.r10,
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: Text(
+                        'Back to home',
+                          style: t.bodyBold(t.textPrimary),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: loading
+                            ? null
+                            : () => Navigator.pop(
+                          context,
+                          TrainingFeedbackResult(
+                            action: TrainingFeedbackAction.goToStats,
+                            savedSessionId: _savedSessionId,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: t.accent,
+                          foregroundColor: t.accentFg,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: AppTokens.r10,
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: Text(
+    'Go to stats',
+                          style: t.bodyBold(t.accentFg),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    final showOverlay = _overlayState != null;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Feedback sessione')),
+      backgroundColor: t.bg,
+      resizeToAvoidBottomInset: true,
+      appBar: AppBar(
+        title: Text(
+            'Session feedback',
+          style: TextStyle(color: t.textPrimary),
+        ),
+        backgroundColor: t.surface,
+        elevation: 0,
+      ),
       body: Stack(
         children: [
-          /// Funzione: descrive in modo semplice questo blocco di logica.
-          ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              /// Funzione: descrive in modo semplice questo blocco di logica.
-              const Text(
-                'Valutazioni (opzionale)',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              /// Funzione: descrive in modo semplice questo blocco di logica.
-              const SizedBox(height: 12),
-              /// Funzione: descrive in modo semplice questo blocco di logica.
-              _scoreField('Focus', _focus, (v) => setState(() => _focus = v)),
-              /// Funzione: descrive in modo semplice questo blocco di logica.
-              _scoreField('Stress', _stress, (v) => setState(() => _stress = v)),
-              /// Funzione: descrive in modo semplice questo blocco di logica.
-              _scoreField('Energia fisica', _energia, (v) => setState(() => _energia = v)),
-              /// Funzione: descrive in modo semplice questo blocco di logica.
-              _scoreField('Fiducia', _fiducia, (v) => setState(() => _fiducia = v)),
-              /// Funzione: descrive in modo semplice questo blocco di logica.
-              _scoreField('Distrazioni', _distrazioni, (v) => setState(() => _distrazioni = v)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _commentoController,
-                minLines: 3,
-                maxLines: 5,
-                decoration: const InputDecoration(
-                  labelText: 'Commento',
-                  border: OutlineInputBorder(),
+          SingleChildScrollView(
+            // FIX 1: padding fisso, senza viewInsets che creava spazio extra
+            padding: const EdgeInsets.only(
+              bottom: 20,
+              left: 16,
+              right: 16,
+              top: 16,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Commento in alto
+                Text(
+            'Comment (optional)',
+            style: t.bodyBold(t.textSecondary),
                 ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _submit,
-                child: const Text('Salva'),
-              ),
-            ],
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _commentoController,
+                  minLines: 3,
+                  maxLines: 5,
+                  style: t.bodySmall(t.textPrimary),
+                  decoration: InputDecoration(
+                    hintText: 'Write your thoughts...',
+                    hintStyle: t.bodySmall(t.textMuted),
+                    filled: true,
+                    fillColor: t.surfaceHigh,
+                    border: OutlineInputBorder(
+                      borderRadius: AppTokens.r12,
+                      borderSide: BorderSide(color: t.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: AppTokens.r12,
+                      borderSide: BorderSide(color: t.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: AppTokens.r12,
+                      borderSide: BorderSide(color: t.accent, width: 1.5),
+                    ),
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Separatore
+                Divider(color: t.divider),
+                const SizedBox(height: 16),
+
+                // Valutazioni
+                Text(
+                    'Ratings (optional)',
+                  style: t.bodyBold(t.textPrimary),
+                ),
+                const SizedBox(height: 16),
+
+                // Carousel per le valutazioni
+                _ratingCarousel('🎯 Focus', _focus, (v) => setState(() => _focus = v)),
+                _ratingCarousel('😰 Stress', _stress, (v) => setState(() => _stress = v)),
+                _ratingCarousel('⚡ Physical energy', _energia, (v) => setState(() => _energia = v)),
+                _ratingCarousel('💪 Confidence', _fiducia, (v) => setState(() => _fiducia = v)),
+                _ratingCarousel('📱 Distractions', _distrazioni, (v) => setState(() => _distrazioni = v)),
+
+                const SizedBox(height: 24),
+
+                // Bottone Salva
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: t.accent,
+                      foregroundColor: t.accentFg,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppTokens.r12,
+                      ),
+                    ),
+                    child: const Text(
+                      'Save session',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
-          if (showOverlay)
-            Positioned.fill(
-              child: AbsorbPointer(
-                absorbing: true,
-                child: Container(color: Colors.transparent),
-              ),
-            ),
-          if (showOverlay)
-            Positioned.fill(
-              child: BlockingOverlay(
-                state: _overlayState!,
-                message: _overlayMessage,
-                primaryActionLabel: 'Vai alle statistiche',
-                secondaryActionLabel: 'Torna alla home',
-                onPrimaryAction: loading
-                    ? null
-                    : () {
-                  Navigator.pop(
-                    context,
-                    TrainingFeedbackResult(
-                      action: TrainingFeedbackAction.goToStats,
-                      savedSessionId: _savedSessionId,
-                    ),
-                  );
-                },
-                onSecondaryAction: loading
-                    ? null
-                    : () {
-                  Navigator.pop(
-                    context,
-                    TrainingFeedbackResult(
-                      action: TrainingFeedbackAction.goHome,
-                      savedSessionId: _savedSessionId,
-                    ),
-                  );
-                },
-              ),
-            ),
+
+          // FIX 2: Overlay con colori coerenti al tema
+          if (showOverlay) _buildOverlay(context),
         ],
       ),
     );

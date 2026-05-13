@@ -7,6 +7,7 @@ import '../domain/models/game_config.dart';
 import '../domain/models/game_state.dart';
 import '../domain/models/player_info.dart';
 import 'widgets/cricket_board.dart';
+import 'widgets/cricket_keyboard.dart';
 import 'widgets/player_score_card.dart';
 import 'widgets/team_score_card.dart';
 import 'widgets/dart_keyboard.dart';
@@ -68,7 +69,10 @@ class MatchPage extends ConsumerWidget {
     final isTeamMode = teamSize > 1;
     final cards = isTeamMode ? _buildTeamCards(gameState) : _buildPlayerCards(gameState);
     final currentLegKey = builderState?.currentLegNumber ?? 1;
-
+// Calcola l'altezza per Cricket fuori dal builder
+    final cricketStripHeight = gameState.isCricket
+        ? (gameState.players.length * 90.0).clamp(180.0, 400.0)
+        : null;
     // 🔥 DIVIDO IN DUE BLOCCHI CON Column + Expanded
     // 🔥 DIVIDO IN DUE BLOCCHI CON Column + Expanded
     return Column(
@@ -90,9 +94,9 @@ class MatchPage extends ConsumerWidget {
           ],
         ),
 
-        // ──────────────────────────────────────────────
-        // BLOCCO 2 - SPINTO IN BASSO
-        // ──────────────────────────────────────────────
+// ──────────────────────────────────────────────
+// BLOCCO 2 - SPINTO IN BASSO
+// ──────────────────────────────────────────────
         Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -101,7 +105,7 @@ class MatchPage extends ConsumerWidget {
               Flexible(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.35,
+                    maxHeight: cricketStripHeight ?? MediaQuery.of(context).size.height * 0.4,
                   ),
                   child: _PlayerStrip(
                     cards: cards,
@@ -111,12 +115,15 @@ class MatchPage extends ConsumerWidget {
                         ? _activeTeamIndex(gameState)
                         : gameState.orderedPlayerIds.indexOf(gameState.currentPlayerId),
                     gameState: gameState,
+                    cricketStripHeight: cricketStripHeight,  // ← NUOVO PARAMETRO
                   ),
                 ),
               ),
               const SizedBox(height: 8),
-              // Tastiera grande e ben visibile
-              const DartKeyboard(),
+              // 🔥 SCELTA TASTIERA in base al tipo di gioco
+              gameState.isCricket
+                  ? const CricketKeyboard()
+                  : const DartKeyboard(),
               const MatchConfigBar(),
             ],
           ),
@@ -222,6 +229,7 @@ class _PlayerStrip extends StatefulWidget {
   final int activeIndex;
   final bool isTeamMode;
   final GameState gameState;
+  final double? cricketStripHeight;  // ← NUOVO PARAMETRO
 
   const _PlayerStrip({
     required this.cards,
@@ -229,6 +237,7 @@ class _PlayerStrip extends StatefulWidget {
     required this.activeIndex,
     required this.isTeamMode,
     required this.gameState,
+    this.cricketStripHeight,  // ← NUOVO PARAMETRO
   });
 
   @override
@@ -277,24 +286,19 @@ class _PlayerStripState extends State<_PlayerStrip> {
 
   void _scrollToActive() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // 🔥 CRICKET: scroll verticale
-      if (!widget.isTeamMode && widget.gameState.isCricket) {
+      // 🔥 CRICKET (sia single che team mode): scroll verticale
+      if (widget.gameState.isCricket) {
         if (!_verticalController.hasClients || widget.cards.isEmpty) return;
 
         final viewportHeight = _verticalController.position.viewportDimension;
 
-        // Calcola l'offset cumulativo fino al giocatore attivo
         double offset = 0;
         for (int i = 0; i < widget.activeIndex; i++) {
           offset += _getCardHeight(i);
         }
 
-        // Altezza della card attiva
         final currentCardHeight = _getCardHeight(widget.activeIndex);
-
-        // Centra la card attiva nel viewport
         final targetOffset = offset - (viewportHeight / 2) + (currentCardHeight / 2);
-
         final clampedOffset = targetOffset.clamp(0.0, _verticalController.position.maxScrollExtent);
 
         _verticalController.animateTo(
@@ -305,7 +309,7 @@ class _PlayerStripState extends State<_PlayerStrip> {
         return;
       }
 
-      // 🔥 X01/TEAM: scroll orizzontale
+      // 🔥 X01: scroll orizzontale
       if (!_horizontalController.hasClients || widget.cards.isEmpty) return;
 
       final viewportWidth = _horizontalController.position.viewportDimension;
@@ -333,17 +337,17 @@ class _PlayerStripState extends State<_PlayerStrip> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // 🔥 CRICKET: colonna verticale scrollabile
-        if (!widget.isTeamMode && widget.gameState.isCricket) {
+        // 🔥 CRICKET (sia single che team mode): colonna verticale scrollabile
+        if (widget.gameState.isCricket) {
           final screenWidth = MediaQuery.of(context).size.width;
-          final screenHeight = MediaQuery.of(context).size.height;
           final cardWidth = (screenWidth * 0.95);
-          final maxHeight = screenHeight * 0.20;
+          // 🔥 USA L'ALTEZZA PASSATA DAL PADRE
+          final maxHeight = widget.cricketStripHeight ?? 360.0;
 
           return Center(
             child: SizedBox(
               width: cardWidth,
-              height: maxHeight,
+              height: maxHeight,  // ← ORA USA L'ALTEZZA CORRETTA
               child: SingleChildScrollView(
                 controller: _verticalController,
                 physics: const BouncingScrollPhysics(),
@@ -351,7 +355,7 @@ class _PlayerStripState extends State<_PlayerStrip> {
                   mainAxisSize: MainAxisSize.min,
                   children: List.generate(widget.cards.length, (index) {
                     return Container(
-                      key: _cardKeys[index], // 🔥 CHIAVE PER MISURARE ALTEZZA
+                      key: _cardKeys[index],
                       child: widget.cards[index],
                     );
                   }),
@@ -361,7 +365,7 @@ class _PlayerStripState extends State<_PlayerStrip> {
           );
         }
 
-        // 🔥 X01/TEAM: scroll orizzontale
+        // 🔥 X01 (invariato)
         final divisor = widget.isTeamMode ? 2.3 : 2.8;
         final cardWidth = constraints.maxWidth / divisor;
 
@@ -382,6 +386,7 @@ class _PlayerStripState extends State<_PlayerStrip> {
       },
     );
   }
+
 
   @override
   void dispose() {

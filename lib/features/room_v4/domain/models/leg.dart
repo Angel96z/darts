@@ -12,6 +12,7 @@ class Leg {
   final int legNumber;
   final List<Round> rounds;
   final String? winnerId;
+  final String? winnerName;
   final int winningScore;
   final DateTime startTime;
   final DateTime? endTime;
@@ -24,6 +25,7 @@ class Leg {
     required this.legNumber,
     required this.rounds,
     this.winnerId,
+    this.winnerName,
     required this.winningScore,
     required this.startTime,
     this.endTime,

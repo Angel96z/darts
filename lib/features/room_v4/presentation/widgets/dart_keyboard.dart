@@ -25,7 +25,7 @@ class _DartKeyboardState extends ConsumerState<DartKeyboard> {
   }
 
   void _miss() {
-    ref.read(roomNotifierProvider.notifier).throwDart(0, 1);
+    ref.read(roomNotifierProvider.notifier).throwDart(0, 0);
     setState(() => _multiplier = 1);
   }
 
@@ -38,7 +38,7 @@ class _DartKeyboardState extends ConsumerState<DartKeyboard> {
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
-    final boardSize = min(screenWidth * 0.92, 390.0);
+    final boardSize = min(screenWidth * 0.8, 340.0);
 
     return Container(
       color: t.bg,
@@ -85,27 +85,48 @@ class _Board extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final btnWidth = size * 0.22;
-    final btnHeight = size * 0.095;
-    final btnFontSize = size * 0.040;
-    const inset = 0.0;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
 
-    return SizedBox.square(
-      dimension: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          GestureDetector(
+    // Dimensioni bottoni basate sullo schermo, non sulla board
+    final btnWidth = screenWidth * 0.16;
+    final btnHeight = screenHeight * 0.065;
+    final btnFontSize = btnHeight * 0.7;
+
+    // Margine dai bordi dello schermo
+    final horizontalMargin = screenWidth * 0.02;
+    final topMargin = screenHeight * 0.01;
+    final bottomMargin = screenHeight * 0.01;
+
+    return Stack(
+      children: [
+        // Board centrata
+        // Board centrata
+        Center(
+          child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTapDown: (details) {
+              // Trova il RenderBox del CustomPaint
+              final RenderBox box = context.findRenderObject() as RenderBox;
+              // Ottieni la posizione relativa al CustomPaint
+              final Offset localPosition = box.globalToLocal(details.globalPosition);
+
+              // Calcola il centro della board (che è centrata nello Stack)
+              final Size boardSize = Size.square(size);
+              final Offset boardTopLeft = Offset(
+                (box.size.width - size) / 2,
+                (box.size.height - size) / 2,
+              );
+
+              // Sottrai l'offset della board centrata
+              final Offset relativeToBoard = localPosition - boardTopLeft;
+
               final hit = _BoardHitTester.hitTest(
-                localPosition: details.localPosition,
+                localPosition: relativeToBoard,
                 size: size,
                 geometry: _geometry,
               );
-
               if (hit == null) return;
-
               onThrow(hit.sector, hit.multiplier ?? multiplier);
             },
             child: CustomPaint(
@@ -115,63 +136,63 @@ class _Board extends StatelessWidget {
               ),
             ),
           ),
-
-          Positioned(
-            top: inset,
-            left: inset,
-            child: _CornerBtn(
-              label: 'MISS',
-              onTap: onMiss,
-              t: t,
-              width: btnWidth,
-              height: btnHeight,
-              fontSize: btnFontSize,
-            ),
+        ),
+        // Bottone D - alto sinistra
+        Positioned(
+          top: topMargin,
+          left: horizontalMargin,
+          child: _CornerBtn(
+            label: 'D',
+            isActive: multiplier == 2,
+            onTap: () => onSetMultiplier(2),
+            t: t,
+            width: btnWidth,
+            height: btnHeight,
+            fontSize: btnFontSize,
           ),
-
-          Positioned(
-            bottom: inset,
-            left: inset,
-            child: _CornerBtn(
-              label: 'indietro',
-              onTap: onUndo,
-              icon: Icons.undo,
-              t: t,
-              width: btnWidth,
-              height: btnHeight,
-              fontSize: btnFontSize,
-            ),
+        ),
+        // Bottone T - alto destra
+        Positioned(
+          top: topMargin,
+          right: horizontalMargin,
+          child: _CornerBtn(
+            label: 'T',
+            isActive: multiplier == 3,
+            onTap: () => onSetMultiplier(3),
+            t: t,
+            width: btnWidth,
+            height: btnHeight,
+            fontSize: btnFontSize,
           ),
-
-          Positioned(
-            top: inset,
-            right: inset,
-            child: _CornerBtn(
-              label: 'TRIPLE',
-              isActive: multiplier == 3,
-              onTap: () => onSetMultiplier(3),
-              t: t,
-              width: btnWidth,
-              height: btnHeight,
-              fontSize: btnFontSize,
-            ),
+        ),
+        // Bottone UNDO - basso sinistra
+        Positioned(
+          bottom: bottomMargin,
+          left: horizontalMargin,
+          child: _CornerBtn(
+            label: 'indietro',
+            onTap: onUndo,
+            icon: Icons.undo,
+            t: t,
+            width: btnWidth,
+            height: btnHeight,
+            fontSize: btnFontSize,
           ),
-
-          Positioned(
-            bottom: inset,
-            right: inset,
-            child: _CornerBtn(
-              label: 'DOUBLE',
-              isActive: multiplier == 2,
-              onTap: () => onSetMultiplier(2),
-              t: t,
-              width: btnWidth,
-              height: btnHeight,
-              fontSize: btnFontSize,
-            ),
+        ),
+        // Bottone MISS - basso destra
+        Positioned(
+          bottom: bottomMargin,
+          right: horizontalMargin,
+          child: _CornerBtn(
+            label: '0',
+            onTap: onMiss,
+            t: t,
+            width: btnWidth,
+            height: btnHeight,
+            fontSize: btnFontSize,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -200,10 +221,10 @@ class _BoardGeometry {
   final double topAngleRadians;
 
   const _BoardGeometry({
-    this.doubleBullRadius = 18,
-    this.gapAfterDoubleBull = 8,
-    this.singleBullThickness = 28,
-    this.gapAfterSingleBull = 12,
+    this.doubleBullRadius = 30,
+    this.gapAfterDoubleBull = 6,
+    this.singleBullThickness = 26,
+    this.gapAfterSingleBull = 10,
     this.innerSectorThickness = 52,
     this.gapBetweenSectorRings = 12,
     this.outerSectorThickness = 52,
@@ -478,7 +499,7 @@ class _BoardPainter extends CustomPainter {
       text: 'DB',
       radius: 0,
       color: Colors.white,
-      fontSize: 15,
+      fontSize: 24,
       fontWeight: FontWeight.w900,
     );
   }

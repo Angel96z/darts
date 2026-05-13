@@ -1,17 +1,23 @@
-/// File: training_stats_screen.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
+/// File: training_stats_screen.dart - Allineato al tema ufficiale AppTokens
+/// Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide OverlayState;
 import 'package:intl/intl.dart';
 
 import '../../../game/domain/entities/dart_models.dart';
 import '../../../game/domain/entities/training_mode.dart';
 import '../../../game/presentation/widgets/dartboard_widget.dart';
 import '../../data/datasources/local_training_sync_service.dart';
+import '../../shared/stats_filter.dart';
+import '../widgets/session_picker_screen.dart';
+import '../widgets/stats_filter_bar.dart';
+import '../widgets/unified_stats_chart.dart';
 import 'training_charts.dart';
 import '../../domain/entities/training_stats.dart';
 import '../widgets/target_sector_selector.dart';
+import '../../../../app_theme.dart';
 
 enum StatsMode { period, session }
 
@@ -25,7 +31,6 @@ enum StatsViewType {
 
 class StatsFilter {
   final int? dartIndex;
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const StatsFilter({this.dartIndex});
 }
 
@@ -33,19 +38,16 @@ class StatsController extends ChangeNotifier {
   StatsViewType view = StatsViewType.heatmap;
   StatsFilter filter = const StatsFilter();
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void setView(StatsViewType v) {
     view = v;
     notifyListeners();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void setFilter(StatsFilter f) {
     filter = f;
     notifyListeners();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   List<DartThrow> applyFilter(List<DartThrow> input) {
     if (filter.dartIndex == null) return input;
     return input.where((t) => t.dartInTurn == filter.dartIndex).toList();
@@ -66,18 +68,18 @@ class TrainingStatsScreen extends StatefulWidget {
   final TrainingMode mode;
   final String? initialSessionId;
   final String? initialTarget;
+  final bool showAppBar;  // ← NUOVO PARAMETRO
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TrainingStatsScreen({
     super.key,
     required this.title,
     required this.mode,
     this.initialSessionId,
     this.initialTarget,
+    this.showAppBar = false,  // ← DEFAULT FALSE
   });
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   State<TrainingStatsScreen> createState() => _TrainingStatsScreenState();
 }
 
@@ -92,9 +94,9 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
 
   List<_CachedThrowRecord> _cachedRecords = [];
   bool _loaded = false;
+  bool _boardGestureActive = false;
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void initState() {
     super.initState();
     _target = widget.initialTarget ?? _target;
@@ -108,17 +110,12 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     _initData();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _initData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-// 🔥 PRIMO: Carica da cache locale
     final localRecords = await _loadFromLocalCache();
-
-// 🔥 SECONDO: Carica da Firestore (solo quelli non in locale)
     final remoteRecords = await _loadFromFirestore(localRecords);
-
     final allRecords = [...localRecords, ...remoteRecords];
 
     if (!mounted) return;
@@ -134,7 +131,6 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       }
     }
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     setState(() {
       _cachedRecords = allRecords;
       _loaded = true;
@@ -145,14 +141,12 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     });
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<List<_CachedThrowRecord>> _loadFromLocalCache() async {
     final allLocal = await LocalTrainingSyncService.instance.getAllRecords();
     final records = <_CachedThrowRecord>[];
 
     for (final local in allLocal) {
       if (local.syncStatus != LocalTrainingSyncStatus.synced) {
-// Includi anche quelli non ancora sincronizzati
         for (final t in local.throwsList) {
           records.add(_CachedThrowRecord(
             trainingId: local.remoteId ?? local.localId,
@@ -166,58 +160,69 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     return records;
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<List<_CachedThrowRecord>> _loadFromFirestore(List<_CachedThrowRecord> existing) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return [];
 
     final existingIds = existing.map((e) => e.trainingId).toSet();
 
-    final snapshot = await FirebaseFirestore.instance
+    final trainingsSnapshot = await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
-        .collection('throws')
+        .collection('trainings')
+        .where('status', isEqualTo: 'complete')
         .get();
 
     final records = <_CachedThrowRecord>[];
 
-    for (final doc in snapshot.docs) {
-      final data = doc.data();
-      final trainingId = (data['trainingId'] ?? '').toString();
+    for (final trainingDoc in trainingsSnapshot.docs) {
+      final trainingId = trainingDoc.id;
 
-// Salta se già presente in locale
       if (existingIds.contains(trainingId)) continue;
 
-      records.add(_CachedThrowRecord(
-        trainingId: trainingId,
-        trainingTarget: (data['trainingTarget'] ?? '').toString(),
-        dartThrow: DartThrow(
-          timestamp: (data['timestamp'] is Timestamp)
-              ? (data['timestamp'] as Timestamp).toDate()
-              : DateTime.now(),
-          dartInTurn: _asInt(data['dart']),
-          position: Offset(
-            _asDouble(data['boardX']),
-            _asDouble(data['boardY']),
+      final trainingData = trainingDoc.data();
+      final trainingTarget = (trainingData['target'] ?? '').toString();
+
+      final throwsSnapshot = await trainingDoc.reference
+          .collection('throws')
+          .orderBy('timestamp')
+          .get();
+
+      for (final throwDoc in throwsSnapshot.docs) {
+        final data = throwDoc.data();
+
+        records.add(_CachedThrowRecord(
+          trainingId: trainingId,
+          trainingTarget: trainingTarget,
+          dartThrow: DartThrow(
+            timestamp: (data['timestamp'] is Timestamp)
+                ? (data['timestamp'] as Timestamp).toDate()
+                : DateTime.now(),
+            dartInTurn: _asInt(data['dart']),
+            position: Offset(
+              _asDouble(data['boardX']),
+              _asDouble(data['boardY']),
+            ),
+            sector: (data['sector'] ?? '').toString(),
+            score: _asInt(data['score']),
+            distanceMm: _asDouble(data['distanceMm']),
+            playerId: (data['playerId'] ?? '').toString(),
+            playerName: (data['playerName'] ?? '').toString(),
+            teamId: (data['teamId'] ?? '').toString(),
+            teamName: (data['teamName'] ?? '').toString(),
+            roundNumber: _asInt(data['round']),
+            turnNumber: _asInt(data['turn']),
+            targetQuadrant: data['quadrant']?.toString(),
+            isPass: data['isPass'] == true,
           ),
-          sector: (data['sector'] ?? '').toString(),
-          score: _asInt(data['score']),
-          distanceMm: _asDouble(data['distanceMm']),
-          playerId: (data['playerId'] ?? '').toString(),
-          playerName: (data['playerName'] ?? '').toString(),
-          teamId: (data['teamId'] ?? '').toString(),
-          teamName: (data['teamName'] ?? '').toString(),
-          roundNumber: _asInt(data['round']),
-          turnNumber: _asInt(data['turn']),
-          targetQuadrant: data['quadrant']?.toString(),
-          isPass: data['isPass'] == true,
-        ),
-      ));
+        ));
+      }
     }
 
     return records;
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
+
+
   String _buildRightLabel() {
     if (_mode == StatsMode.period) {
       if (_range == null) return 'Range';
@@ -225,128 +230,37 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     }
 
     if (_session == null) return 'Seleziona';
-    return '${DateFormat('dd/MM').format(_session!.startTime)} • ${_session!.id}';
+    return DateFormat('dd/MM/yyyy HH:mm').format(_session!.startTime);  // ← SOLO DATA E ORA
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  Future<void> _openPeriod() async {
-    final now = DateTime.now();
+// In training_stats_screen.dart, modifica _openSessionPicker:
 
-    final result = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: now,
-      initialDateRange: _range ??
-          DateTimeRange(
-            start: now.subtract(const Duration(days: 7)),
-            end: now,
-          ),
-    );
-
-    if (result == null) return;
-
-    /// Funzione: descrive in modo semplice questo blocco di logica.
-    setState(() {
-      _mode = StatsMode.period;
-      _range = result;
-      _session = null;
-    });
-  }
-
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _openSessionPicker() {
     Navigator.push(
       context,
-      /// Funzione: descrive in modo semplice questo blocco di logica.
       MaterialPageRoute(
-        builder: (_) => _SessionPickerScreen(
-          target: _target,
-          highlightedSessionId: widget.initialSessionId,
+        builder: (_) => SessionPickerScreen<TrainingSessionStats>(
+          type: SessionType.training,
+          filterBy: _target,
+          highlightedId: widget.initialSessionId,
           onSelect: (session) {
-            /// Funzione: descrive in modo semplice questo blocco di logica.
             setState(() {
               _mode = StatsMode.session;
               _session = session;
             });
           },
+          allowDelete: true,
         ),
       ),
     );
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  Widget _buildTopBar() {
-    /// Funzione: descrive in modo semplice questo blocco di logica.
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          /// Funzione: descrive in modo semplice questo blocco di logica.
-          TargetSectorSelector(
-            currentTarget: _target,
-            onSelected: (value) {
-              /// Funzione: descrive in modo semplice questo blocco di logica.
-              setState(() {
-                _target = value;
-                _session = null;
-              });
-            },
-          ),
-          /// Funzione: descrive in modo semplice questo blocco di logica.
-          const SizedBox(width: 8),
-          PopupMenuButton<StatsMode>(
-            onSelected: (mode) {
-              /// Funzione: descrive in modo semplice questo blocco di logica.
-              setState(() {
-                _mode = mode;
-              });
-
-              if (mode == StatsMode.period) {
-                _openPeriod();
-              } else {
-                _openSessionPicker();
-              }
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: StatsMode.period,
-                child: Text('Periodo'),
-              ),
-              /// Funzione: descrive in modo semplice questo blocco di logica.
-              PopupMenuItem(
-                value: StatsMode.session,
-                child: Text('Sessione'),
-              ),
-            ],
-            child: _Box(_mode == StatsMode.period ? 'Periodo' : 'Sessione'),
-          ),
-          /// Funzione: descrive in modo semplice questo blocco di logica.
-          const Spacer(),
-          /// Funzione: descrive in modo semplice questo blocco di logica.
-          GestureDetector(
-            onTap: () {
-              if (_mode == StatsMode.period) {
-                _openPeriod();
-              } else {
-                _openSessionPicker();
-              }
-            },
-            child: _Box(_buildRightLabel()),
-          ),
-        ],
-      ),
-    );
-  }
-
-
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _viewBtn(String label, StatsViewType type) {
+    final t = AppTokens.of(context);
     final selected = _statsController.view == type;
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return GestureDetector(
       onTap: () {
-        /// Funzione: descrive in modo semplice questo blocco di logica.
         setState(() {
           _statsController.setView(type);
           _pageController.jumpToPage(type.index);
@@ -355,31 +269,26 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          color: selected ? Colors.blue : Colors.black.withOpacity(0.4),
-          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: AppTokens.r8,
+          color: selected ? t.accent : t.surfaceHigh,
+          border: Border.all(color: t.border),
         ),
         child: Text(
           label,
-          style: TextStyle(
-            color: selected ? Colors.white : Colors.black,
-            fontSize: 12,
-          ),
+          style: t.bodyBold(selected ? t.accentFg : t.textPrimary),
         ),
       ),
     );
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _filterBtn(String label, int? dart) {
+    final t = AppTokens.of(context);
     final selected = _statsController.filter.dartIndex == dart;
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: GestureDetector(
         onTap: () {
-          /// Funzione: descrive in modo semplice questo blocco di logica.
           setState(() {
             _statsController.setFilter(StatsFilter(dartIndex: dart));
           });
@@ -387,22 +296,19 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            color: selected ? Colors.blue : Colors.black.withOpacity(0.4),
-            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: AppTokens.r10,
+            color: selected ? t.accent : t.surfaceHigh,
+            border: Border.all(color: t.border),
           ),
           child: Text(
             label,
-            style: TextStyle(
-              color: selected ? Colors.white : Colors.black,
-            ),
+            style: t.bodyBold(selected ? t.accentFg : t.textPrimary),
           ),
         ),
       ),
     );
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<List<TrainingSessionStats>> _loadTrainingsForTarget() async {
     final sessions = <TrainingSessionStats>[];
     final added = <String>{};
@@ -494,7 +400,6 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     return sessions;
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<List<TrainingSessionStats>> _loadSessionsForActivePeriod() async {
     final sessions = await _loadTrainingsForTarget();
     final range = _range;
@@ -513,14 +418,12 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       59,
     );
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return sessions.where((session) {
       final date = session.startTime;
       return !date.isBefore(start) && !date.isAfter(end);
     }).toList();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   PeriodStats _aggregatePeriodStats(List<TrainingSessionStats> filtered) {
     if (filtered.isEmpty) {
       return const PeriodStats.empty();
@@ -548,11 +451,8 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       }
     }
 
-    final hitPercent =
-    totalThrows == 0 ? 0 : ((totalHits / totalThrows) * 100).round();
-
-    final avgDistanceMm =
-    totalSessions == 0 ? 0.0 : (totalAvgDistance / totalSessions);
+    final hitPercent = totalThrows == 0 ? 0 : ((totalHits / totalThrows) * 100).round();
+    final avgDistanceMm = totalSessions == 0 ? 0.0 : (totalAvgDistance / totalSessions);
 
     return PeriodStats(
       totalSessions: totalSessions,
@@ -567,26 +467,22 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     );
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   List<DartThrow> _getFilteredThrows() {
     Iterable<_CachedThrowRecord> filtered = _cachedRecords;
 
-    // Filtra per target
     filtered = filtered.where((r) => r.trainingTarget == _target);
 
-    // Filtra per periodo - CORRETTO!
     if (_mode == StatsMode.period && _range != null) {
       final startDay = DateTime(_range!.start.year, _range!.start.month, _range!.start.day);
       final endDay = DateTime(_range!.end.year, _range!.end.month, _range!.end.day, 23, 59, 59);
 
       filtered = filtered.where((r) {
         final t = r.dartThrow.timestamp;
-        return t.isAfter(startDay.subtract(Duration(milliseconds: 1))) &&
-            t.isBefore(endDay.add(Duration(milliseconds: 1)));
+        return t.isAfter(startDay.subtract(const Duration(milliseconds: 1))) &&
+            t.isBefore(endDay.add(const Duration(milliseconds: 1)));
       });
     }
 
-    // Filtra per sessione
     if (_mode == StatsMode.session && _session != null) {
       filtered = filtered.where((r) => r.trainingId == _session!.id);
     }
@@ -595,7 +491,6 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     return _statsController.applyFilter(throws);
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildStats() {
     if (!_loaded) {
       return const Center(child: CircularProgressIndicator());
@@ -610,42 +505,39 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       ],
     );
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
+
   Widget _statsSection() {
+    final t = AppTokens.of(context);
     final throws = _getFilteredThrows();
 
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Column(
         children: [
-          _clusterTitle('PRECISIONE'),
-          TrainingCharts.mmTrend(throws, _target),
+          _clusterTitle('PRECISIONE', t),
+          _buildUnifiedPrecisionTrendChart(throws),
+
           TrainingCharts.distanceAnalysis(throws, _target),
           TrainingCharts.directionalBias(throws),
           const SizedBox(height: 4),
-          _clusterTitle('PERFORMANCE'),
+          _clusterTitle('PERFORMANCE', t),
           TrainingCharts.hitTrend(throws, _target),
           TrainingCharts.dartBreakdown(throws, _target),
           TrainingCharts.streak(throws, _target),
           const SizedBox(height: 4),
-          _clusterTitle('CONTROLLO'),
+          _clusterTitle('CONTROLLO', t),
           TrainingCharts.consistencyTrend(throws, _target),
           TrainingCharts.relationalPerformance(
             throws,
             _target,
             showSessionTime: _mode == StatsMode.period,
           ),
-          /// Funzione: descrive in modo semplice questo blocco di logica.
           const SizedBox(height: 4),
-          /// Funzione: descrive in modo semplice questo blocco di logica.
-          _clusterTitle('RIEPILOGO'),
+          _clusterTitle('RIEPILOGO', t),
           TrainingCharts.performanceScore(throws, _target),
-          TrainingCharts.bestWorstAnalysis(throws, _target),
           TrainingCharts.ringDistribution(throws, _target),
-          /// Funzione: descrive in modo semplice questo blocco di logica.
           const SizedBox(height: 4),
-          /// Funzione: descrive in modo semplice questo blocco di logica.
-          _clusterTitle('SESSIONI'),
+          _clusterTitle('SESSIONI', t),
           FutureBuilder<List<TrainingSessionStats>>(
             future: _loadSessionsForActivePeriod(),
             builder: (context, snapshot) {
@@ -663,13 +555,77 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       ),
     );
   }
+  Widget _buildUnifiedPrecisionTrendChart(List<DartThrow> throws) {
+    final sorted = [...throws]..sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
+    if (sorted.isEmpty) {
+      return UnifiedStatsChart(
+        title: 'Precisione nel tempo',
+        subtitle: 'Errore medio dal target per ogni tiro registrato.',
+        points: const [],
+        xAxisLabel: 'freccetta',
+        yAxisLabel: 'mm',
+        invertYAxis: true,
+        minYValue: 0,
+        infoTitle: 'Precisione nel tempo',
+        infoText:
+        'Questo grafico mostra la distanza in millimetri dal target lungo la sequenza dei tiri. '
+            'Più la linea scende, più il tiro si avvicina al bersaglio.',
+        advice: const [
+          'Linea discendente: precisione in miglioramento.',
+          'Linea instabile: gesto o focus non ancora costanti.',
+          'Picchi verso l’alto: analizzare postura, ritmo e rilascio.',
+        ],
+      );
+    }
+
+    final points = <UnifiedStatsPoint>[];
+
+    for (int i = 0; i < sorted.length; i++) {
+      final dart = sorted[i];
+      final mm = dart.distanceMm;
+      final label = 'Tiro ${i + 1}';
+      final time = DateFormat('dd/MM HH:mm').format(dart.timestamp);
+      final sector = dart.sector.isEmpty ? '—' : dart.sector;
+
+      points.add(
+        UnifiedStatsPoint(
+          x: i + 1.0,
+          y: mm,
+          label: label,
+          detail: 'Data $time • Settore $sector • Distanza ${mm.toStringAsFixed(1)} mm',
+        ),
+      );
+    }
+
+    return UnifiedStatsChart(
+      title: 'Precisione nel tempo',
+      subtitle: 'Distanza dal target in mm, tiro dopo tiro.',
+      points: points,
+      mode: UnifiedStatsChartMode.lineAndPoints,
+      xAxisLabel: 'freccetta',
+      yAxisLabel: 'mm',
+      invertYAxis: true,
+      minYValue: 0,
+      infoTitle: 'Come leggere la precisione',
+      infoText:
+      'L’asse X rappresenta la sequenza dei tiri filtrati. '
+          'L’asse Y rappresenta la distanza dal target in millimetri. '
+          'Valori più bassi indicano maggiore precisione.',
+      advice: const [
+        'Obiettivo: linea progressivamente più bassa.',
+        'Se i picchi sono frequenti, lavora su routine e rilascio.',
+        'Se la linea è piatta ma alta, il gesto è costante ma decentrato.',
+        'Se la linea è bassa e stabile, la precisione è solida.',
+      ],
+    );
+  }
+
   SessionPerformancePoint _toSessionPoint(TrainingSessionStats s) {
     return SessionPerformancePoint(
       id: s.id,
       performance: s.hitPercent.toDouble(),
-      sessionDate: s.startTime, // ← FIX
+      sessionDate: s.startTime,
       focus: s.focus,
       stress: s.stress,
       energia: s.energia,
@@ -679,59 +635,56 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
     );
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  Widget _clusterTitle(String title) {
+  Widget _clusterTitle(String title, AppTokens t) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 8, top: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(8),
+        color: t.accent.withOpacity(0.08),
+        borderRadius: AppTokens.r8,
       ),
       child: Text(
         title,
-        style: const TextStyle(fontWeight: FontWeight.w700),
+        style: t.bodyBold(t.textPrimary),
       ),
     );
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
+
   Widget _statBox(String title) {
+    final t = AppTokens.of(context);
+
     return Container(
       width: double.infinity,
       height: 120,
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: AppTokens.r12,
+        border: Border.all(color: t.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
+          Text(title, style: t.bodyBold(t.textPrimary)),
           const SizedBox(height: 8),
           const Expanded(
             child: Center(
-              child: Text(
-                'placeholder',
-                style: TextStyle(color: Colors.grey),
-              ),
+              child: Text('placeholder', style: TextStyle(color: Colors.grey)),
             ),
           ),
         ],
       ),
     );
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
+
   Widget _buildInsight(List<DartThrow> throws) {
+    final t = AppTokens.of(context);
+
     if (throws.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(12),
-        child: Text('Nessun dato'),
+      return Padding(
+        padding: const EdgeInsets.all(12),
+        child: Text('Nessun dato', style: t.bodySmall(t.textSecondary)),
       );
     }
 
@@ -745,16 +698,17 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
         return _insightBox(
           'Distribuzione colpi',
           'Mostra dove colpisci più spesso. Cerca concentrazione sul target.',
+          t,
         );
 
       case StatsViewType.accuracy:
         final mm = stats.averageDistanceMm.toStringAsFixed(1);
-
         return _insightBox(
           'Precisione sul target',
           'Errore medio: $mm mm\n'
               '${percent.toStringAsFixed(0)}% hit\n'
               '${percent > 60 ? 'Buona precisione' : 'Riduci distanza dal target'}',
+          t,
         );
 
       case StatsViewType.precision:
@@ -763,6 +717,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
           'Valuta quanto i tiri sono raggruppati.\n'
               'Ellisse stretta = alta precisione.\n'
               'Ellisse larga = gesto instabile.',
+          t,
         );
 
       case StatsViewType.bias:
@@ -770,38 +725,39 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
           'Errore direzionale',
           'Il punto rosso mostra dove tendi a tirare.\n'
               'Correggi nella direzione opposta.',
+          t,
         );
       case StatsViewType.directionalBias:
         return _insightBox(
           'Bias direzionale (bande)',
           'Le bande mostrano media e dispersione orizzontale/verticale.\n'
               'Banda più larga = più variabilità su quell\'asse.',
+          t,
         );
     }
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  Widget _insightBox(String title, String text) {
+
+  Widget _insightBox(String title, String text, AppTokens t) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         border: Border(
-          top: BorderSide(color: Colors.grey.shade300),
+          top: BorderSide(color: t.divider),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(title, style: t.bodyBold(t.textPrimary)),
           const SizedBox(height: 6),
-          Text(text),
+          Text(text, style: t.bodySmall(t.textSecondary)),
         ],
       ),
     );
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
+
   Widget _buildHeatmapView(List<DartThrow> throws) {
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return DartboardWidget(
       throws: throws,
       target: _target,
@@ -810,9 +766,8 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       },
     );
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
+
   Widget _buildAccuracyView(List<DartThrow> throws) {
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return DartboardWidget(
       throws: throws,
       target: _target,
@@ -823,9 +778,8 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       },
     );
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
+
   Widget _buildPrecisionView(List<DartThrow> throws) {
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return DartboardWidget(
       throws: throws,
       target: _target,
@@ -834,9 +788,8 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       },
     );
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
+
   Widget _buildBiasView(List<DartThrow> throws) {
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return DartboardWidget(
       throws: throws,
       target: _target,
@@ -846,9 +799,8 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       },
     );
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
+
   Widget _buildDirectionalBiasView(List<DartThrow> throws) {
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return DartboardWidget(
       throws: throws,
       target: _target,
@@ -858,42 +810,42 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       },
     );
   }
-  /// Funzione: descrive in modo semplice questo blocco di logica.
+
   Widget _buildDistanceView(List<DartThrow> throws) {
+    final t = AppTokens.of(context);
+
     if (throws.isEmpty) {
-      return const Center(child: Text('Nessun dato'));
+      return Center(child: Text('Nessun dato', style: t.bodySmall(t.textSecondary)));
     }
 
-    // USA TrainingStats!
     final stats = TrainingStats(throws);
 
     return Center(
       child: Text(
         '${stats.averageDistanceMm.toStringAsFixed(1)} mm',
-        style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+        style: t.numericMedium(t.textPrimary),
       ),
     );
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildHitRateView(List<DartThrow> throws) {
+    final t = AppTokens.of(context);
+
     if (throws.isEmpty) {
-      return const Center(child: Text('Nessun dato'));
+      return Center(child: Text('Nessun dato', style: t.bodySmall(t.textSecondary)));
     }
 
-    // USA TrainingStats!
     final stats = TrainingStats(throws);
-    final hits = stats.targetHits(_target); // o qualsiasi altra logica
+    final hits = stats.targetHits(_target);
 
     return Center(
       child: Text(
         '${((hits / throws.length) * 100).round()}%',
-        style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+        style: t.numericMedium(t.accent),
       ),
     );
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildStatsPager(List<DartThrow> throws) {
     return SizedBox.expand(
       child: PageView(
@@ -912,37 +864,109 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
       ),
     );
   }
+
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void dispose() {
     _pageController.dispose();
     _statsController.dispose();
     super.dispose();
   }
 
+  Future<void> _handleModeTap() async {
+    final mode = await showStatsModeDialog(context);
+    if (mode == null) return;
+
+    if (mode == StatsFilterMode.period) {
+      final range = await showPeriodPickerDialog(
+        context,
+        initialRange: _range,
+      );
+      if (range != null) {
+        setState(() {
+          _mode = StatsMode.period;
+          _range = range;
+          _session = null;
+        });
+      }
+    } else {
+      _openSessionPicker();
+    }
+  }
+
+
+  Future<void> _handleSelectorTap() async {
+    if (_mode == StatsMode.period) {
+      final range = await showPeriodPickerDialog(
+        context,
+        initialRange: _range,
+      );
+      if (range != null) {
+        setState(() {
+          _range = range;
+          _session = null;
+        });
+      }
+    } else {
+      _openSessionPicker();
+    }
+  }
+
+
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
     final isDesktop = MediaQuery.of(context).size.width >= 700;
 
+    // Converte _mode (StatsMode) in StatsFilterMode
+    final filterMode = _mode == StatsMode.period
+        ? StatsFilterMode.period
+        : StatsFilterMode.session;
+
+    final filterState = StatsFilterState(
+      mode: _mode == StatsMode.period ? StatsFilterMode.period : StatsFilterMode.session,
+      periodRange: _range,
+      selectedSessionId: _session?.id,
+      selectedSessionLabel: _session != null
+          ? DateFormat('dd/MM/yyyy HH:mm').format(_session!.startTime)
+          : null,
+    );
+    final statsWidget = RepaintBoundary(
+      child: isDesktop ? _buildDesktopLayout() : _buildMobileLayout(),
+    );
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Statistiche - ${widget.title}'),
-      ),
+      backgroundColor: t.bg,
+      appBar: widget.showAppBar
+          ? AppBar(
+        title: Text('Statistiche - ${widget.title}', style: TextStyle(color: t.textPrimary)),
+        backgroundColor: t.surface,
+        elevation: 0,
+      )
+          : null,
       body: Column(
         children: [
-          _buildTopBar(),
-          const Divider(height: 1),
+          StatsFilterBar(
+            state: filterState,
+            onModeTap: _handleModeTap,
+            onSelectorTap: _handleSelectorTap,  // ← usa questo unico callback
+            leadingChild: TargetSectorSelector(
+              currentTarget: _target,
+              onSelected: (value) {
+                setState(() {
+                  _target = value;
+                  _session = null;
+                });
+              },
+            ),
+          ),
+          Divider(color: t.divider, height: 1),
           Expanded(
-            child: isDesktop ? _buildDesktopLayout() : _buildMobileLayout(),
+            child: statsWidget,
           ),
         ],
       ),
     );
-
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildDesktopLayout() {
     return Row(
       children: [
@@ -995,72 +1019,81 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
             ),
           ),
         ),
-        SizedBox(
-          width: MediaQuery.of(context).size.width * 0.3,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(0, 12, 12, 12),
-            child: _statsSection(),
-          ),
-        ),
       ],
     );
   }
-
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _buildMobileLayout() {
     return Stack(
       children: [
         SingleChildScrollView(
-          physics: const BouncingScrollPhysics(
+          physics: _boardGestureActive
+              ? const NeverScrollableScrollPhysics()
+              : const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),
           ),
           padding: const EdgeInsets.only(bottom: 80),
           child: Column(
             children: [
-              SizedBox(
-                height: 420,
-                child: Stack(
-                  children: [
-                    _buildStats(),
-                    Positioned(
-                      left: 8,
-                      top: 40,
-                      child: Column(
-                        children: [
-                          _viewBtn('H', StatsViewType.heatmap),
-                          const SizedBox(height: 8),
-                          _viewBtn('A', StatsViewType.accuracy),
-                          const SizedBox(height: 8),
-                          _viewBtn('P', StatsViewType.precision),
-                          const SizedBox(height: 8),
-                          _viewBtn('B', StatsViewType.bias),
-                          const SizedBox(height: 8),
-                          _viewBtn('DB', StatsViewType.directionalBias),
-                        ],
+              Listener(
+                behavior: HitTestBehavior.opaque,
+                onPointerDown: (_) {
+                  if (_boardGestureActive) return;
+                  setState(() => _boardGestureActive = true);
+                },
+                onPointerUp: (_) {
+                  if (!_boardGestureActive) return;
+                  setState(() => _boardGestureActive = false);
+                },
+                onPointerCancel: (_) {
+                  if (!_boardGestureActive) return;
+                  setState(() => _boardGestureActive = false);
+                },
+                child: SizedBox(
+                  height: 420,
+                  child: Stack(
+                    children: [
+                      _buildStats(),
+                      Positioned(
+                        left: 8,
+                        top: 40,
+                        child: Column(
+                          children: [
+                            _viewBtn('H', StatsViewType.heatmap),
+                            const SizedBox(height: 8),
+                            _viewBtn('A', StatsViewType.accuracy),
+                            const SizedBox(height: 8),
+                            _viewBtn('P', StatsViewType.precision),
+                            const SizedBox(height: 8),
+                            _viewBtn('B', StatsViewType.bias),
+                            const SizedBox(height: 8),
+                            _viewBtn('DB', StatsViewType.directionalBias),
+                          ],
+                        ),
                       ),
-                    ),
-                    Positioned(
-                      right: 8,
-                      top: 40,
-                      child: Column(
-                        children: [
-                          _filterBtn('T', null),
-                          const SizedBox(height: 8),
-                          _filterBtn('1', 1),
-                          const SizedBox(height: 8),
-                          _filterBtn('2', 2),
-                          const SizedBox(height: 8),
-                          _filterBtn('3', 3),
-                        ],
+                      Positioned(
+                        right: 8,
+                        top: 40,
+                        child: Column(
+                          children: [
+                            _filterBtn('T', null),
+                            const SizedBox(height: 8),
+                            _filterBtn('1', 1),
+                            const SizedBox(height: 8),
+                            _filterBtn('2', 2),
+                            const SizedBox(height: 8),
+                            _filterBtn('3', 3),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
+
               _statsSection(),
             ],
           ),
-        )
+        ),
       ],
     );
   }
@@ -1071,7 +1104,6 @@ class _SessionPickerScreen extends StatefulWidget {
   final String? highlightedSessionId;
   final ValueChanged<TrainingSessionStats> onSelect;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _SessionPickerScreen({
     required this.target,
     required this.highlightedSessionId,
@@ -1079,22 +1111,21 @@ class _SessionPickerScreen extends StatefulWidget {
   });
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   State<_SessionPickerScreen> createState() => _SessionPickerScreenState();
 }
 
 class _SessionPickerScreenState extends State<_SessionPickerScreen> {
   SessionSort _sort = SessionSort.dateDesc;
   late Future<List<TrainingSessionStats>> _future;
+  bool _isSelectionMode = false;
+  final Set<String> _selectedIds = <String>{};
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void initState() {
     super.initState();
     _future = _loadSessions();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<List<TrainingSessionStats>> _loadSessions() async {
     final sessions = <TrainingSessionStats>[];
     final added = <String>{};
@@ -1190,7 +1221,6 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
     return sessions;
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _sortSessions(List<TrainingSessionStats> sessions) {
     switch (_sort) {
       case SessionSort.dateDesc:
@@ -1214,55 +1244,140 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
     }
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void _reload() {
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     setState(() {
       _future = _loadSessions();
     });
   }
 
-  @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  Widget build(BuildContext context) {
-    /// Funzione: descrive in modo semplice questo blocco di logica.
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sessioni'),
+  void _toggleSelectionMode() {
+    setState(() {
+      _isSelectionMode = !_isSelectionMode;
+      if (!_isSelectionMode) {
+        _selectedIds.clear();
+      }
+    });
+  }
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  Future<void> _deleteSelected() async {
+    if (_selectedIds.isEmpty) return;
+
+    final idsToDelete = _selectedIds.toList();
+    final t = AppTokens.of(context);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Elimina sessioni', style: t.bodyBold(t.textPrimary)),
+        content: Text(
+          'Sei sicuro di voler eliminare ${idsToDelete.length} sessione${idsToDelete.length > 1 ? '?' : '?'}',
+          style: t.bodySmall(t.textSecondary),
+        ),
         actions: [
-          PopupMenuButton<SessionSort>(
-            onSelected: (value) {
-              _sort = value;
-              _reload();
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: SessionSort.dateDesc,
-                child: Text('Data ↓'),
-              ),
-              PopupMenuItem(
-                value: SessionSort.dateAsc,
-                child: Text('Data ↑'),
-              ),
-              PopupMenuItem(
-                value: SessionSort.performanceDesc,
-                child: Text('Performance ↓'),
-              ),
-              PopupMenuItem(
-                value: SessionSort.performanceAsc,
-                child: Text('Performance ↑'),
-              ),
-              PopupMenuItem(
-                value: SessionSort.durationDesc,
-                child: Text('Durata ↓'),
-              ),
-              /// Funzione: descrive in modo semplice questo blocco di logica.
-              PopupMenuItem(
-                value: SessionSort.durationAsc,
-                child: Text('Durata ↑'),
-              ),
-            ],
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Annulla', style: t.bodyBold(t.textSecondary)),
           ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Elimina', style: t.bodyBold(t.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isSelectionMode = false;
+    });
+
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+      final db = FirebaseFirestore.instance;
+
+      for (final id in idsToDelete) {
+        final trainingRef = db
+            .collection('users')
+            .doc(user.uid)
+            .collection('trainings')
+            .doc(id);
+
+        final throwsSnapshot = await trainingRef.collection('throws').get();
+
+        final batch = db.batch();
+        for (final throwDoc in throwsSnapshot.docs) {
+          batch.delete(throwDoc.reference);
+        }
+        batch.delete(trainingRef);
+        await batch.commit();
+      }
+    }
+
+    await LocalTrainingSyncService.instance.deleteRecords(idsToDelete);
+
+    if (!mounted) return;
+
+    _selectedIds.clear();
+    _reload();
+  }
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+
+    return Scaffold(
+      backgroundColor: t.bg,
+      appBar: AppBar(
+        title: Text(
+          _isSelectionMode ? '${_selectedIds.length} selezionate' : 'Sessioni',
+          style: TextStyle(color: t.textPrimary),
+        ),
+        backgroundColor: t.surface,
+        elevation: 0,
+        leading: _isSelectionMode
+            ? IconButton(
+          icon: Icon(Icons.close, color: t.textPrimary),
+          onPressed: _toggleSelectionMode,
+        )
+            : null,
+        actions: [
+          if (_isSelectionMode && _selectedIds.isNotEmpty)
+            IconButton(
+              icon: Icon(Icons.delete, color: t.red),
+              onPressed: _deleteSelected,
+            ),
+          if (!_isSelectionMode)
+            PopupMenuButton<SessionSort>(
+              onSelected: (value) {
+                _sort = value;
+                _reload();
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: SessionSort.dateDesc, child: Text('Data ↓')),
+                PopupMenuItem(value: SessionSort.dateAsc, child: Text('Data ↑')),
+                PopupMenuItem(value: SessionSort.performanceDesc, child: Text('Performance ↓')),
+                PopupMenuItem(value: SessionSort.performanceAsc, child: Text('Performance ↑')),
+                PopupMenuItem(value: SessionSort.durationDesc, child: Text('Durata ↓')),
+                PopupMenuItem(value: SessionSort.durationAsc, child: Text('Durata ↑')),
+              ],
+            ),
+          if (!_isSelectionMode)
+            IconButton(
+              icon: Icon(Icons.select_all, color: t.textSecondary),
+              onPressed: _toggleSelectionMode,
+              tooltip: 'Seleziona sessioni',
+            ),
         ],
       ),
       body: FutureBuilder<List<TrainingSessionStats>>(
@@ -1276,7 +1391,8 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text('Errore caricamento sessioni: ${snapshot.error}'),
+                child: Text('Errore caricamento sessioni: ${snapshot.error}',
+                    style: t.bodySmall(t.red)),
               ),
             );
           }
@@ -1284,8 +1400,8 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
           final sessions = snapshot.data ?? [];
 
           if (sessions.isEmpty) {
-            return const Center(
-              child: Text('Nessuna sessione'),
+            return Center(
+              child: Text('Nessuna sessione', style: t.bodySmall(t.textSecondary)),
             );
           }
 
@@ -1294,6 +1410,7 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
             itemBuilder: (context, index) {
               final s = sessions[index];
               final isHighlighted = widget.highlightedSessionId == s.id;
+              final isSelected = _selectedIds.contains(s.id);
               final status = s.syncStatus;
               IconData? icon;
               Color? iconColor;
@@ -1301,52 +1418,65 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
               switch (status) {
                 case LocalTrainingSyncStatus.synced:
                   icon = Icons.cloud_done;
-                  iconColor = Colors.green;
+                  iconColor = t.green;
                   break;
                 case LocalTrainingSyncStatus.pending:
                   icon = Icons.cloud_upload;
-                  iconColor = Colors.orange;
+                  iconColor = t.orange;
                   break;
                 case LocalTrainingSyncStatus.syncing:
                   icon = Icons.cloud_sync;
-                  iconColor = Colors.blue;
+                  iconColor = t.accent;
                   break;
                 case LocalTrainingSyncStatus.failed:
                   icon = Icons.cloud_off;
-                  iconColor = Colors.red;
+                  iconColor = t.red;
                   break;
                 case null:
                   break;
               }
 
               return Container(
-                color: isHighlighted ? Colors.amber.withOpacity(0.15) : null,
+                color: isSelected
+                    ? t.accent.withOpacity(0.2)
+                    : (isHighlighted ? t.accent.withOpacity(0.15) : null),
                 child: ListTile(
-                  leading: icon != null ? Icon(icon, color: iconColor) : null,
+                  leading: _isSelectionMode
+                      ? Checkbox(
+                    value: isSelected,
+                    onChanged: (_) => _toggleSelection(s.id),
+                    activeColor: t.accent,
+                    checkColor: t.accentFg,
+                  )
+                      : (icon != null ? Icon(icon, color: iconColor) : null),
                   title: Text(
-                    '${DateFormat('dd/MM/yyyy').format(s.startTime)} • ${s.id}',
+                    DateFormat('dd/MM/yyyy HH:mm').format(s.startTime),
+                    style: t.bodyBold(t.textPrimary),
                   ),
                   subtitle: Text(
                     '${s.hitPercent}% • ${s.totalThrows} tiri • ${_formatDuration(s.durationSeconds)}',
+                    style: t.bodySmall(t.textSecondary),
                   ),
-                  trailing: status == LocalTrainingSyncStatus.failed
+                  trailing: !_isSelectionMode && status == LocalTrainingSyncStatus.failed
                       ? IconButton(
-                          icon: const Icon(Icons.refresh),
-                          onPressed: () async {
-                            await LocalTrainingSyncService.instance.syncAll();
-                            _reload();
-                          },
-                        )
-                      : isHighlighted
-                          ? const Icon(Icons.check_circle, color: Colors.amber)
-                          : null,
+                    icon: Icon(Icons.refresh, color: t.accent),
+                    onPressed: () async {
+                      await LocalTrainingSyncService.instance.syncAll();
+                      _reload();
+                    },
+                  )
+                      : null,
                   onTap: () {
-                    widget.onSelect(s);
-                    Navigator.pop(context);
+                    if (_isSelectionMode) {
+                      _toggleSelection(s.id);
+                    } else {
+                      widget.onSelect(s);
+                      Navigator.pop(context);
+                    }
                   },
                 ),
               );
-            },
+              },
           );
         },
       ),
@@ -1359,7 +1489,6 @@ class _CachedThrowRecord {
   final String trainingTarget;
   final DartThrow dartThrow;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _CachedThrowRecord({
     required this.trainingId,
     required this.trainingTarget,
@@ -1388,7 +1517,6 @@ class TrainingSessionStats {
   final String? commento;
   final LocalTrainingSyncStatus? syncStatus;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TrainingSessionStats({
     required this.id,
     required this.target,
@@ -1410,6 +1538,33 @@ class TrainingSessionStats {
     this.commento,
     this.syncStatus,
   });
+  // Aggiungi in training_stats_screen.dart, dentro la classe TrainingSessionStats
+  factory TrainingSessionStats.fromRecord(LocalTrainingRecord record) {
+    final stats = TrainingStats(record.throwsList);
+    return TrainingSessionStats(
+      id: record.remoteId ?? record.localId,
+      target: record.target,
+      startTime: record.startTime,
+      endTime: record.endTime,
+      durationSeconds: record.endTime.difference(record.startTime).inSeconds,
+      totalThrows: stats.totalThrows,
+      totalTurns: stats.totalTurns,
+      hits: stats.targetHits(record.target),
+      miss: stats.targetMiss(record.target),
+      hitPercent: stats.totalThrows == 0
+          ? 0
+          : ((stats.targetHits(record.target) / stats.totalThrows) * 100).round(),
+      avgDistanceMm: stats.averageDistanceMm,
+      bestStreak: stats.bestStreak(record.target),
+      focus: record.focus,
+      stress: record.stress,
+      energia: record.energia,
+      fiducia: record.fiducia,
+      distrazioni: record.distrazioni,
+      commento: record.commento,
+      syncStatus: record.syncStatus,
+    );
+  }
 }
 
 class PeriodStats {
@@ -1423,7 +1578,6 @@ class PeriodStats {
   final int totalDurationSeconds;
   final int bestStreak;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const PeriodStats({
     required this.totalSessions,
     required this.totalThrows,
@@ -1455,23 +1609,21 @@ class _Stat extends StatelessWidget {
   const _Stat(this.label, this.value);
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: AppTokens.r10,
+        border: Border.all(color: t.border),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label),
-          Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
+          Text(label, style: t.bodySmall(t.textSecondary)),
+          Text(value, style: t.bodyBold(t.textPrimary)),
         ],
       ),
     );
@@ -1480,24 +1632,35 @@ class _Stat extends StatelessWidget {
 
 class _Box extends StatelessWidget {
   final String text;
+  final IconData? icon;
 
-  const _Box(this.text);
+  const _Box(this.text, {this.icon});
 
   @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: AppTokens.r10,
+        border: Border.all(color: t.border),
+        color: t.surfaceHigh,
       ),
-      child: Text(text),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(text, style: t.bodyBold(t.textPrimary)),
+          if (icon != null) ...[
+            const SizedBox(width: 4),
+            Icon(icon, color: t.textSecondary, size: 18),
+          ],
+        ],
+      ),
     );
   }
 }
 
-/// Funzione: descrive in modo semplice questo blocco di logica.
 int _asInt(dynamic value) {
   if (value is int) return value;
   if (value is double) return value.round();
@@ -1505,7 +1668,6 @@ int _asInt(dynamic value) {
   return 0;
 }
 
-/// Funzione: descrive in modo semplice questo blocco di logica.
 int? _asNullableInt(dynamic value) {
   if (value == null) return null;
   if (value is int) return value;
@@ -1513,7 +1675,6 @@ int? _asNullableInt(dynamic value) {
   return int.tryParse(value.toString());
 }
 
-/// Funzione: descrive in modo semplice questo blocco di logica.
 double _asDouble(dynamic value) {
   if (value is double) return value;
   if (value is int) return value.toDouble();
@@ -1521,7 +1682,6 @@ double _asDouble(dynamic value) {
   return 0;
 }
 
-/// Funzione: descrive in modo semplice questo blocco di logica.
 String _formatDuration(int totalSeconds) {
   final duration = Duration(seconds: totalSeconds);
   final hours = duration.inHours;
@@ -1538,3 +1698,4 @@ String _formatDuration(int totalSeconds) {
 
   return '${seconds}s';
 }
+

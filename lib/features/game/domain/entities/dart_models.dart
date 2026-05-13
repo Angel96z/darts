@@ -9,7 +9,6 @@ class DartHitData {
   final double distanceMm;
   final String? targetQuadrant;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const DartHitData({
     required this.boardPosition,
     required this.sector,
@@ -23,7 +22,6 @@ class DartPlayer {
   final String id;
   final String name;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const DartPlayer({
     required this.id,
     required this.name,
@@ -35,7 +33,6 @@ class DartTeam {
   final String name;
   final List<DartPlayer> players;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const DartTeam({
     required this.id,
     required this.name,
@@ -61,7 +58,6 @@ class DartThrow {
   final int dartInTurn;
   final bool isPass;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const DartThrow({
     required this.position,
     required this.sector,
@@ -78,6 +74,52 @@ class DartThrow {
     required this.dartInTurn,
     this.isPass = false,
   });
+
+  /// 🔥 NUOVO: Factory per creare DartThrow da Map (usato nel sync service)
+  factory DartThrow.fromMap(Map<String, dynamic> map) {
+    return DartThrow(
+      position: Offset(
+        (map['boardX'] ?? 0.0).toDouble(),
+        (map['boardY'] ?? 0.0).toDouble(),
+      ),
+      sector: map['sector']?.toString() ?? 'MISS',
+      score: (map['score'] ?? 0).toInt(),
+      timestamp: map['timestamp'] is DateTime
+          ? map['timestamp']
+          : DateTime.tryParse(map['timestamp']?.toString() ?? '') ?? DateTime.now(),
+      distanceMm: (map['distanceMm'] ?? 0.0).toDouble(),
+      targetQuadrant: map['quadrant']?.toString(),
+      playerId: map['playerId']?.toString() ?? '',
+      playerName: map['playerName']?.toString() ?? '',
+      teamId: map['teamId']?.toString() ?? '',
+      teamName: map['teamName']?.toString() ?? '',
+      roundNumber: (map['round'] ?? 0).toInt(),
+      turnNumber: (map['turn'] ?? 0).toInt(),
+      dartInTurn: (map['dart'] ?? 0).toInt(),
+      isPass: map['isPass'] == true,
+    );
+  }
+
+  /// 🔥 NUOVO: Metodo per convertire DartThrow in Map (usato nel save)
+  Map<String, dynamic> toMap() {
+    return {
+      'boardX': position.dx,
+      'boardY': position.dy,
+      'sector': sector,
+      'score': score,
+      'timestamp': timestamp.toIso8601String(),
+      'distanceMm': distanceMm,
+      'quadrant': targetQuadrant,
+      'playerId': playerId,
+      'playerName': playerName,
+      'teamId': teamId,
+      'teamName': teamName,
+      'round': roundNumber,
+      'turn': turnNumber,
+      'dart': dartInTurn,
+      'isPass': isPass,
+    };
+  }
 }
 
 abstract class DartGameEngine {
@@ -92,7 +134,6 @@ class DartTurnPlayer {
   final String teamId;
   final String teamName;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const DartTurnPlayer({
     required this.playerId,
     required this.playerName,
@@ -124,12 +165,10 @@ class DartThrowManagerController extends ChangeNotifier {
     return _turnOrder[_currentOrderIndex];
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void setEngine(DartGameEngine engine) {
     _engine = engine;
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void configureSingles({
     required List<DartPlayer> players,
   }) {
@@ -147,7 +186,6 @@ class DartThrowManagerController extends ChangeNotifier {
     }
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void registerHit(DartHitData hit) {
     if (_waitingNextTurn) return;
 
@@ -184,7 +222,6 @@ class DartThrowManagerController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void finishVisualTurn() {
     if (!_waitingNextTurn) return;
 
@@ -204,9 +241,7 @@ class DartThrowManagerController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void undoLastThrow() {
-
     if (_throws.isEmpty) return;
 
     final removed = _throws.removeLast();
@@ -217,8 +252,7 @@ class DartThrowManagerController extends ChangeNotifier {
     final round = removed.roundNumber;
     final turn = removed.turnNumber;
 
-    final playerIndex =
-    _turnOrder.indexWhere((p) => p.playerId == playerId);
+    final playerIndex = _turnOrder.indexWhere((p) => p.playerId == playerId);
 
     if (playerIndex != -1) {
       _currentOrderIndex = playerIndex;
@@ -245,7 +279,6 @@ class DartThrowManagerController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   void clearAll() {
     _throws.clear();
     _currentTurn.clear();

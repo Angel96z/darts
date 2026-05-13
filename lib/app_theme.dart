@@ -200,6 +200,11 @@ abstract class AppThemeData {
       scaffoldBackgroundColor: t.bg,
       cardColor: t.surface,
       dividerColor: t.divider,
+      dialogTheme: DialogThemeData(
+        backgroundColor: t.overlay,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: t.bg,
         foregroundColor: t.textPrimary,

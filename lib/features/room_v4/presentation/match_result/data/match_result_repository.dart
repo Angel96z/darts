@@ -92,14 +92,27 @@ class MatchResultRepository {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return null;
 
-      final matchRef = FirebaseFirestore.instance
+      // Prova prima in x01_matches
+      var matchRef = FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
-          .collection('matches')
+          .collection('x01_matches')
           .doc(remoteMatchId);
 
-      final matchDoc = await matchRef.get();
+      var matchDoc = await matchRef.get();
+
+      // Se non trovato, prova in cricket_matches
+      if (!matchDoc.exists) {
+        matchRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('cricket_matches')
+            .doc(remoteMatchId);
+        matchDoc = await matchRef.get();
+      }
+
       if (!matchDoc.exists) return null;
+
 
       final matchData = matchDoc.data()!;
       final matchSets = await _fetchFirestoreHierarchy(matchRef);

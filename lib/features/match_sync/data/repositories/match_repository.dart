@@ -3,6 +3,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../room_v4/domain/models/player_turn.dart';
+import '../../../stats/domain/services/stats_aggregator_service.dart';
 import '../../domain/entities/local_match_record.dart';
 import '../../domain/entities/match_stats.dart';
 import '../../domain/repositories/match_repository_interface.dart';
@@ -14,8 +15,6 @@ class MatchRepository implements MatchRepositoryInterface {
 
   @override
 // Nel metodo saveMatch di MatchRepository
-
-  @override
   Future<String> saveMatch(LocalMatchRecord record) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -23,11 +22,13 @@ class MatchRepository implements MatchRepositoryInterface {
     }
 
     final uid = user.uid;
+    // Determina la collezione in base alla modalità
+    final collectionName = record.mode == 'x01' ? 'x01_matches' : 'cricket_matches';
     final matchRef = _db
         .collection('users')
         .doc(uid)
-        .collection('matches')
-        .doc(record.remoteId ?? _db.collection('matches').doc().id);
+        .collection(collectionName)
+        .doc(record.remoteId ?? _db.collection(collectionName).doc().id);
 
     // 1. Salva le info del match
     final matchInfo = {
@@ -79,6 +80,8 @@ class MatchRepository implements MatchRepositoryInterface {
           'winningScore': legData['winningScore'],
           'startTime': legData['startTime'],
           'endTime': legData['endTime'],
+          'cricketMarks': legData['cricketMarks'] ?? {},
+          'cricketPoints': legData['cricketPoints'] ?? {},
           'createdAt': FieldValue.serverTimestamp(),
         }).timeout(_timeout);
 
@@ -104,22 +107,37 @@ class MatchRepository implements MatchRepositoryInterface {
       }
     }
 
+    // 🔥 Aggiorna statistiche carriera DOPO il salvataggio del match
+    await StatsAggregatorService.instance.updateUserStats();
+
     return matchRef.id;
   }
-
 
   @override
   Future<void> updateMatchStatus(String matchId, String status) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    await _db
+    // Determina la collezione (cerchiamo in entrambe o salviamo il mode?
+    // Per update usiamo lo stesso approccio - cerchiamo prima in x01_matches)
+    final x01Ref = _db
         .collection('users')
         .doc(user.uid)
-        .collection('matches')
-        .doc(matchId)
-        .update({'status': status, 'updatedAt': FieldValue.serverTimestamp()})
-        .timeout(_timeout);
+        .collection('x01_matches')
+        .doc(matchId);
+
+    final cricketRef = _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('cricket_matches')
+        .doc(matchId);
+
+    final x01Doc = await x01Ref.get();
+    if (x01Doc.exists) {
+      await x01Ref.update({'status': status, 'updatedAt': FieldValue.serverTimestamp()}).timeout(_timeout);
+    } else {
+      await cricketRef.update({'status': status, 'updatedAt': FieldValue.serverTimestamp()}).timeout(_timeout);
+    }
   }
 
   @override
@@ -127,13 +145,24 @@ class MatchRepository implements MatchRepositoryInterface {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return false;
 
-    final snap = await _db
+    final x01Snap = await _db
         .collection('users')
         .doc(user.uid)
-        .collection('matches')
+        .collection('x01_matches')
         .doc(matchId)
         .get();
 
-    return snap.exists;
+    if (x01Snap.exists) {
+      return true;
+    }
+
+    final cricketSnap = await _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('cricket_matches')
+        .doc(matchId)
+        .get();
+
+    return cricketSnap.exists;
   }
 }

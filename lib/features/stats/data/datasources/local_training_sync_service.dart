@@ -1,4 +1,5 @@
-/// File: local_training_sync_service.dart. Contiene accesso e trasformazione dati (datasource, dto, repository o mapper).
+/// File: local_training_sync_service.dart
+/// Sincronizzazione bidirezionale COMPLETA per sessioni di training
 
 import 'dart:convert';
 import 'dart:ui';
@@ -23,7 +24,6 @@ class LocalTrainingSaveResult {
   final String localId;
   final LocalTrainingSyncStatus status;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const LocalTrainingSaveResult({
     required this.localId,
     required this.status,
@@ -48,7 +48,6 @@ class LocalTrainingRecord {
   final int? distrazioni;
   final String? commento;
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const LocalTrainingRecord({
     required this.localId,
     required this.remoteId,
@@ -68,7 +67,6 @@ class LocalTrainingRecord {
     this.commento,
   });
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   LocalTrainingRecord copyWith({
     String? remoteId,
     LocalTrainingSyncStatus? syncStatus,
@@ -80,6 +78,7 @@ class LocalTrainingRecord {
     int? fiducia,
     int? distrazioni,
     String? commento,
+    List<DartThrow>? throwsList,
   }) {
     return LocalTrainingRecord(
       localId: localId,
@@ -88,7 +87,7 @@ class LocalTrainingRecord {
       target: target,
       startTime: startTime,
       endTime: endTime,
-      throwsList: throwsList,
+      throwsList: throwsList ?? this.throwsList,
       syncStatus: syncStatus ?? this.syncStatus,
       retryCount: retryCount ?? this.retryCount,
       lastSyncAttempt: lastSyncAttempt ?? this.lastSyncAttempt,
@@ -138,9 +137,7 @@ class LocalTrainingRecord {
     };
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   static LocalTrainingRecord fromMap(Map<String, dynamic> map) {
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return LocalTrainingRecord(
       localId: map['localId'],
       remoteId: map['remoteId'],
@@ -185,27 +182,26 @@ class LocalTrainingRecord {
 }
 
 class LocalTrainingSyncService {
-  static const _key = 'training_queue_v2';
+  static const String _key = 'training_queue_v2';
+  static const int _maxRetries = 3;
+  static const Duration _retryDelay = Duration(hours: 1);
 
-// Singleton instance
   static late final LocalTrainingSyncService instance;
 
   final TrainingRepository _repo;
-  final _uuid = const Uuid();
+  final Uuid _uuid = const Uuid();
 
   bool _running = false;
 
-// Factory per inizializzare il singleton
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   static Future<void> initialize(TrainingRepository repo) async {
     instance = LocalTrainingSyncService._internal(repo);
     await instance.start();
   }
 
-// Costruttore privato
   LocalTrainingSyncService._internal(this._repo);
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
+  // ==================== PUBLIC API ====================
+
   Future<LocalTrainingSaveResult> saveSession({
     required String mode,
     required String target,
@@ -249,8 +245,6 @@ class LocalTrainingSyncService {
     );
   }
 
-  // SAVE LOCALE
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<String> saveLocal({
     required String mode,
     required String target,
@@ -282,6 +276,7 @@ class LocalTrainingSyncService {
       distrazioni: distrazioni,
       commento: commento,
     );
+
     final all = await _getAll();
     all.add(record);
     await _saveAll(all);
@@ -289,145 +284,20 @@ class LocalTrainingSyncService {
     return record.localId;
   }
 
-  // START
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> start() async {
     await syncAll();
   }
 
-  // SYNC BIDIREZIONALE
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> syncAll() async {
     if (_running) return;
     if (!await _checkBackendConnection()) return;
-    _running = true;
 
+    _running = true;
     await _pushLocalToRemote();
     await _pullRemoteToLocal();
-
     _running = false;
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  Future<bool> _checkBackendConnection() async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .limit(1)
-          .get(const GetOptions(source: Source.server))
-          .timeout(const Duration(seconds: 3));
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  // LOCALE → DB
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  Future<void> _pushLocalToRemote() async {
-    final all = await _getAll();
-
-    for (int i = 0; i < all.length; i++) {
-      final r = all[i];
-
-// Salta se già sincronizzato
-      if (r.syncStatus == LocalTrainingSyncStatus.synced) continue;
-
-// Controlla retry per quelli falliti
-      if (r.syncStatus == LocalTrainingSyncStatus.failed) {
-        if (r.retryCount >= 3) continue; // Troppi tentativi, salta
-        if (r.lastSyncAttempt != null) {
-          final hoursSinceLastAttempt = DateTime.now().difference(r.lastSyncAttempt!).inHours;
-          if (hoursSinceLastAttempt < 1) continue; // Aspetta almeno 1 ora tra retry
-        }
-      }
-
-      all[i] = r.copyWith(
-        syncStatus: LocalTrainingSyncStatus.syncing,
-        retryCount: r.retryCount + 1,
-        lastSyncAttempt: DateTime.now(),
-      );
-      await _saveAll(all);
-
-      try {
-        final id = await _repo.saveTraining(
-          mode: r.mode,
-          target: r.target,
-          startTime: r.startTime,
-          endTime: r.endTime,
-          throwsList: r.throwsList,
-          focus: r.focus,
-          stress: r.stress,
-          energia: r.energia,
-          fiducia: r.fiducia,
-          distrazioni: r.distrazioni,
-          commento: r.commento,
-          trainingIdOverride: r.localId,
-        );
-
-        all[i] = r.copyWith(
-          remoteId: id,
-          syncStatus: LocalTrainingSyncStatus.synced,
-          retryCount: 0, // Reset retry count on success
-        );
-      } catch (e) {
-        all[i] = r.copyWith(
-          syncStatus: LocalTrainingSyncStatus.failed,
-// retryCount già incrementato sopra
-        );
-      }
-
-      await _saveAll(all);
-    }
-  }
-
-  // DB → LOCALE
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  Future<void> _pullRemoteToLocal() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final db = FirebaseFirestore.instance;
-
-    final snap = await db
-        .collection('users')
-        .doc(user.uid)
-        .collection('trainings')
-        .get();
-
-    final local = await _getAll();
-
-    for (final doc in snap.docs) {
-      final exists = local.any((e) => e.remoteId == doc.id);
-      if (exists) continue;
-
-      final data = doc.data();
-// ignora record non completati (evita dati sporchi)
-      if (data['status'] != 'complete') continue;
-      final record = LocalTrainingRecord(
-        localId: data['id'] ?? doc.id,
-        remoteId: doc.id,
-        mode: data['mode'],
-        target: data['target'],
-        startTime: (data['startTime'] as Timestamp).toDate(),
-        endTime: (data['endTime'] as Timestamp).toDate(),
-        throwsList: [], // opzionale: puoi ricostruirli
-        syncStatus: LocalTrainingSyncStatus.synced,
-        focus: data['focus'] as int?,
-        stress: data['stress'] as int?,
-        energia: data['energia'] as int?,
-        fiducia: data['fiducia'] as int?,
-        distrazioni: data['distrazioni'] as int?,
-        commento: data['commento']?.toString(),
-      );
-
-      local.add(record);
-    }
-
-    await _saveAll(local);
-  }
-
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<LocalTrainingRecord?> getById(String id) async {
     final all = await _getAll();
     for (final r in all) {
@@ -435,13 +305,99 @@ class LocalTrainingSyncService {
     }
     return null;
   }
-// Ottieni tutti i record locali
-  /// Funzione: descrive in modo semplice questo blocco di logica.
+
   Future<List<LocalTrainingRecord>> getAllRecords() async {
     return await _getAll();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
+  Future<void> deleteRecord(String id) async {
+    final all = await _getAll();
+    final index = all.indexWhere((r) => r.localId == id || r.remoteId == id);
+    if (index == -1) return;
+
+    final record = all[index];
+
+    // Elimina dal backend se esiste remoteId
+    if (record.remoteId != null) {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final db = FirebaseFirestore.instance;
+        final trainingRef = db
+            .collection('users')
+            .doc(user.uid)
+            .collection('trainings')
+            .doc(record.remoteId);
+
+        // Elimina il training
+        await trainingRef.delete();
+
+        // Elimina i throws associati
+        final throwsSnapshot = await trainingRef.collection('throws').get();
+        final batch = db.batch();
+        for (final throwDoc in throwsSnapshot.docs) {
+          batch.delete(throwDoc.reference);
+        }
+        await batch.commit();
+      }
+    }
+
+    // Elimina dal locale
+    all.removeAt(index);
+    await _saveAll(all);
+  }
+
+  Future<void> deleteRecords(List<String> ids) async {
+    if (ids.isEmpty) return;
+
+    final all = await _getAll();
+    final toDelete = <LocalTrainingRecord>[];
+    final toKeep = <LocalTrainingRecord>[];
+
+    for (final record in all) {
+      if (ids.contains(record.localId) || ids.contains(record.remoteId)) {
+        toDelete.add(record);
+      } else {
+        toKeep.add(record);
+      }
+    }
+
+    if (toDelete.isEmpty) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final db = FirebaseFirestore.instance;
+
+      for (final record in toDelete) {
+        if (record.remoteId != null) {
+          final trainingRef = db
+              .collection('users')
+              .doc(user.uid)
+              .collection('trainings')
+              .doc(record.remoteId);
+
+          final throwsSnapshot = await trainingRef.collection('throws').get();
+          final batch = db.batch();
+          batch.delete(trainingRef);
+          for (final throwDoc in throwsSnapshot.docs) {
+            batch.delete(throwDoc.reference);
+          }
+          await batch.commit();
+        }
+      }
+    }
+
+    await _saveAll(toKeep);
+  }
+  Future<int> deleteAllRecords() async {
+    final all = await _getAll();
+    if (all.isEmpty) return 0;
+
+    final ids = all.map((record) => record.localId).toList();
+    await deleteRecords(ids);
+
+    return all.length;
+  }
+
   Future<void> updateSessionReview({
     required String id,
     int? focus,
@@ -474,7 +430,7 @@ class LocalTrainingSyncService {
             .doc(user.uid)
             .collection('trainings')
             .doc(updated.remoteId)
-            .set({
+            .update({
           'focus': focus,
           'stress': stress,
           'energia': energia,
@@ -482,15 +438,13 @@ class LocalTrainingSyncService {
           'distrazioni': distrazioni,
           'commento': commento,
           'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+        });
       }
     }
   }
-  // Metodo di debug per vedere tutti i record
-  /// Funzione: descrive in modo semplice questo blocco di logica.
+
   Future<void> debugPrintAllRecords() async {
     final all = await _getAll();
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     debugPrint('=== RECORD LOCALI (${all.length}) ===');
     for (var i = 0; i < all.length; i++) {
       final r = all[i];
@@ -499,21 +453,213 @@ class LocalTrainingSyncService {
     debugPrint('===================================');
   }
 
+  // ==================== PRIVATE METHODS ====================
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
+  Future<bool> _checkBackendConnection() async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .limit(1)
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 3));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _pushLocalToRemote() async {
+    final all = await _getAll();
+
+    for (int i = 0; i < all.length; i++) {
+      final r = all[i];
+
+      if (r.syncStatus == LocalTrainingSyncStatus.synced) continue;
+
+      if (r.syncStatus == LocalTrainingSyncStatus.failed) {
+        if (r.retryCount >= _maxRetries) continue;
+        if (r.lastSyncAttempt != null) {
+          final hoursSinceLastAttempt = DateTime.now().difference(r.lastSyncAttempt!).inHours;
+          if (hoursSinceLastAttempt < 1) continue;
+        }
+      }
+
+      all[i] = r.copyWith(
+        syncStatus: LocalTrainingSyncStatus.syncing,
+        retryCount: r.retryCount + 1,
+        lastSyncAttempt: DateTime.now(),
+      );
+      await _saveAll(all);
+
+      try {
+        final id = await _repo.saveTraining(
+          mode: r.mode,
+          target: r.target,
+          startTime: r.startTime,
+          endTime: r.endTime,
+          throwsList: r.throwsList,
+          focus: r.focus,
+          stress: r.stress,
+          energia: r.energia,
+          fiducia: r.fiducia,
+          distrazioni: r.distrazioni,
+          commento: r.commento,
+          trainingIdOverride: r.localId,
+        );
+
+        all[i] = r.copyWith(
+          remoteId: id,
+          syncStatus: LocalTrainingSyncStatus.synced,
+          retryCount: 0,
+        );
+      } catch (e) {
+        debugPrint('❌ Push fallito per ${r.localId}: $e');
+        all[i] = r.copyWith(
+          syncStatus: LocalTrainingSyncStatus.failed,
+        );
+      }
+
+      await _saveAll(all);
+    }
+  }
+
+  /// 🔥 METODO CORRETTO: PULL COMPLETO CON THROWS
+  Future<void> _pullRemoteToLocal() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final db = FirebaseFirestore.instance;
+    final localRecords = await _getAll();
+    final existingRemoteIds = localRecords
+        .where((r) => r.remoteId != null)
+        .map((r) => r.remoteId!)
+        .toSet();
+
+    // Ottieni tutti i training completati dal backend
+    final trainingsSnapshot = await db
+        .collection('users')
+        .doc(user.uid)
+        .collection('trainings')
+        .where('status', isEqualTo: 'complete')
+        .get();
+
+    final newRecords = <LocalTrainingRecord>[];
+
+    for (final trainingDoc in trainingsSnapshot.docs) {
+      final remoteId = trainingDoc.id;
+
+      // Salta se già presente in locale
+      if (existingRemoteIds.contains(remoteId)) continue;
+
+      final data = trainingDoc.data();
+
+      // 🔥 LEGGI I THROWS DALLA SUBCOLLECTION
+      final throwsSnapshot = await trainingDoc.reference
+          .collection('throws')
+          .orderBy('timestamp')
+          .get();
+
+      final throwsList = <DartThrow>[];
+
+      for (final throwDoc in throwsSnapshot.docs) {
+        final throwData = throwDoc.data();
+        throwsList.add(DartThrow(
+          position: Offset(
+            _toDouble(throwData['boardX']),
+            _toDouble(throwData['boardY']),
+          ),
+          sector: throwData['sector']?.toString() ?? 'MISS',
+          score: _toInt(throwData['score']),
+          timestamp: (throwData['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          distanceMm: _toDouble(throwData['distanceMm']),
+          targetQuadrant: throwData['quadrant']?.toString(),
+          playerId: throwData['playerId']?.toString() ?? '',
+          playerName: throwData['playerName']?.toString() ?? '',
+          teamId: throwData['teamId']?.toString() ?? '',
+          teamName: throwData['teamName']?.toString() ?? '',
+          roundNumber: _toInt(throwData['round']),
+          turnNumber: _toInt(throwData['turn']),
+          dartInTurn: _toInt(throwData['dart']),
+          isPass: throwData['isPass'] == true,
+        ));
+      }
+
+      final stats = data['stats'] as Map<String, dynamic>? ?? {};
+
+      final record = LocalTrainingRecord(
+        localId: remoteId, // Usa remoteId come localId per consistenza
+        remoteId: remoteId,
+        mode: data['mode']?.toString() ?? 'bull',
+        target: data['target']?.toString() ?? 'T20',
+        startTime: (data['startTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        endTime: (data['endTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        throwsList: throwsList, // 🔥 ORA PIENO!
+        syncStatus: LocalTrainingSyncStatus.synced,
+        retryCount: 0,
+        lastSyncAttempt: null,
+        focus: _toNullableInt(data['focus']),
+        stress: _toNullableInt(data['stress']),
+        energia: _toNullableInt(data['energia']),
+        fiducia: _toNullableInt(data['fiducia']),
+        distrazioni: _toNullableInt(data['distrazioni']),
+        commento: data['commento']?.toString(),
+      );
+
+      newRecords.add(record);
+    }
+
+    if (newRecords.isNotEmpty) {
+      final all = await _getAll();
+      all.addAll(newRecords);
+      await _saveAll(all);
+      debugPrint('✅ Pull completato: ${newRecords.length} nuove sessioni con ${newRecords.fold<int>(0, (sum, r) => sum + r.throwsList.length)} tiri');
+    }
+  }
+
   Future<List<LocalTrainingRecord>> _getAll() async {
-    final p = await SharedPreferences.getInstance();
-    final raw = p.getString(_key);
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key);
     if (raw == null) return [];
 
-    return (jsonDecode(raw) as List)
-        .map((e) => LocalTrainingRecord.fromMap(e))
-        .toList();
+    try {
+      final list = jsonDecode(raw) as List;
+      return list.map((e) => LocalTrainingRecord.fromMap(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      debugPrint('❌ Errore decode JSON: $e');
+      return [];
+    }
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Future<void> _saveAll(List<LocalTrainingRecord> list) async {
-    final p = await SharedPreferences.getInstance();
-    await p.setString(_key, jsonEncode(list.map((e) => e.toMap()).toList()));
+    final prefs = await SharedPreferences.getInstance();
+    final json = jsonEncode(list.map((e) => e.toMap()).toList());
+    await prefs.setString(_key, json);
   }
+}
+
+// ==================== HELPER FUNCTIONS ====================
+
+int _toInt(dynamic value) {
+  if (value is int) return value;
+  if (value is double) return value.round();
+  if (value is String) return int.tryParse(value) ?? 0;
+  if (value is num) return value.toInt();
+  return 0;
+}
+
+double _toDouble(dynamic value) {
+  if (value is double) return value;
+  if (value is int) return value.toDouble();
+  if (value is String) return double.tryParse(value) ?? 0.0;
+  if (value is num) return value.toDouble();
+  return 0.0;
+}
+
+int? _toNullableInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is double) return value.round();
+  if (value is String) return int.tryParse(value);
+  if (value is num) return value.toInt();
+  return null;
 }

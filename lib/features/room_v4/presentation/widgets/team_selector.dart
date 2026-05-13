@@ -1,8 +1,10 @@
 // TARGET: Selettore team per la lobby
 // LOGIC GOAL: Permettere selezione modalità team (2v2, 3v3, 4v4)
+// UI: Stile moderno compatibile con ConfigColumn, su un'unica riga
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../app_theme.dart';
 import '../../application/room_notifier.dart';
 
 class TeamSelector extends ConsumerWidget {
@@ -12,41 +14,103 @@ class TeamSelector extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state    = ref.watch(roomNotifierProvider);
+    final state = ref.watch(roomNotifierProvider);
+    final t = AppTokens.of(context);
     final teamSize = state.teamSize;
-    final invalid  = !state.canStartMatch && teamSize > 0;
+    final invalid = !state.canStartMatch && teamSize > 0;
+
+    // I valori UI sono 1v1, 2v2, 3v3, 4v4
+    // Ma mappano ai valori backend: 0 -> 1v1, 2 -> 2v2, 3 -> 3v3, 4 -> 4v4
+    final uiOptions = const [0, 2, 3, 4];
+    final uiLabels = const ['1v1', '2v2', '3v3', '4v4'];
+
+    final currentIndex = uiOptions.indexOf(teamSize);
+    final canGoLeft = currentIndex > 0;
+    final canGoRight = currentIndex < uiOptions.length - 1;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          'Team',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+        if (invalid) ...[
+          const SizedBox(width: 8),
+          Icon(Icons.warning_amber_rounded, size: 16, color: t.red),
+        ],
+        Container(
+          decoration: BoxDecoration(
+            color: t.surface,
+            borderRadius: AppTokens.r16,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _CarouselButton(
+                onTap: canGoLeft
+                    ? () => ref
+                    .read(roomNotifierProvider.notifier)
+                    .updateTeamSize(uiOptions[currentIndex - 1])
+                    : null,
+                icon: Icons.chevron_left,
+                isActive: canGoLeft,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Text(
+                  uiLabels[currentIndex],
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: t.textPrimary,
+                  ),
+                ),
+              ),
+              _CarouselButton(
+                onTap: canGoRight
+                    ? () => ref
+                    .read(roomNotifierProvider.notifier)
+                    .updateTeamSize(uiOptions[currentIndex + 1])
+                    : null,
+                icon: Icons.chevron_right,
+                isActive: canGoRight,
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: 4),
-        DropdownButton<int>(
-          value: teamSize,
-          underline: const SizedBox(),
-          isDense: true,
-          style: Theme.of(context).textTheme.bodySmall,
-          items: const [
-            DropdownMenuItem(value: 0, child: Text('No')),
-            DropdownMenuItem(value: 2, child: Text('2v2')),
-            DropdownMenuItem(value: 3, child: Text('3v3')),
-            DropdownMenuItem(value: 4, child: Text('4v4')),
-          ],
-          onChanged: (v) {
-            if (v != null) ref.read(roomNotifierProvider.notifier).updateTeamSize(v);
-          },
-        ),
-        if (invalid)
-          const Padding(
-            padding: EdgeInsets.only(left: 4),
-            child: Icon(Icons.warning_amber_rounded, size: 14, color: Colors.red),
-          ),
       ],
+    );
+  }
+}
+
+/// Bottone del carousel (stile unificato con ConfigColumn)
+class _CarouselButton extends StatelessWidget {
+  final VoidCallback? onTap;
+  final IconData icon;
+  final bool isActive;
+
+  const _CarouselButton({
+    required this.onTap,
+    required this.icon,
+    required this.isActive,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 150),
+          opacity: isActive ? 1.0 : 0.25,
+          child: Icon(
+            icon,
+            size: 20,
+            color: isActive ? t.accent : t.textMuted,
+          ),
+        ),
+      ),
     );
   }
 }

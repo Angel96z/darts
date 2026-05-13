@@ -61,173 +61,161 @@ class TrainingQuadrantDistance extends StatelessWidget {
     );
   }
 
-  @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
-
     final total = totalMiss == 0 ? 1 : totalMiss;
 
-    final gridSize = (MediaQuery.of(context).size.width * 0.38)
-        .clamp(150.0, 260.0);
-    const gap = 5.0;
-    final cellSize = (gridSize - gap) / 2;
-    final circleSize = gridSize * 0.32;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final fallbackWidth = MediaQuery.of(context).size.width;
+        final availableWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : fallbackWidth;
 
-    final percent = hitPercent;
+        final availableHeight = constraints.maxHeight;
 
-    String freqText;
+        double gridSize = availableWidth.clamp(96.0, 260.0).toDouble();
 
-    if (percent <= 0) {
-      freqText = "—";
-    } else {
-      final n = (100 / percent).round();
-      freqText = "1/$n";
-    }
+        if (availableHeight.isFinite) {
+          final maxGridByHeight = (availableHeight - 48).clamp(80.0, 260.0).toDouble();
+          if (maxGridByHeight < gridSize) {
+            gridSize = maxGridByHeight;
+          }
+        }
 
-    return Align(
-      alignment: Alignment.center,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+        const gap = 5.0;
+        final cellSize = (gridSize - gap) / 2;
+        final circleSize = gridSize * 0.32;
 
-          SizedBox(
-            width: gridSize,
-            height: gridSize,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
+        final percent = hitPercent;
 
-                Column(
+        String freqText;
+
+        if (percent <= 0) {
+          freqText = "—";
+        } else {
+          final n = (100 / percent).round();
+          freqText = "1/$n";
+        }
+
+        return Align(
+          alignment: Alignment.topCenter,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: gridSize,
+                height: gridSize,
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-
-                    Row(
+                    Column(
                       children: [
-
-                        SizedBox(
-                          width: cellSize,
-                          height: cellSize,
-                          child: _cell(quadrants["tl"] ?? 0, total),
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: cellSize,
+                              height: cellSize,
+                              child: _cell(quadrants["tl"] ?? 0, total),
+                            ),
+                            const SizedBox(width: gap),
+                            SizedBox(
+                              width: cellSize,
+                              height: cellSize,
+                              child: _cell(quadrants["tr"] ?? 0, total),
+                            ),
+                          ],
                         ),
-
-                        const SizedBox(width: gap),
-
-                        SizedBox(
-                          width: cellSize,
-                          height: cellSize,
-                          child: _cell(quadrants["tr"] ?? 0, total),
+                        const SizedBox(height: gap),
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: cellSize,
+                              height: cellSize,
+                              child: _cell(quadrants["bl"] ?? 0, total),
+                            ),
+                            const SizedBox(width: gap),
+                            SizedBox(
+                              width: cellSize,
+                              height: cellSize,
+                              child: _cell(quadrants["br"] ?? 0, total),
+                            ),
+                          ],
                         ),
-
                       ],
                     ),
-
-                    const SizedBox(height: gap),
-
-                    Row(
-                      children: [
-
-                        SizedBox(
-                          width: cellSize,
-                          height: cellSize,
-                          child: _cell(quadrants["bl"] ?? 0, total),
-                        ),
-
-                        const SizedBox(width: gap),
-
-                        SizedBox(
-                          width: cellSize,
-                          height: cellSize,
-                          child: _cell(quadrants["br"] ?? 0, total),
-                        ),
-
-                      ],
+                    Container(
+                      width: circleSize,
+                      height: circleSize,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2ECC71),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF2ECC71).withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      alignment: Alignment.center,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            "${percent.toStringAsFixed(0)}%",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: (gridSize * 0.095).clamp(10.0, 14.0),
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            freqText,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: (gridSize * 0.075).clamp(8.0, 11.0),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-
                   ],
                 ),
-
-                Container(
-                  width: circleSize,
-                  height: circleSize,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2ECC71),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF2ECC71).withOpacity(0.3),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-
-                      Text(
-                        "${percent.toStringAsFixed(0)}%",
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-
-                      const SizedBox(height: 2),
-
-                      Text(
-                        freqText,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-
-                    ],
-                  ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  color: _distBg,
+                  border: Border.all(color: _cellBorder),
                 ),
-
-              ],
-            ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.straighten_rounded,
+                      size: 16,
+                      color: _distText.withOpacity(0.6),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      "${distanceMm.toStringAsFixed(1)} mm",
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: _distText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-
-          const SizedBox(height: 10),
-
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              color: _distBg,
-              border: Border.all(color: _cellBorder),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-
-                Icon(
-                  Icons.straighten_rounded,
-                  size: 18,
-                  color: _distText.withOpacity(0.6),
-                ),
-
-                const SizedBox(width: 5),
-
-                Text(
-                  "${distanceMm.toStringAsFixed(1)} mm",
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: _distText,
-                  ),
-                ),
-
-              ],
-            ),
-          ),
-
-        ],
-      ),
+        );
+      },
     );
   }
 }

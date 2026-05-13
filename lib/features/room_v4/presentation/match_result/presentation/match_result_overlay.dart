@@ -315,17 +315,6 @@ class _Header extends StatelessWidget {
                     color: t.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Vincitore: $winnerName',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: t.textSecondary,
-                  ),
-                ),
               ],
             ),
           ),

@@ -35,6 +35,9 @@ class LocalMatchRecord {
   final int retryCount;
   final DateTime? lastSyncAttempt;
   final List<Map<String, dynamic>> matchSets;
+  final Map<String, Map<String, Map<int, int>>> legCricketMarks;  // legKey -> playerId -> marks
+  final Map<String, Map<String, int>> legCricketPoints;          // legKey -> playerId -> points
+
 
   /// Per ogni giocatore (SOLO Firebase ID), lista dei suoi turni (con dardi)
   final Map<String, List<PlayerTurn>> playerTurns;
@@ -63,6 +66,9 @@ class LocalMatchRecord {
     this.retryCount = 0,
     this.lastSyncAttempt,
     required this.matchSets,
+    this.legCricketMarks = const {},
+    this.legCricketPoints = const {},
+
 
   });
 
@@ -97,7 +103,17 @@ class LocalMatchRecord {
       'retryCount': retryCount,
       'lastSyncAttempt': lastSyncAttempt?.toIso8601String(),
       'matchSets': matchSets,
-
+      'legCricketMarks': legCricketMarks.map((key, value) => MapEntry(
+        key,
+        value.map((playerId, marks) => MapEntry(
+          playerId,
+          marks.map((k, v) => MapEntry(k.toString(), v)),
+        )),
+      )),
+      'legCricketPoints': legCricketPoints.map((key, value) => MapEntry(
+        key,
+        value.map((playerId, points) => MapEntry(playerId, points)),
+      )),
     };
   }
 
@@ -111,6 +127,23 @@ class LocalMatchRecord {
           .toList();
       turnsMap[entry.key] = turns;
     }
+
+    // Deserializza legCricketMarks
+    final rawLegMarks = map['legCricketMarks'] as Map<String, dynamic>? ?? {};
+    final legCricketMarks = rawLegMarks.map((legKey, playerMap) => MapEntry(
+      legKey,
+      (playerMap as Map<String, dynamic>).map((playerId, marksMap) => MapEntry(
+        playerId,
+        (marksMap as Map<String, dynamic>).map((k, v) => MapEntry(int.parse(k), v as int)),
+      )),
+    ));
+
+    // Deserializza legCricketPoints
+    final rawLegPoints = map['legCricketPoints'] as Map<String, dynamic>? ?? {};
+    final legCricketPoints = rawLegPoints.map((legKey, playerMap) => MapEntry(
+      legKey,
+      Map<String, int>.from(playerMap as Map<String, dynamic>),
+    ));
 
     return LocalMatchRecord(
       localId: map['localId'],
@@ -143,7 +176,8 @@ class LocalMatchRecord {
           ? DateTime.parse(map['lastSyncAttempt'])
           : null,
       matchSets: List<Map<String, dynamic>>.from(map['matchSets'] ?? []),
-
+      legCricketMarks: legCricketMarks,
+      legCricketPoints: legCricketPoints,
     );
   }
 
@@ -154,7 +188,8 @@ class LocalMatchRecord {
     DateTime? lastSyncAttempt,
     Map<String, List<PlayerTurn>>? playerTurns,
     List<Map<String, dynamic>>? matchSets,
-
+    Map<String, Map<String, Map<int, int>>>? legCricketMarks,
+    Map<String, Map<String, int>>? legCricketPoints,
   }) {
     return LocalMatchRecord(
       localId: localId,
@@ -180,7 +215,8 @@ class LocalMatchRecord {
       retryCount: retryCount ?? this.retryCount,
       lastSyncAttempt: lastSyncAttempt ?? this.lastSyncAttempt,
       matchSets: matchSets ?? this.matchSets,
-
+      legCricketMarks: legCricketMarks ?? this.legCricketMarks,
+      legCricketPoints: legCricketPoints ?? this.legCricketPoints,
     );
   }
 }

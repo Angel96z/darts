@@ -23,8 +23,9 @@ class TeamScoreCard extends StatelessWidget {
     final isCurrentTeam = playerIds.contains(gameState.currentPlayerId);
 
     final score = isCricket
-        ? _getTeamCricketPoints()
+        ? gameState.getTeamCricketPoints(teamId)
         : gameState.getTeamScore(teamId);
+
     final legs = gameState.getTeamLegsWon(teamId);
     final sets = gameState.getTeamSetsWon(teamId);
 
@@ -35,76 +36,47 @@ class TeamScoreCard extends StatelessWidget {
     final fg = isCurrentTeam ? t.green : t.textPrimary;
 
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
-        color: isCurrentTeam ? t.green.withOpacity(0.08) : t.surface,
-        borderRadius: AppTokens.r10,
-        border: Border.all(
-          color: isCurrentTeam ? t.green.withOpacity(0.5) : t.border,
-        ),
+        color: t.surface,
+        borderRadius: AppTokens.r8,
+        border: Border.all(color: t.border, width: 0.5),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          /// HEADER
           Row(
             children: [
-              /// TEAM NAME
-              Text(
-                teamId,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: fg,
-                ),
-              ),
-              const SizedBox(width: 6),
-              /// SET / LEG
+              Text(teamId, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg)),
+              const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   'Set $sets  Leg $legs',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: t.textMuted,
-                  ),
+                  style: TextStyle(fontSize: 10, color: t.textMuted),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              /// SCORE
-              Text(
-                '$score',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: fg,
-                ),
-              ),
+              Text('$score', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: fg)),
             ],
           ),
-          const SizedBox(height: 6),
-          /// PLAYERS
+          const SizedBox(height: 2),
           Column(
             mainAxisSize: MainAxisSize.min,
             children: orderedIds.map<Widget>((id) {
-              return PlayerScoreCard(
-                playerId: id,
-                gameState: gameState,
-                position: gameState.getPlayerPosition(id),
-                isTeamMode: true,
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: PlayerScoreCard(
+                  playerId: id,
+                  gameState: gameState,
+                  position: gameState.getPlayerPosition(id),
+                  isTeamMode: true,
+                ),
               );
             }).toList(),
           ),
         ],
       ),
     );
-  }
-
-  int _getTeamCricketPoints() {
-    int total = 0;
-    for (final playerId in playerIds) {
-      total = total + gameState.getCricketPoints(playerId);
-    }
-    return total;
   }
 }

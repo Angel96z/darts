@@ -1,6 +1,5 @@
 // TARGET: Colonna configurazioni per la lobby
-// LOGIC GOAL: Mostrare e modificare configurazioni di gioco e match
-// REACTION: UI reagisce ai cambiamenti delle config
+// UI: Compatta, centrata, moderna, con icone essenziali
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,135 +15,64 @@ class ConfigColumn extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(roomNotifierProvider);
-    final t = AppTokens.of(context);
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _FormGroup(
-          title: 'Match',
+        _ConfigSection(
+          title: 'MATCH',
           icon: Icons.emoji_events_outlined,
-          t: t,
           child: _MatchConfigCard(
             matchConfig: state.matchConfig,
             onUpdate: (c) =>
                 ref.read(roomNotifierProvider.notifier).updateMatchConfig(c),
           ),
         ),
-
-        const SizedBox(height: 18),
-
-        _FormGroup(
-          title: 'Gioco',
+        const SizedBox(height: 60),
+        _ConfigSection(
+          title: 'GAME',
           icon: Icons.sports_esports_outlined,
-          t: t,
           child: _GameConfigCard(
             gameConfig: state.gameConfig,
             onUpdate: (c) =>
                 ref.read(roomNotifierProvider.notifier).updateGameConfig(c),
           ),
         ),
+        const SizedBox(height: 60),
       ],
     );
   }
 }
 
 /// ─────────────────────────────────────────────
-/// HEADER FORM
+/// SEZIONE CON INTESTAZIONE
 /// ─────────────────────────────────────────────
 
-class _FormHeader extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final AppTokens t;
-
-  const _FormHeader({
-    required this.title,
-    required this.subtitle,
-    required this.t,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(
-          Icons.tune_rounded,
-          size: 18,
-          color: t.accent,
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 15,
-                  height: 1,
-                  fontWeight: FontWeight.w900,
-                  color: t.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 11,
-                  height: 1.15,
-                  fontWeight: FontWeight.w500,
-                  color: t.textMuted,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// ─────────────────────────────────────────────
-/// FORM GROUP
-/// Sezione visiva leggera: niente card pesante.
-/// ─────────────────────────────────────────────
-
-class _FormGroup extends StatelessWidget {
+class _ConfigSection extends StatelessWidget {
   final String title;
   final IconData icon;
   final Widget child;
-  final AppTokens t;
 
-  const _FormGroup({
+  const _ConfigSection({
     required this.title,
     required this.icon,
     required this.child,
-    required this.t,
   });
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(icon, size: 15, color: t.textSecondary),
-            const SizedBox(width: 7),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 12,
-                height: 1,
-                fontWeight: FontWeight.w900,
-                color: t.textSecondary,
-                letterSpacing: 0.2,
-              ),
-            ),
+            Icon(icon, size: 16, color: t.accent),
+            const SizedBox(width: 8),
+            Text(title, style: t.labelCaps(t.accent)),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         child,
       ],
     );
@@ -152,153 +80,116 @@ class _FormGroup extends StatelessWidget {
 }
 
 /// ─────────────────────────────────────────────
-/// UI BASE
+/// CAROSELLO MODERNO
+/// <  valore  > con frecce grandi e touch friendly
 /// ─────────────────────────────────────────────
 
-class _OptionChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  final IconData? icon;
-
-  const _OptionChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppTokens.of(context);
-
-    final bg = selected ? t.accent.withOpacity(0.14) : t.surfaceHigh;
-    final border = selected ? t.accent.withOpacity(0.75) : t.border;
-    final fg = selected ? t.accent : t.textSecondary;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: AppTokens.r8,
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          width: double.infinity,
-          constraints: const BoxConstraints(minHeight: 38),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: AppTokens.r8,
-            border: Border.all(
-              color: border,
-              width: selected ? 1.2 : 1,
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 14, color: fg),
-                const SizedBox(width: 6),
-              ],
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1,
-                    fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-                    color: fg,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ToggleLine extends StatelessWidget {
-  final String label;
-  final bool value;
-  final IconData icon;
-  final ValueChanged<bool> onChanged;
-
-  const _ToggleLine({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppTokens.of(context);
-
-    final bg = value ? t.accent.withOpacity(0.13) : t.surfaceHigh;
-    final border = value ? t.accent.withOpacity(0.75) : t.border;
-    final fg = value ? t.accent : t.textSecondary;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: AppTokens.r8,
-        onTap: () => onChanged(!value),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          constraints: const BoxConstraints(minHeight: 40),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: AppTokens.r8,
-            border: Border.all(color: border),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, size: 15, color: fg),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1,
-                    fontWeight: FontWeight.w800,
-                    color: fg,
-                  ),
-                ),
-              ),
-              Icon(
-                value ? Icons.check_circle_rounded : Icons.circle_outlined,
-                size: 16,
-                color: fg,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CompactDropdown<T> extends StatelessWidget {
+class _Carousel<T> extends StatelessWidget {
+  final List<T> options;
   final T value;
-  final List<T> items;
   final String Function(T) label;
   final ValueChanged<T> onChanged;
+  final double width;
 
-  const _CompactDropdown({
+  const _Carousel({
+    required this.options,
     required this.value,
-    required this.items,
     required this.label,
+    required this.onChanged,
+    this.width = 130,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    final currentIndex = options.indexOf(value);
+    final canGoLeft = currentIndex > 0;
+    final canGoRight = currentIndex < options.length - 1;
+
+    return Container(
+      width: width,
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: AppTokens.r16,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _CarouselButton(
+            onTap: canGoLeft ? () => onChanged(options[currentIndex - 1]) : null,
+            icon: Icons.chevron_left,
+            isActive: canGoLeft,
+          ),
+          Expanded(
+            child: Text(
+              label(value),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: t.textPrimary,
+              ),
+            ),
+          ),
+          _CarouselButton(
+            onTap: canGoRight ? () => onChanged(options[currentIndex + 1]) : null,
+            icon: Icons.chevron_right,
+            isActive: canGoRight,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CarouselButton extends StatelessWidget {
+  final VoidCallback? onTap;
+  final IconData icon;
+  final bool isActive;
+
+  const _CarouselButton({
+    required this.onTap,
+    required this.icon,
+    required this.isActive,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 150),
+          opacity: isActive ? 1.0 : 0.25,
+          child: Icon(
+            icon,
+            size: 20,
+            color: isActive ? t.accent : t.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// ─────────────────────────────────────────────
+/// TOGGLE MODERNO (checkbox elegante)
+/// Icona check + label
+/// ─────────────────────────────────────────────
+
+class _ModernToggle extends StatelessWidget {
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _ModernToggle({
+    required this.label,
+    required this.value,
     required this.onChanged,
   });
 
@@ -306,68 +197,261 @@ class _CompactDropdown<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
 
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: t.surfaceHigh,
-        borderRadius: AppTokens.r8,
-        border: Border.all(color: t.border),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<T>(
-          value: value,
-          isExpanded: true,
-          iconSize: 18,
-          dropdownColor: t.surface,
-          borderRadius: AppTokens.r10,
-          style: TextStyle(
-            fontSize: 13,
-            height: 1,
-            fontWeight: FontWeight.w800,
-            color: t.textPrimary,
-          ),
-          items: items
-              .map(
-                (e) => DropdownMenuItem<T>(
-              value: e,
-              child: Text(
-                label(e),
-                overflow: TextOverflow.ellipsis,
+    return GestureDetector(
+      onTap: () => onChanged(!value),
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 40,
+            height: 40,
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: value ? t.accent : Colors.transparent,
+                  border: Border.all(
+                    color: value ? t.accent : t.border,
+                    width: 1.5,
+                  ),
+                ),
+                child: value
+                    ? Icon(Icons.check, size: 20, color: t.accentFg)
+                    : null,
               ),
             ),
-          )
-              .toList(),
-          onChanged: (v) {
-            if (v != null) onChanged(v);
-          },
-        ),
+          ),
+          if (label.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: value ? FontWeight.w700 : FontWeight.w500,
+                color: value ? t.accent : t.textPrimary,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
 }
 
-class _FieldLabel extends StatelessWidget {
-  final String text;
+/// ─────────────────────────────────────────────
+/// LABEL ROW (label + child, usata ovunque)
+/// ─────────────────────────────────────────────
 
-  const _FieldLabel(this.text);
+class _LabeledField extends StatelessWidget {
+  final String label;
+  final Widget child;
+
+  const _LabeledField({required this.label, required this.child});
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 7),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 10,
-          height: 1,
-          fontWeight: FontWeight.w800,
-          color: t.textMuted,
-          letterSpacing: 0.7,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: t.labelCaps(t.textSecondary)),
+        const SizedBox(height: 6),
+        child,
+      ],
+    );
+  }
+}
+
+/// ─────────────────────────────────────────────
+/// RIGA CON DUE CAROSELLI AFFIANCATI (per int)
+/// ─────────────────────────────────────────────
+
+class _DoubleCarouselInt extends StatelessWidget {
+  final String label1;
+  final List<int> options1;
+  final int value1;
+  final String Function(int) label1Builder;
+  final ValueChanged<int> onChanged1;
+
+  final String label2;
+  final List<int> options2;
+  final int value2;
+  final String Function(int) label2Builder;
+  final ValueChanged<int> onChanged2;
+
+  const _DoubleCarouselInt({
+    required this.label1,
+    required this.options1,
+    required this.value1,
+    required this.label1Builder,
+    required this.onChanged1,
+    required this.label2,
+    required this.options2,
+    required this.value2,
+    required this.label2Builder,
+    required this.onChanged2,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _LabeledField(
+            label: label1,
+            child: _Carousel<int>(
+              options: options1,
+              value: value1,
+              label: label1Builder,
+              onChanged: onChanged1,
+              width: double.infinity,
+            ),
+          ),
         ),
-      ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _LabeledField(
+            label: label2,
+            child: _Carousel<int>(
+              options: options2,
+              value: value2,
+              label: label2Builder,
+              onChanged: onChanged2,
+              width: double.infinity,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// ─────────────────────────────────────────────
+/// RIGA CON DUE CAROSELLI AFFIANCATI (generica per X01)
+/// ─────────────────────────────────────────────
+
+class _DoubleCarouselX01 extends StatelessWidget {
+  final String label1;
+  final List<GameType> options1;
+  final GameType value1;
+  final String Function(GameType) label1Builder;
+  final ValueChanged<GameType> onChanged1;
+
+  final String label2;
+  final List<int> options2;
+  final int value2;
+  final String Function(int) label2Builder;
+  final ValueChanged<int> onChanged2;
+
+  const _DoubleCarouselX01({
+    required this.label1,
+    required this.options1,
+    required this.value1,
+    required this.label1Builder,
+    required this.onChanged1,
+    required this.label2,
+    required this.options2,
+    required this.value2,
+    required this.label2Builder,
+    required this.onChanged2,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _LabeledField(
+            label: label1,
+            child: _Carousel<GameType>(
+              options: options1,
+              value: value1,
+              label: label1Builder,
+              onChanged: onChanged1,
+              width: double.infinity,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _LabeledField(
+            label: label2,
+            child: _Carousel<int>(
+              options: options2,
+              value: value2,
+              label: label2Builder,
+              onChanged: onChanged2,
+              width: double.infinity,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// ─────────────────────────────────────────────
+/// RIGA CON CAROSELLO + TOGGLE AFFIANCATI (OUT + Double In)
+/// ─────────────────────────────────────────────
+
+class _DoubleCarouselOut extends StatelessWidget {
+  final String label1;
+  final List<String> options1;
+  final String value1;
+  final String Function(String) label1Builder;
+  final ValueChanged<String> onChanged1;
+
+  final String label2;
+  final bool value2;
+  final ValueChanged<bool> onChanged2;
+
+  const _DoubleCarouselOut({
+    required this.label1,
+    required this.options1,
+    required this.value1,
+    required this.label1Builder,
+    required this.onChanged1,
+    required this.label2,
+    required this.value2,
+    required this.onChanged2,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _LabeledField(
+            label: label1,
+            child: _Carousel<String>(
+              options: options1,
+              value: value1,
+              label: label1Builder,
+              onChanged: onChanged1,
+              width: double.infinity,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _LabeledField(
+            label: label2,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: _ModernToggle(
+                label: '',
+                value: value2,
+                onChanged: onChanged2,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -394,7 +478,9 @@ class _MatchConfigCardState extends State<_MatchConfigCard> {
   late int _setCount;
   late int _legCount;
 
-  static const _options = [1, 2, 3, 4, 5, 6, 7];
+  static const _setOptions = [1, 2, 3, 4, 5];
+  static const _legOptions = [1, 2, 3, 4, 5, 6, 7];
+  static const _modeOptions = [MatchMode.firstTo, MatchMode.bestOf];
 
   @override
   void initState() {
@@ -415,66 +501,38 @@ class _MatchConfigCardState extends State<_MatchConfigCard> {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _FieldLabel('DURATA'),
-        Row(
-          children: [
-            Expanded(
-              child: _CompactDropdown<int>(
-                value: _setCount,
-                items: _options,
-                label: (v) => 'Set $v',
-                onChanged: (v) {
-                  setState(() => _setCount = v);
-                  _emit();
-                },
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _CompactDropdown<int>(
-                value: _legCount,
-                items: _options,
-                label: (v) => 'Leg $v',
-                onChanged: (v) {
-                  setState(() => _legCount = v);
-                  _emit();
-                },
-              ),
-            ),
-          ],
+        _LabeledField(
+          label: 'MODE',
+          child: _Carousel<MatchMode>(
+            options: _modeOptions,
+            value: _mode,
+            label: (v) => v == MatchMode.firstTo ? 'First To' : 'Best Of',
+            onChanged: (v) {
+              setState(() => _mode = v);
+              _emit();
+            },
+            width: double.infinity,
+          ),
         ),
-
-        const SizedBox(height: 12),
-
-        const _FieldLabel('MODALITÀ'),
-        Row(
-          children: [
-            Expanded(
-              child: _OptionChip(
-                label: 'First To',
-                icon: Icons.flag_outlined,
-                selected: _mode == MatchMode.firstTo,
-                onTap: () {
-                  setState(() => _mode = MatchMode.firstTo);
-                  _emit();
-                },
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _OptionChip(
-                label: 'Best Of',
-                icon: Icons.emoji_events_outlined,
-                selected: _mode == MatchMode.bestOf,
-                onTap: () {
-                  setState(() => _mode = MatchMode.bestOf);
-                  _emit();
-                },
-              ),
-            ),
-          ],
+        const SizedBox(height: 16),
+        _DoubleCarouselInt(
+          label1: 'SET',
+          options1: _setOptions,
+          value1: _setCount,
+          label1Builder: (v) => '$v',
+          onChanged1: (v) {
+            setState(() => _setCount = v);
+            _emit();
+          },
+          label2: 'LEG',
+          options2: _legOptions,
+          value2: _legCount,
+          label2Builder: (v) => '$v',
+          onChanged2: (v) {
+            setState(() => _legCount = v);
+            _emit();
+          },
         ),
       ],
     );
@@ -506,6 +564,8 @@ class _GameConfigCardState extends State<_GameConfigCard> {
   late bool _cutThroat;
 
   static const _scoreOptions = [101, 301, 501, 701, 1001];
+  static const _typeOptions = [GameType.x01, GameType.cricket];
+  static const _outModeOptions = ['Single', 'Double', 'Triple'];
 
   @override
   void initState() {
@@ -513,10 +573,10 @@ class _GameConfigCardState extends State<_GameConfigCard> {
     _type = widget.gameConfig.type;
     _startingScore = widget.gameConfig.startingScore ?? 501;
     _outMode = widget.gameConfig.tripleOut == true
-        ? 'triple'
+        ? 'Triple'
         : widget.gameConfig.doubleOut == true
-        ? 'double'
-        : 'single';
+        ? 'Double'
+        : 'Single';
     _doubleIn = widget.gameConfig.doubleIn ?? false;
     _cutThroat = widget.gameConfig.cutThroat ?? false;
   }
@@ -524,8 +584,8 @@ class _GameConfigCardState extends State<_GameConfigCard> {
   void _emitX01() => widget.onUpdate(
     GameConfig.x01(
       startingScore: _startingScore,
-      doubleOut: _outMode == 'double',
-      tripleOut: _outMode == 'triple',
+      doubleOut: _outMode == 'Double',
+      tripleOut: _outMode == 'Triple',
       doubleIn: _doubleIn,
     ),
   );
@@ -537,143 +597,99 @@ class _GameConfigCardState extends State<_GameConfigCard> {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _FieldLabel('TIPO GIOCO'),
-        Row(
-          children: [
-            Expanded(
-              child: _OptionChip(
-                label: 'X01',
-                icon: Icons.adjust_rounded,
-                selected: _type == GameType.x01,
-                onTap: () {
-                  setState(() => _type = GameType.x01);
+        // X01: TYPE e SCORE affiancati
+        if (_type == GameType.x01)
+          _DoubleCarouselX01(
+            label1: 'TYPE',
+            options1: _typeOptions,
+            value1: _type,
+            label1Builder: (v) => v == GameType.x01 ? 'X01' : 'Cricket',
+            onChanged1: (v) {
+              setState(() {
+                _type = v;
+                if (_type == GameType.x01) {
                   _emitX01();
-                },
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _OptionChip(
-                label: 'Cricket',
-                icon: Icons.grid_3x3_rounded,
-                selected: _type == GameType.cricket,
-                onTap: () {
-                  setState(() => _type = GameType.cricket);
+                } else {
                   _emitCricket();
-                },
-              ),
-            ),
-          ],
-        ),
+                }
+              });
+            },
+            label2: 'SCORE',
+            options2: _scoreOptions,
+            value2: _startingScore,
+            label2Builder: (v) => '$v',
+            onChanged2: (v) {
+              setState(() => _startingScore = v);
+              _emitX01();
+            },
+          ),
 
-        const SizedBox(height: 14),
-
-        if (_type == GameType.x01) _buildX01Config(),
-        if (_type == GameType.cricket) _buildCricketConfig(),
-      ],
-    );
-  }
-
-  Widget _buildX01Config() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _FieldLabel('PUNTEGGIO'),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final itemWidth = (constraints.maxWidth - 12) / 3;
-
-            return Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: _scoreOptions.map((score) {
-                return SizedBox(
-                  width: itemWidth,
-                  child: _OptionChip(
-                    label: '$score',
-                    selected: _startingScore == score,
-                    onTap: () {
-                      setState(() => _startingScore = score);
-                      _emitX01();
+        // Cricket: TYPE e CUT THROAT affiancati
+        if (_type == GameType.cricket)
+          Row(
+            children: [
+              Expanded(
+                child: _LabeledField(
+                  label: 'TYPE',
+                  child: _Carousel<GameType>(
+                    options: _typeOptions,
+                    value: _type,
+                    label: (v) => v == GameType.x01 ? 'X01' : 'Cricket',
+                    onChanged: (v) {
+                      setState(() {
+                        _type = v;
+                        if (_type == GameType.x01) {
+                          _emitX01();
+                        } else {
+                          _emitCricket();
+                        }
+                      });
                     },
+                    width: double.infinity,
                   ),
-                );
-              }).toList(),
-            );
-          },
-        ),
-
-        const SizedBox(height: 12),
-
-        const _FieldLabel('CHIUSURA'),
-        Row(
-          children: [
-            Expanded(
-              child: _OptionChip(
-                label: 'Single',
-                selected: _outMode == 'single',
-                onTap: () {
-                  setState(() => _outMode = 'single');
-                  _emitX01();
-                },
+                ),
               ),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: _OptionChip(
-                label: 'Double',
-                selected: _outMode == 'double',
-                onTap: () {
-                  setState(() => _outMode = 'double');
-                  _emitX01();
-                },
+              const SizedBox(width: 12),
+              Expanded(
+                child: _LabeledField(
+                  label: 'CUT THROAT',
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: _ModernToggle(
+                      label: '',
+                      value: _cutThroat,
+                      onChanged: (v) {
+                        setState(() => _cutThroat = v);
+                        _emitCricket();
+                      },
+                    ),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: _OptionChip(
-                label: 'Triple',
-                selected: _outMode == 'triple',
-                onTap: () {
-                  setState(() => _outMode = 'triple');
-                  _emitX01();
-                },
-              ),
-            ),
-          ],
-        ),
+            ],
+          ),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
 
-        _ToggleLine(
-          label: 'Double In',
-          value: _doubleIn,
-          icon: Icons.lock_open_outlined,
-          onChanged: (v) {
-            setState(() => _doubleIn = v);
-            _emitX01();
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCricketConfig() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _FieldLabel('REGOLE'),
-        _ToggleLine(
-          label: 'Cut Throat',
-          value: _cutThroat,
-          icon: Icons.groups_2_outlined,
-          onChanged: (v) {
-            setState(() => _cutThroat = v);
-            _emitCricket();
-          },
-        ),
+        // X01: OUT (CAROUSEL) e Double In (TOGGLE) affiancati
+        if (_type == GameType.x01)
+          _DoubleCarouselOut(
+            label1: 'OUT',
+            options1: _outModeOptions,
+            value1: _outMode,
+            label1Builder: (v) => v,
+            onChanged1: (v) {
+              setState(() => _outMode = v);
+              _emitX01();
+            },
+            label2: 'DOUBLE IN',
+            value2: _doubleIn,
+            onChanged2: (v) {
+              setState(() => _doubleIn = v);
+              _emitX01();
+            },
+          ),
       ],
     );
   }

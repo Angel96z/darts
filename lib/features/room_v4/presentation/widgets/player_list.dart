@@ -1,8 +1,10 @@
 // TARGET: Lista giocatori per la lobby
 // LOGIC GOAL: Mostrare giocatori, permettere rimozione/riordino
+// TEAM MODE: Mostra team come blocchi verticali separati
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../app_theme.dart';
 import '../../application/room_notifier.dart';
 import '../../domain/models/player_info.dart';
 
@@ -30,7 +32,7 @@ class PlayerList extends ConsumerWidget {
   }
 }
 
-// ─── Lista singola ────────────────────────────────────────────────────────────
+// ─── Lista singola (single mode) ─────────────────────────────────────────────
 
 class _PlayerListView extends StatelessWidget {
   final List<PlayerInfo> players;
@@ -55,7 +57,7 @@ class _PlayerListView extends StatelessWidget {
   }
 }
 
-// ─── Lista team ───────────────────────────────────────────────────────────────
+// ─── Lista team (blocchi verticali separati) ─────────────────────────────────
 
 class _TeamListView extends StatelessWidget {
   final List<PlayerInfo> players;
@@ -79,40 +81,57 @@ class _TeamListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: _teams.asMap().entries.map((entry) {
+    final t = AppTokens.of(context);
+    final teams = _teams;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: teams.asMap().entries.map((entry) {
         final ti = entry.key;
         final team = entry.value;
-        return SizedBox(
-          width: 240,
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: t.surfaceHigh,
+            borderRadius: AppTokens.r12,
+            border: Border.all(color: t.accent.withValues(alpha: 0.15)),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Label team
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  'TEAM ${ti + 1}',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1,
+              // HEADER DEL TEAM
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: t.accent.withValues(alpha: 0.08),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
                   ),
                 ),
+                child: Text(
+                  'TEAM ${ti + 1}',
+                  style: t.labelCaps(t.accent),
+                ),
               ),
-              ...team.map((p) {
-                final gi = players.indexWhere((x) => x.id == p.id);
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: _PlayerRow(
-                    index: gi,
-                    player: p,
-                    total: players.length,
-                    ref: ref,
-                  ),
-                );
-              }),
+              // LISTA GIOCATORI DEL TEAM
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  children: team.map((p) {
+                    final gi = players.indexWhere((x) => x.id == p.id);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _PlayerRow(
+                        index: gi,
+                        player: p,
+                        total: players.length,
+                        ref: ref,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
             ],
           ),
         );
@@ -121,7 +140,7 @@ class _TeamListView extends StatelessWidget {
   }
 }
 
-// ─── Riga giocatore ───────────────────────────────────────────────────────────
+// ─── Riga giocatore ───────────────────────────────────────────────
 
 class _PlayerRow extends StatefulWidget {
   final int index;
@@ -154,25 +173,23 @@ class _PlayerRowState extends State<_PlayerRow> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final t = AppTokens.of(context);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
+        color: t.surface,
+        borderRadius: AppTokens.r10,
+        border: Border.all(color: t.border),
       ),
       child: Row(
         children: [
-          // Avatar
           CircleAvatar(
             radius: 16,
-            backgroundColor: cs.primary.withOpacity(0.1),
-            child: Icon(Icons.person, size: 16, color: cs.primary),
+            backgroundColor: t.accent.withValues(alpha: 0.1),
+            child: Icon(Icons.person, size: 16, color: t.accent),
           ),
           const SizedBox(width: 10),
-
-          // Nome + badge
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,18 +197,20 @@ class _PlayerRowState extends State<_PlayerRow> {
                 Text(
                   widget.player.name,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: t.textPrimary,
+                  ),
                 ),
                 if (widget.player.isGuest)
                   Text(
                     'guest',
-                    style: TextStyle(fontSize: 10, color: cs.outline),
+                    style: t.bodySmall(t.textMuted).copyWith(fontSize: 10),
                   ),
               ],
             ),
           ),
-
-          // Frecce riordino
           _ArrowBtn(
             icon: Icons.arrow_upward,
             enabled: widget.index > 0,
@@ -202,15 +221,17 @@ class _PlayerRowState extends State<_PlayerRow> {
             enabled: widget.index < widget.total - 1,
             onTap: () => _reorder(widget.index, widget.index + 1),
           ),
-
-          // Rimuovi
           GestureDetector(
             onTap: () => widget.ref
                 .read(roomNotifierProvider.notifier)
                 .removePlayer(widget.player.id),
-            child: const Padding(
-              padding: EdgeInsets.all(6),
-              child: Icon(Icons.close, size: 18, color: Colors.red),
+            behavior: HitTestBehavior.opaque,
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: Center(
+                child: Icon(Icons.close, size: 20, color: t.red),
+              ),
             ),
           ),
         ],
@@ -218,26 +239,33 @@ class _PlayerRowState extends State<_PlayerRow> {
     );
   }
 }
-
 class _ArrowBtn extends StatelessWidget {
   final IconData icon;
   final bool enabled;
   final VoidCallback onTap;
 
-  const _ArrowBtn({required this.icon, required this.enabled, required this.onTap});
+  const _ArrowBtn({
+    required this.icon,
+    required this.enabled,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+
     return GestureDetector(
       onTap: enabled ? onTap : null,
-      child: Padding(
-        padding: const EdgeInsets.all(6),
-        child: Icon(
-          icon,
-          size: 16,
-          color: enabled
-              ? Theme.of(context).colorScheme.onSurface
-              : Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: Center(
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 150),
+            opacity: enabled ? 1.0 : 0.2,
+            child: Icon(icon, size: 20, color: t.textPrimary),
+          ),
         ),
       ),
     );

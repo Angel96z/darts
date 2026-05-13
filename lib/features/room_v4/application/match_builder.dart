@@ -361,140 +361,94 @@ class MatchBuilder {
   // CRICKET - REGOLE SPECIFICHE
   // ============================================================
 
+// In match_builder.dart, sostituisci il metodo _throwDartCricket con questo:
+
+// In match_builder.dart, sostituisci l'intero metodo _throwDartCricket:
+
+// match_builder.dart - solo la parte di _throwDartCricket
+
+// match_builder.dart - solo il metodo _throwDartCricket corretto
+
   MatchBuilderState _throwDartCricket(MatchBuilderState state, DartThrow dart, GameConfig config) {
     final currentPlayerId = state.currentPlayerId;
     final isCutThroat = config.cutThroat ?? false;
+    final isTeamMode = state.teamSize > 1;
+    final currentTeamId = isTeamMode ? state.playerToTeam[currentPlayerId] : null;
+    final target = dart.target;
+    final multiplier = dart.multiplier;
 
-    // Costruisci i marks attuali (inclusi dardi del turno corrente)
     final currentMarks = _buildCricketMarksFromState(state);
     final currentPoints = Map<String, int>.from(state.cricketPoints);
 
-    // Assicurati che ogni giocatore abbia un valore
-    for (final playerId in state.playerIds) {
-      currentPoints.putIfAbsent(playerId, () => 0);
-    }
-
-    final target = dart.target;
-    final multiplier = dart.multiplier;
-    final isValidTarget = CricketRules.isValidCricketNumber(target);
-
-    // ============================================================
-    // CALCOLO MARKS E PUNTI ECCEDENTI
-    // ============================================================
-    int excessMarks = 0;
-    int newTotalMarks = 0;
-    bool numberJustOpened = false;
+    int pointsToAssign = 0;
     int totalMarksForTurn = state.currentTurn.totalMarks;
-    if (isValidTarget && target != 0 && multiplier != 0) {
+    int newTotalMarksForPlayer = 0;
+    List<String> pointsRecipients = [];
+
+    if (CricketRules.isValidCricketNumber(target) && target != 0 && multiplier != 0) {
       totalMarksForTurn += multiplier;
+      final currentPlayerMarks = currentMarks[currentPlayerId]?[target] ?? 0;
 
-      final currentMarksOnTarget = currentMarks[currentPlayerId]?[target] ?? 0;
+      final result = CricketRules.calculateDart(
+        currentPlayerMarks: currentPlayerMarks,
+        multiplier: multiplier,
+        target: target,
+        allMarks: currentMarks,
+        currentPlayerId: currentPlayerId,
+        allPlayerIds: state.playerIds,
+        isCutThroat: isCutThroat,
+        isTeamMode: isTeamMode,
+        playerToTeam: state.playerToTeam,
+      );
 
-      if (currentMarksOnTarget < 3) {
-        // Calcola il nuovo totale marks (max 3)
-        final wouldBe = currentMarksOnTarget + multiplier;
-        newTotalMarks = wouldBe.clamp(0, 3);
-
-        // Calcola marks eccedenti: se supera 3, l'eccesso diventa punti
-        if (wouldBe > 3) {
-          excessMarks = wouldBe - 3;
-        }
-
-        numberJustOpened = newTotalMarks >= 3 && currentMarksOnTarget < 3;
-      } else {
-        // Settore già chiuso dal giocatore: TUTTI i marks sono eccedenti
-        excessMarks = multiplier;
-        newTotalMarks = 3; // Resta 3
-        numberJustOpened = false;
-      }
+      pointsToAssign = result.pointsToAssign;
+      pointsRecipients = result.targetsForPoints;
+      newTotalMarksForPlayer = result.newTotalMarks;
     }
 
-    // Verifica se l'avversario ha già chiuso questo numero
-    final opponentHasClosed = _isNumberClosedByOpponent(
-        currentMarks,
-        target,
-        currentPlayerId
-    );
-
-    // Verifica se il giocatore ha aperto il numero (dopo questo dardo)
-    final playerHasNumber = numberJustOpened ||
-        ((currentMarks[currentPlayerId]?[target] ?? 0) >= 3);
-
-    // ============================================================
-    // CALCOLO PUNTI (SOLO MARKS ECCEDENTI)
-    // ============================================================
-    int pointsScored = 0;
-    int actualScore = 0;
-
-    // Solo se:
-    // 1. Il giocatore ha aperto il numero (3+ marks totali)
-    // 2. L'avversario NON ha chiuso il numero
-    // 3. Ci sono marks eccedenti
-    if (isValidTarget && target != 0 && multiplier != 0 && playerHasNumber && !opponentHasClosed && excessMarks > 0) {
-      final pointsValue = CricketRules.getNumberValue(target);
-      pointsScored = pointsValue * excessMarks;
-
-      if (isCutThroat) {
-        // Cut Throat: i punti vanno agli avversari
-        actualScore = 0;
-      } else {
-        // Standard Cricket: i punti vanno al giocatore corrente
-        actualScore = pointsScored;
-      }
-    }
-
-    // ============================================================
-    // AGGIORNA PUNTEGGI
-    // ============================================================
-    final updatedCricketPoints = Map<String, int>.from(currentPoints);
-
-    if (!isCutThroat) {
-      // Standard: aggiungi punti al giocatore corrente
-      updatedCricketPoints[currentPlayerId] = (updatedCricketPoints[currentPlayerId] ?? 0) + actualScore;
-    } else {
-      // Cut Throat: distribuisci punti a TUTTI gli avversari che NON hanno chiuso il numero
-      if (playerHasNumber && !opponentHasClosed && pointsScored > 0) {
-        for (final playerId in state.playerIds) {
-          if (playerId == currentPlayerId) continue;
-
-          final opponentMarks = currentMarks[playerId]?[target] ?? 0;
-          // Solo gli avversari che NON hanno chiuso il numero ricevono punti
-          if (opponentMarks < 3) {
-            updatedCricketPoints[playerId] = (updatedCricketPoints[playerId] ?? 0) + pointsScored;
-          }
-        }
-      }
-      // Il giocatore corrente non prende punti in Cut Throat
-      updatedCricketPoints[currentPlayerId] = updatedCricketPoints[currentPlayerId] ?? 0;
-    }
-
-    // ============================================================
-    // AGGIORNA MARKS
-    // ============================================================
+    // Aggiorna marks
     final updatedMarks = _updateCricketMarksWithExcess(
-      state,
-      currentPlayerId,
-      target,
-      multiplier,
-      newTotalMarks,
+      state, currentPlayerId, target, multiplier, newTotalMarksForPlayer,
     );
 
-    // ============================================================
-    // VERIFICA VITTORIA
-    // ============================================================
-    final isCheckout = _checkCricketVictory(
-      updatedMarks,
-      updatedCricketPoints,
-      currentPlayerId,
-      isCutThroat,
+    // Aggiorna punti
+    final updatedPoints = Map<String, int>.from(currentPoints);
+
+    if (pointsToAssign > 0) {
+      for (final recipientId in pointsRecipients) {
+        updatedPoints[recipientId] = (updatedPoints[recipientId] ?? 0) + pointsToAssign;
+      }
+    }
+
+    // Calcola teamPoints (somma dei punti individuali per team)
+    final Map<String, int> computedTeamPoints = {};
+    if (isTeamMode) {
+      for (final entry in state.playerToTeam.entries) {
+        final teamId = entry.value;
+        final playerId = entry.key;
+        computedTeamPoints[teamId] = (computedTeamPoints[teamId] ?? 0) + (updatedPoints[playerId] ?? 0);
+      }
+    }
+
+    // 🔥 VERIFICA VITTORIA - usando le funzioni ESISTENTI
+    final isCheckout = isTeamMode && currentTeamId != null
+        ? CricketRules.checkVictoryTeam(
+      teamId: currentTeamId,
+      allMarks: updatedMarks,
+      teamPoints: computedTeamPoints,  // ← usa computedTeamPoints
+      playerToTeam: state.playerToTeam,
+      allPlayerIds: state.playerIds,
+      isCutThroat: isCutThroat,
+    )
+        : CricketRules.checkVictorySingle(
+      playerId: currentPlayerId,
+      allMarks: updatedMarks,
+      allPoints: updatedPoints,
+      isCutThroat: isCutThroat,
     );
 
-    // ============================================================
-    // AGGIORNA TURNO
-    // ============================================================
     final newThrows = [...state.currentTurn.throws, dart];
-    final newTotal = state.currentTurn.total + actualScore;
-    final newPlayerScore = updatedCricketPoints[currentPlayerId] ?? 0;
+    final newPlayerScore = updatedPoints[currentPlayerId] ?? 0;
 
     final updatedTurn = PlayerTurn(
       playerId: currentPlayerId,
@@ -502,8 +456,8 @@ class MatchBuilder {
       roundNumber: state.currentTurn.roundNumber,
       legNumber: state.currentTurn.legNumber,
       throws: newThrows,
-      total: 0,  // 🆕 Cricket non usa total per i punti (usa cricketPoints)
-      totalMarks: totalMarksForTurn,  // 🆕 somma dei moltiplicatori
+      total: 0,
+      totalMarks: totalMarksForTurn,
       initialScore: state.currentTurn.initialScore,
       score: newPlayerScore,
       isBust: false,
@@ -511,26 +465,24 @@ class MatchBuilder {
       timestamp: DateTime.now(),
     );
 
-    // ============================================================
-    // GESTIONE VITTORIA
-    // ============================================================
     if (isCheckout) {
       return state.copyWith(
         currentTurn: updatedTurn,
         cricketMarks: updatedMarks,
-        cricketPoints: updatedCricketPoints,
-        playerScores: updatedCricketPoints,
+        cricketPoints: updatedPoints,
+        teamScores: computedTeamPoints,
+        playerScores: isTeamMode ? {} : updatedPoints,
       );
     }
 
     return state.copyWith(
       currentTurn: updatedTurn,
       cricketMarks: updatedMarks,
-      cricketPoints: updatedCricketPoints,
-      playerScores: updatedCricketPoints,
+      cricketPoints: updatedPoints,
+      teamScores: computedTeamPoints,
+      playerScores: isTeamMode ? {} : updatedPoints,
     );
   }
-
 // Helper aggiornato per gestire correttamente i marks (max 3)
   Map<String, Map<int, int>> _updateCricketMarksWithExcess(
       MatchBuilderState state,

@@ -25,7 +25,7 @@ class TrainingSaveLogic {
     if (throws.isEmpty) {
       return const TrainingSaveResult(
         canSave: false,
-        message: "Nessun tiro registrato",
+        message: "No throws recorded",
       );
     }
 
@@ -42,13 +42,13 @@ class TrainingSaveLogic {
       return const TrainingSaveResult(
         canSave: false,
         message:
-        "Turno incompleto. Lancia tutte le freccette o annulla le ultime.",
+        "Incomplete turn. Throw all darts or undo the last ones.",
       );
     }
 
     return const TrainingSaveResult(
       canSave: true,
-      message: "Allenamento salvabile",
+      message: "Training can be saved",
     );
   }
 

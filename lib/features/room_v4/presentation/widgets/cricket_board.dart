@@ -71,7 +71,7 @@ class _CricketNumberTile extends StatelessWidget {
         ? t.textMuted.withOpacity(0.3)
         : isClosed
         ? t.accent
-        : t.textSecondary;
+        : t.textPrimary;
 
     final textStyle = TextStyle(
       fontSize: 13,

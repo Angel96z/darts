@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app_theme.dart';
 import '../../application/room_notifier.dart';
+import '../../domain/game_types/cricket_rules.dart';
 import '../../domain/models/checkout_suggestion.dart';
 import '../../domain/models/game_state.dart';
 import '../../domain/models/player_turn.dart';
@@ -39,7 +40,7 @@ class _Vm {
   final List<String?> suggestedDartLabels;
   final String liveTotalLabel;
   final int tableStartScore;
-  final List<_RowVm> tableRows;
+  final List<RowVm> tableRows;
   final GameState gameState;
 
   const _Vm({
@@ -105,29 +106,122 @@ class _Vm {
 
     return _Vm(
       playerName: gameState.getPlayerName(pid),
-      score: gameState.getPlayerLiveScore(pid).toString(),
+      // 🔥 SCORE: distinguo tra Cricket e X01
+      score: isCricket
+          ? gameState.getCricketPoints(pid).toString()
+          : gameState.getPlayerLiveScore(pid).toString(),
       avg: avgRaw.isNaN ? '-' : avgRaw.toStringAsFixed(1),
       roundLabel: gameState.currentRoundLabel,
       setLabel: 'S $setsWon/${gameState.matchConfig.setsToWin}',
       legLabel: 'L $legsWon/${gameState.matchConfig.legsToWin}',
+
       isFrozen: isFrozen, isOut: isOut, isBust: isBust, isCheckoutBlocked: isCheckoutBlocked,
-      badge: _resolveBadge(statusLabel: gameState.getPlayerStateLabel(pid), isOut: isOut, isBust: isBust, isFrozen: isFrozen, isCheckoutBlocked: isCheckoutBlocked),
+      badge: _resolveBadge(statusLabel: gameState.getPlayerStateLabel(pid), isOut: isOut, isBust: isBust, isFrozen: isFrozen, isCheckoutBlocked: isCheckoutBlocked,isCricket: isCricket,),
       dartLabels: dartLabels, suggestedDartLabels: suggestedDartLabels,
-      liveTotalLabel: isFrozen ? '---' : '${turn.total}',
+      liveTotalLabel: isFrozen
+          ? '---'
+          : isCricket
+          ? '${_calculateCurrentCricketTurnPoints(gameState, turn)}'
+          : '${turn.total}',
+
       tableStartScore: legTurns.isNotEmpty ? legTurns.first.initialScore : turn.initialScore,
-      tableRows: legTurns.map(_RowVm.fromTurn).toList(),
+      tableRows: legTurns.map(RowVm.fromTurn).toList(),
       teamLabel: teamLabel,
       gameState: gameState,
+
     );
   }
-  static _BadgeVm? _resolveBadge({required String statusLabel, required bool isOut, required bool isBust, required bool isFrozen, required bool isCheckoutBlocked}) {
+// Sostituisci il metodo _resolveBadge con questo:
+
+  static _BadgeVm? _resolveBadge({
+    required String statusLabel,
+    required bool isOut,
+    required bool isBust,
+    required bool isFrozen,
+    required bool isCheckoutBlocked,
+    required bool isCricket,
+  }) {
+    // 🔥 CRICKET: solo badge OUT, niente altro
+    if (isCricket) {
+      if (isOut) return const _BadgeVm(icon: Icons.check_circle_rounded, text: 'OUT', kind: _BK.green);
+      return null;
+    }
+
+    // 🔥 X01: badge completi
     if (isCheckoutBlocked) return const _BadgeVm(icon: Icons.block_rounded, text: 'NO OUT', kind: _BK.orange);
     if (isOut) return const _BadgeVm(icon: Icons.check_circle_rounded, text: 'OUT', kind: _BK.green);
     if (isBust) return const _BadgeVm(icon: Icons.cancel_rounded, text: 'BUST', kind: _BK.red);
     if (isFrozen) return const _BadgeVm(icon: Icons.lock_rounded, text: 'DOUBLE IN', kind: _BK.grey);
-    if (statusLabel.isNotEmpty && !statusLabel.endsWith('LEFT'))
+    if (statusLabel.isNotEmpty && !statusLabel.endsWith('LEFT')) {
       return _BadgeVm(icon: Icons.play_arrow_rounded, text: statusLabel, kind: _BK.accent);
+    }
     return null;
+  }
+  static int _calculateCurrentCricketTurnPoints(GameState gameState, PlayerTurn turn) {
+    final allPlayerIds = gameState.players.map((p) => p.id).toList();
+    final replayMarks = CricketRules.initializeMarks(allPlayerIds);
+    final replayPoints = CricketRules.initializePoints(allPlayerIds);
+    final isTeamMode = gameState.isTeamMode;
+    final isCutThroat = gameState.gameConfig.cutThroat == true;
+    final playerToTeam = gameState.playerToTeam;
+
+    int currentTurnPoints = 0;
+
+    void applyDart({
+      required String throwingPlayerId,
+      required int target,
+      required int multiplier,
+      required bool countForCurrentTurn,
+    }) {
+      if (!CricketRules.isValidCricketNumber(target)) return;
+      if (multiplier <= 0) return;
+
+      final result = CricketRules.calculateDart(
+        currentPlayerMarks: replayMarks[throwingPlayerId]?[target] ?? 0,
+        multiplier: multiplier,
+        target: target,
+        allMarks: replayMarks,
+        currentPlayerId: throwingPlayerId,
+        allPlayerIds: allPlayerIds,
+        isCutThroat: isCutThroat,
+        isTeamMode: isTeamMode,
+        playerToTeam: playerToTeam,
+      );
+
+      replayMarks[throwingPlayerId]![target] = result.newTotalMarks;
+
+      for (final targetPlayerId in result.targetsForPoints) {
+        replayPoints[targetPlayerId] = (replayPoints[targetPlayerId] ?? 0) + result.pointsToAssign;
+      }
+
+      if (countForCurrentTurn) {
+        currentTurnPoints += result.pointsToAssign * result.targetsForPoints.length;
+      }
+    }
+
+    for (final completedTurn in gameState.allTurns) {
+      if (completedTurn.legNumber != turn.legNumber) continue;
+
+      for (final dart in completedTurn.throws) {
+        applyDart(
+          throwingPlayerId: completedTurn.playerId,
+          target: dart.target,
+          multiplier: dart.multiplier,
+          countForCurrentTurn: false,
+        );
+      }
+    }
+
+    for (final dart in turn.throws) {
+      applyDart(
+        throwingPlayerId: turn.playerId,
+        target: dart.target,
+        multiplier: dart.multiplier,
+        countForCurrentTurn: true,
+      );
+    }
+
+    return currentTurnPoints;
   }
 
   static List<String> _buildCheckoutLabels({
@@ -160,11 +254,11 @@ class _Vm {
   }
 }
 
-class _RowVm {
+class RowVm {
   final String turnTotal, dartsLabel, scoreAfterTurn, roundNumber;
   final bool isBust, isCheckout;
-  const _RowVm({required this.turnTotal, required this.dartsLabel, required this.scoreAfterTurn, required this.roundNumber, required this.isBust, required this.isCheckout});
-  factory _RowVm.fromTurn(PlayerTurn t) => _RowVm(
+  const RowVm({required this.turnTotal, required this.dartsLabel, required this.scoreAfterTurn, required this.roundNumber, required this.isBust, required this.isCheckout});
+  factory RowVm.fromTurn(PlayerTurn t) => RowVm(
     turnTotal: t.isBust ? '0' : '${t.total}',
     dartsLabel: t.throws.isEmpty ? '-' : t.throws.map((d) => d.label).join(' · '),
     scoreAfterTurn: '${t.score}', roundNumber: '${t.roundNumber}',
@@ -193,7 +287,13 @@ class _CardView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
-    final live = t.liveColor(isOut: vm.isOut, isBust: vm.isBust, isCheckoutBlocked: vm.isCheckoutBlocked);
+    final live = vm.gameState.isCricket
+        ? (vm.isOut ? t.green : t.accent)
+        : t.liveColor(
+      isOut: vm.isOut,
+      isBust: vm.isBust,
+      isCheckoutBlocked: vm.isCheckoutBlocked,
+    );
 
     if (vm.gameState.isCricket) {
       // 🔥 CRICKET: live panel a sinistra, stats a destra, cricket board sotto
@@ -227,7 +327,7 @@ class _CardView extends StatelessWidget {
           SizedBox(width: 180, child: _LivePanel(vm: vm, t: t, live: live, showStats: true)),
           Container(width: 1, color: t.divider),
           Expanded(
-            child: _HistoryPanel(startScore: vm.tableStartScore, rows: vm.tableRows, t: t),
+            child: HistoryPanel(startScore: vm.tableStartScore, rows: vm.tableRows, t: t),
           ),
         ],
       ),
@@ -263,7 +363,14 @@ class _LivePanel extends StatelessWidget {
           // Riga 1: Nome + Badge
           Row(children: [
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(vm.playerName, overflow: TextOverflow.ellipsis, style: t.bodyBold(t.textPrimary)),
+              Text(
+                vm.playerName,
+                overflow: TextOverflow.ellipsis,
+                style: t.bodyBold(t.textPrimary).copyWith(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
               if (vm.teamLabel != null) Text(vm.teamLabel!, style: t.bodySmall(t.textMuted)),
             ])),
             if (vm.badge != null) _Pill(vm: vm.badge!, t: t),
@@ -275,7 +382,7 @@ class _LivePanel extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               decoration: BoxDecoration(color: t.accent.withOpacity(0.15), borderRadius: AppTokens.r4),
-              child: Text(vm.roundLabel, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: t.accent, letterSpacing: 0.5)),
+              child: Text(vm.roundLabel, style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800, color: t.accent, letterSpacing: 0.5)),
             ),
           ]),
           // 🔥 Riga 3: 3 freccette - SOLO se showStats = true (X01)
@@ -392,26 +499,19 @@ class _Pill extends StatelessWidget {
 class _DartChip extends StatelessWidget {
   final String? label, suggested; final bool isFrozen; final Color live; final AppTokens t;
   const _DartChip({required this.label, required this.suggested, required this.isFrozen, required this.live, required this.t});
+
   @override
   Widget build(BuildContext context) {
     final hasValue = label != null;
-    final hasSuggestion = !hasValue && suggested != null;
-    final text = hasValue ? label! : hasSuggestion ? suggested! : isFrozen ? '?' : '_';
+    final text = hasValue ? label! : suggested ?? (isFrozen ? '?' : '_');
+    final bgColor = hasValue ? live.withOpacity(0.12) : t.surfaceHigh;
+    final txtColor = hasValue ? live : t.textMuted;
+
     return Container(
-      height: 32,
+      padding: EdgeInsets.zero,
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: hasValue ? live.withOpacity(0.1) : t.surfaceHigh,
-        borderRadius: AppTokens.r6,
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 24,
-          fontWeight: hasValue ? FontWeight.w800 : FontWeight.w600,
-          color: hasValue ? live : hasSuggestion ? t.textMuted : t.textMuted,
-        ),
-      ),
+      decoration: BoxDecoration(color: bgColor, borderRadius: AppTokens.r4),
+      child: Text(text, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: txtColor)),
     );
   }
 }
@@ -433,59 +533,100 @@ class _StatItem extends StatelessWidget {
 // HISTORY PANEL (X01)
 // ──────────────────────────────────────────────
 
-class _HistoryPanel extends StatefulWidget {
-  final int startScore; final List<_RowVm> rows; final AppTokens t;
-  const _HistoryPanel({required this.startScore, required this.rows, required this.t});
-  @override State<_HistoryPanel> createState() => _HistoryPanelState();
+class HistoryPanel extends StatefulWidget {
+  final int startScore; final List<RowVm> rows; final AppTokens t;
+  const HistoryPanel({required this.startScore, required this.rows, required this.t});
+  @override State<HistoryPanel> createState() => HistoryPanelState();
 }
 
-class _HistoryPanelState extends State<_HistoryPanel> {
+class HistoryPanelState extends State<HistoryPanel> {
   final _scroll = ScrollController();
-  @override void initState() { super.initState(); _toBottom(); }
-  @override void didUpdateWidget(covariant _HistoryPanel old) {
+
+  @override
+  void initState() {
+    super.initState();
+    _toBottom();
+  }
+
+  @override
+  void didUpdateWidget(covariant HistoryPanel old) {
     super.didUpdateWidget(old);
     if (old.rows.length != widget.rows.length) _toBottom();
   }
+
   void _toBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      if (_scroll.hasClients) {
+        _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      }
     });
   }
-  @override void dispose() { _scroll.dispose(); super.dispose(); }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final t = widget.t;
+    final listMaxHeight = (MediaQuery.sizeOf(context).height * 0.20)
+        .clamp(96.0, 160.0)
+        .toDouble();
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
-          child: Row(children: [
-            Expanded(child: Text('SCORE', style: t.labelCaps(t.textMuted))),
-            Text('${widget.startScore}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: t.textSecondary)),
-            const SizedBox(width: 24),
-            Text('R', style: t.labelCaps(t.textMuted)),
-          ]),
+          child: Row(
+            children: [
+              Expanded(child: Text('SCORE', style: t.labelCaps(t.textMuted))),
+              Text(
+                '${widget.startScore}',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: t.textSecondary,
+                ),
+              ),
+              const SizedBox(width: 24),
+              Text('R', style: t.labelCaps(t.textMuted)),
+            ],
+          ),
         ),
         Container(height: 1, color: t.divider),
-        widget.rows.isEmpty
-            ? Center(child: Padding(padding: const EdgeInsets.all(16), child: Text('No turns yet', style: t.bodySmall(t.textMuted))))
-            : ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          controller: _scroll,
-          itemCount: widget.rows.length,
-          itemBuilder: (_, i) => _HistoryRow(vm: widget.rows[i], t: t),
+        ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: listMaxHeight),
+          child: widget.rows.isEmpty
+              ? Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'No turns yet',
+                style: t.bodySmall(t.textMuted),
+              ),
+            ),
+          )
+              : ListView.builder(
+            controller: _scroll,
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.zero,
+            itemCount: widget.rows.length,
+            itemBuilder: (_, i) => HistoryRow(
+              vm: widget.rows[i],
+              t: t,
+            ),
+          ),
         ),
       ],
     );
   }
 }
-
-class _HistoryRow extends StatelessWidget {
-  final _RowVm vm; final AppTokens t;
-  const _HistoryRow({required this.vm, required this.t});
+class HistoryRow extends StatelessWidget {
+  final RowVm vm; final AppTokens t;
+  const HistoryRow({required this.vm, required this.t});
   @override
   Widget build(BuildContext context) {
     final scoreColor = vm.isCheckout ? t.green : vm.isBust ? t.red : t.textPrimary;

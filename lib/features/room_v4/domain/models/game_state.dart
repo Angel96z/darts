@@ -249,15 +249,45 @@ class GameState {
 
   bool get isTeamMode => teamSize > 1;
   String? getPlayerTeam(String playerId) => playerToTeam[playerId];
+
+  // In game_state.dart, sostituisci getTeamScore con:
+
   int getTeamScore(String teamId) {
-    // Trova tutti i giocatori di questo team
+    if (isCricket && teamSize > 1) {
+      // 🔥 Cricket team: somma i punti INDIVIDUALI dei giocatori del team
+      final teamPlayerIds = playerToTeam.entries
+          .where((entry) => entry.value == teamId)
+          .map((entry) => entry.key)
+          .toList();
+
+      int total = 0;
+      for (final playerId in teamPlayerIds) {
+        total += getCricketPoints(playerId);
+      }
+      return total;
+    }
+
+    // X01 team mode: somma i punteggi live
+    final teamPlayerIds = playerToTeam.entries
+        .where((entry) => entry.value == teamId)
+        .map((entry) => entry.key)
+        .toList();
+    return teamPlayerIds.fold(0, (sum, playerId) => sum + getPlayerLiveScore(playerId));
+  }
+
+  /// Ottieni il punteggio Cricket per un team - 🔥 STESSA LOGICA di getTeamScore
+  int getTeamCricketPoints(String teamId) {
+    // Cricket team: somma i punti INDIVIDUALI
     final teamPlayerIds = playerToTeam.entries
         .where((entry) => entry.value == teamId)
         .map((entry) => entry.key)
         .toList();
 
-    // Somma i loro punteggi live
-    return teamPlayerIds.fold(0, (sum, playerId) => sum + getPlayerLiveScore(playerId));
+    int total = 0;
+    for (final playerId in teamPlayerIds) {
+      total += getCricketPoints(playerId);
+    }
+    return total;
   }
 
   int getTeamLegsWon(String teamId) => teamLegsWon[teamId] ?? 0;
@@ -391,6 +421,33 @@ class GameState {
     }
     return true;
   }
+// In game_state.dart, aggiungi dopo i metodi esistenti:
+
+  // ========== CRICKET TEAM SUPPORT ==========
+
+  /// Verifica se un numero è aperto per un team (tutti i giocatori del team hanno 3+ marks)
+  bool isCricketNumberOpenForTeam(int number, String teamId) {
+    final teamPlayers = playerToTeam.entries
+        .where((e) => e.value == teamId)
+        .map((e) => e.key)
+        .toList();
+
+    if (teamPlayers.isEmpty) return false;
+
+    for (final playerId in teamPlayers) {
+      if ((cricketMarks[playerId]?[number] ?? 0) < 3) return false;
+    }
+    return true;
+  }
+
+  /// Verifica se un numero è chiuso globalmente (tutti i giocatori hanno 3+ marks)
+  bool isCricketNumberClosedGlobally(int number) {
+    for (final player in players) {
+      if ((cricketMarks[player.id]?[number] ?? 0) < 3) return false;
+    }
+    return true;
+  }
+
 
   GameState copyWith({
     Match? match,

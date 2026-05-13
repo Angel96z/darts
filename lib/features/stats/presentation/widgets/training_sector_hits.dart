@@ -1,26 +1,25 @@
-/// File: training_sector_hits.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
+/// File: training_sector_hits.dart. Logica di presentazione per il riepilogo settori training.
 
 import 'package:flutter/material.dart';
+import '../../../../app_theme.dart';
+
+// ---------------------------------------------------------------------------
+// Root widget
+// ---------------------------------------------------------------------------
 
 class TrainingSectorHits extends StatelessWidget {
-  final Map<String, Map<String, int>> stats;
-  final String target;
-  final int totalThrows;
-
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const TrainingSectorHits({
     super.key,
     required this.stats,
     required this.target,
     required this.totalThrows,
+    this.maxHeight = 220,
   });
 
-  static const _colorT = Color(0xFFE05252);
-  static const _colorD = Color(0xFF4CAF82);
-  static const _colorS = Color(0xFF5B8FE8);
-  static const _colorMiss = Color(0xFFD9534F);
-  static const _colorTarget = Color(0xFFFFF3CD);
-  static const _borderTarget = Color(0xFFE8A020);
+  final Map<String, Map<String, int>> stats;
+  final String target;
+  final int totalThrows;
+  final double maxHeight;
 
   static const List<int> boardOrder = [
     20, 1, 18, 4, 13,
@@ -29,322 +28,304 @@ class TrainingSectorHits extends StatelessWidget {
     11, 14, 9, 12, 5,
   ];
 
+  String get _targetNumber => int.tryParse(target.substring(1))?.toString() ?? '';
+
   String get _targetType {
     if (target.startsWith('T')) return 'T';
     if (target.startsWith('D')) return 'D';
     return 'S';
   }
 
-  String get _targetNumber {
-    final value = int.tryParse(target.substring(1));
-    if (value == null) return '';
-    return value.toString();
-  }
-
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   List<String> _orderedSectors() {
-    if (_targetNumber == '25') {
-      return ['25', ...boardOrder.map((e) => e.toString())];
-    }
-
     final targetValue = int.tryParse(_targetNumber);
-    if (targetValue == null) {
-      return boardOrder.map((e) => e.toString()).toList();
+
+    if (_targetNumber == '25' || targetValue == null) {
+      return [
+        if (_targetNumber == '25') '25',
+        ...boardOrder.map((n) => n.toString()),
+      ];
     }
 
     final index = boardOrder.indexOf(targetValue);
-    if (index == -1) {
-      return boardOrder.map((e) => e.toString()).toList();
-    }
+    if (index == -1) return boardOrder.map((n) => n.toString()).toList();
 
-    final result = <String>[_targetNumber];
-
+    final result = [_targetNumber];
     for (int d = 1; d < boardOrder.length; d++) {
-      result.add(boardOrder[(index - d + boardOrder.length) % boardOrder.length].toString());
-      result.add(boardOrder[(index + d) % boardOrder.length].toString());
-
+      result
+        ..add(boardOrder[(index - d + boardOrder.length) % boardOrder.length].toString())
+        ..add(boardOrder[(index + d) % boardOrder.length].toString());
       if (result.length >= boardOrder.length) break;
     }
-
     return result.take(boardOrder.length).toList();
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  Widget _bar(double value, Color color) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(3),
-      child: Container(
-        height: 5,
-        color: color.withOpacity(0.12),
-        child: FractionallySizedBox(
-          alignment: Alignment.centerLeft,
-          widthFactor: value.clamp(0.0, 1.0),
-          child: Container(
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(3),
-            ),
+  List<String> _buildOrdered() => [
+    if (stats.containsKey('MISS')) 'MISS',
+    ..._orderedSectors().where((s) => s == _targetNumber || stats.containsKey(s)),
+    if (_targetNumber != '25' && stats.containsKey('25')) '25',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final ordered = _buildOrdered();
+    return SizedBox(
+      height: maxHeight,
+      child: ListView.builder(
+        padding: EdgeInsets.zero,
+        physics: const ClampingScrollPhysics(),
+        itemCount: ordered.length,
+        itemBuilder: (context, index) {
+          final number = ordered[index];
+          return _SectorRow(
+            number: number,
+            data: stats[number] ?? {},
+            isTarget: number == _targetNumber,
+            isMiss: number == 'MISS',
+            targetType: _targetType,
+            totalThrows: totalThrows,
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Row: settore con barre lineari S / D / T
+// ---------------------------------------------------------------------------
+
+class _SectorRow extends StatelessWidget {
+  const _SectorRow({
+    required this.number,
+    required this.data,
+    required this.isTarget,
+    required this.isMiss,
+    required this.targetType,
+    required this.totalThrows,
+  });
+
+  final String number;
+  final Map<String, int> data;
+  final bool isTarget;
+  final bool isMiss;
+  final String targetType;
+  final int totalThrows;
+
+  int get _totalSectorHits => data.values.fold(0, (a, b) => a + b);
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    final total = _totalSectorHits;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: isTarget
+            ? t.accent.withOpacity(0.08)
+            : t.surfaceHigh.withOpacity(0.72),
+        borderRadius: AppTokens.r16,
+        border: Border.all(
+          color: isTarget ? t.accent.withOpacity(0.60) : t.border,
+          width: isTarget ? 1.5 : 1,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: AppTokens.r16,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Accent strip verticale — solo sul target
+              if (isTarget)
+                Container(width: 3, color: t.accent),
+
+              // Numero settore + totale colpi
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  isTarget ? 10 : 12,
+                  10,
+                  8,
+                  10,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      number,
+                      style: TextStyle(
+                        fontSize: isTarget ? 20 : 15,
+                        height: 1,
+                        fontWeight: FontWeight.w900,
+                        color: isTarget
+                            ? t.accent
+                            : isMiss
+                            ? t.orange
+                            : t.textPrimary,
+                      ),
+                    ),
+                    if (total > 0) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '$total',
+                        style: TextStyle(
+                          fontSize: 10,
+                          height: 1,
+                          fontWeight: FontWeight.w700,
+                          color: t.textMuted,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              // Separatore verticale
+              VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: t.border.withOpacity(0.5),
+              ),
+
+              // Barre per ogni tipo
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  child: isMiss
+                      ? Center(
+                    child: _TypeBar(
+                      type: 'M',
+                      hits: total,
+                      isTargetType: false,
+                      totalThrows: totalThrows,
+                    ),
+                  )
+                      : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      for (final type in ['S', 'D', 'T']) ...[
+                        _TypeBar(
+                          type: type,
+                          hits: data[type] ?? 0,
+                          isTargetType: isTarget && targetType == type,
+                          totalThrows: totalThrows,
+                        ),
+                        if (type != 'T') const SizedBox(height: 5),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+}
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  Widget _line({
-    required String label,
-    required double value,
-    required Color color,
-    required int hits,
-    required bool showHits,
-    required bool isTargetLine,
-  }) {
+// ---------------------------------------------------------------------------
+// Barra lineare per un singolo tipo (S / D / T / M)
+// ---------------------------------------------------------------------------
+
+class _TypeBar extends StatelessWidget {
+  const _TypeBar({
+    required this.type,
+    required this.hits,
+    required this.isTargetType,
+    required this.totalThrows,
+  });
+
+  final String type;
+  final int hits;
+  final bool isTargetType;
+  final int totalThrows;
+
+  double get _ratio =>
+      totalThrows > 0 && hits > 0 ? (hits / totalThrows).clamp(0.0, 1.0) : 0.0;
+
+  static Color _colorFor(AppTokens t, String type) => switch (type) {
+    'T' => t.red,
+    'D' => t.green,
+    'S' => t.accent,
+    _ => t.orange, // M / fallback
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    final color = _colorFor(t, type);
+    final ratio = _ratio;
+    final percent = (ratio * 100).round();
+    final hasHits = hits > 0;
+
     return Row(
       children: [
+        // Label tipo
         SizedBox(
           width: 14,
           child: Text(
-            label,
+            type,
             style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: color,
+              fontSize: 11,
+              height: 1,
+              fontWeight: FontWeight.w900,
+              color: hasHits || isTargetType ? color : t.textMuted,
             ),
           ),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 7),
+
+        // Barra di progresso
         Expanded(
-          child: _bar(value, color),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: LinearProgressIndicator(
+              value: ratio,
+              minHeight: isTargetType ? 7 : 5,
+              backgroundColor: t.surfaceHigh,
+              valueColor: AlwaysStoppedAnimation(
+                hasHits ? color.withOpacity(isTargetType ? 1.0 : 0.75) : t.border,
+              ),
+            ),
+          ),
         ),
         const SizedBox(width: 8),
+
+        // Conteggio colpi
         SizedBox(
-          width: 34,
+          width: 22,
           child: Text(
-            value > 0 ? "${(value * 100).round()}%" : "—",
+            hasHits ? '$hits' : '—',
             textAlign: TextAlign.right,
             style: TextStyle(
-              fontSize: 10,
-              color: value > 0 || isTargetLine ? Colors.black87 : Colors.black26,
+              fontSize: 11,
+              height: 1,
+              fontWeight: FontWeight.w800,
+              color: hasHits ? t.textPrimary : t.textMuted,
             ),
           ),
         ),
+        const SizedBox(width: 4),
+
+        // Percentuale
         SizedBox(
-          width: 28,
-          child: showHits
-              ? Text(
-            hits.toString(),
-            textAlign: TextAlign.right,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: Colors.black54,
+          width: 30,
+          child: Text(
+            hasHits ? '$percent%' : '',
+            style: TextStyle(
+              fontSize: 9,
+              height: 1,
+              fontWeight: FontWeight.w600,
+              color: t.textMuted,
             ),
-          )
-              : const SizedBox.shrink(),
+          ),
         ),
       ],
-    );
-  }
-
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  Widget _sectorCard(String number, Map<String, int> data) {
-    if (number == "MISS") {
-      final miss = data.values.fold(0, (a, b) => a + b);
-      final pmiss = totalThrows == 0 ? 0.0 : miss / totalThrows;
-
-      return Container(
-        margin: const EdgeInsets.symmetric(vertical: 3),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          color: _colorMiss.withOpacity(0.05),
-          border: Border.all(color: _colorMiss.withOpacity(0.35)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const SizedBox(
-              width: 48,
-              child: Text(
-                "MISS",
-                maxLines: 1,
-                softWrap: false,
-                overflow: TextOverflow.clip,
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12,
-                  color: _colorMiss,
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Row(
-                children: [
-                  const SizedBox(
-                    width: 14,
-                    child: Text(
-                      "M",
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: _colorMiss,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: _bar(pmiss, _colorMiss),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 34,
-                    child: Text(
-                      pmiss > 0 ? "${(pmiss * 100).round()}%" : "—",
-                      textAlign: TextAlign.right,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 28,
-                    child: Text(
-                      miss.toString(),
-                      textAlign: TextAlign.right,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black54,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final isTargetNumber = number == _targetNumber;
-
-    final s = data["S"] ?? 0;
-    final d = data["D"] ?? 0;
-    final t = data["T"] ?? 0;
-
-    final ps = totalThrows == 0 ? 0.0 : s / totalThrows;
-    final pd = totalThrows == 0 ? 0.0 : d / totalThrows;
-    final pt = totalThrows == 0 ? 0.0 : t / totalThrows;
-
-    final isBull = number == '25';
-
-    final showT = !isBull && (isTargetNumber ? _targetType == 'T' || t > 0 : t > 0);
-    final showD = isTargetNumber ? _targetType == 'D' || d > 0 : d > 0;
-    final showS = isTargetNumber ? _targetType == 'S' || s > 0 : s > 0;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 3),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        color: isTargetNumber ? _colorTarget : Colors.white,
-        border: Border.all(
-          color: isTargetNumber ? _borderTarget : Colors.black12,
-          width: isTargetNumber ? 1.5 : 1,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 48,
-            child: Text(
-              number,
-              maxLines: 1,
-              softWrap: false,
-              overflow: TextOverflow.clip,
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: isTargetNumber ? 15 : 12,
-                color: isTargetNumber ? _borderTarget : Colors.black87,
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (showT)
-                  _line(
-                    label: "T",
-                    value: pt,
-                    color: _colorT,
-                    hits: t,
-                    showHits: true,
-                    isTargetLine: isTargetNumber && _targetType == 'T',
-                  ),
-                if (showD)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: _line(
-                      label: "D",
-                      value: pd,
-                      color: _colorD,
-                      hits: d,
-                      showHits: true,
-                      isTargetLine: isTargetNumber && _targetType == 'D',
-                    ),
-                  ),
-                if (showS)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: _line(
-                      label: "S",
-                      value: ps,
-                      color: _colorS,
-                      hits: s,
-                      showHits: true,
-                      isTargetLine: isTargetNumber && _targetType == 'S',
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  Widget build(BuildContext context) {
-    final ordered = <String>[
-      if (stats.containsKey("MISS")) "MISS",
-      ..._orderedSectors().where((s) => stats.containsKey(s)),
-    ];
-
-    return NotificationListener<ScrollNotification>(
-      onNotification: (notification) {
-        if (notification is OverscrollNotification) {
-// quando sei già al limite → lascia propagare al parent
-          return false;
-        }
-        return false;
-      },
-      child: ListView.builder(
-        padding: EdgeInsets.zero,
-        itemCount: ordered.length,
-        shrinkWrap: true,
-        physics: const ClampingScrollPhysics(),
-        itemBuilder: (context, i) {
-          final number = ordered[i];
-          final data = stats[number] ?? {};
-          return _sectorCard(number, data);
-        },
-      ),
     );
   }
 }

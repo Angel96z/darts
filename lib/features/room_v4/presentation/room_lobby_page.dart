@@ -11,16 +11,19 @@ import 'widgets/players_column.dart';
 class RoomLobbyPage extends ConsumerWidget {
   const RoomLobbyPage({super.key});
 
+  static const double _bottomControlsHeight = 92;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppTokens.of(context);
     final state = ref.watch(roomNotifierProvider);
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: t.bg,
       appBar: AppBar(
         title: Text(
-          'Lobby',
+          'Play darts',
           style: TextStyle(
             color: t.textPrimary,
             fontSize: 16,
@@ -32,23 +35,19 @@ class RoomLobbyPage extends ConsumerWidget {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => _onBackPressed(context, ref, t),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: t.divider),
+          icon: Icon(Icons.arrow_back, color: t.textPrimary),
+          onPressed: () => _onBackPressed(context, ref),
         ),
       ),
-
       body: Stack(
         children: [
           _LobbyContent(
+            bottomPadding: _bottomControlsHeight + 120,
+          ),
+          _BottomLobbyControls(
             canStartMatch: state.canStartMatch,
             onStart: () => _startMatch(context, ref),
-            t: t,
           ),
-
           const MatchResultOverlay(),
         ],
       ),
@@ -57,46 +56,46 @@ class RoomLobbyPage extends ConsumerWidget {
 
   void _startMatch(BuildContext context, WidgetRef ref) {
     ref.read(roomNotifierProvider.notifier).startMatch();
-
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const MatchPage()),
     );
   }
 
-  Future<void> _onBackPressed(
-      BuildContext context,
-      WidgetRef ref,
-      AppTokens t,
-      ) async {
+  Future<void> _onBackPressed(BuildContext context, WidgetRef ref) async {
+    final t = AppTokens.of(context);
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: t.overlay,
         surfaceTintColor: Colors.transparent,
         title: Text(
-          'Esci dalla lobby?',
+          'Leave lobby?',
           style: TextStyle(
             color: t.textPrimary,
             fontWeight: FontWeight.w800,
           ),
         ),
         content: Text(
-          'I giocatori verranno rimossi.',
+          'Players will be removed.',
           style: TextStyle(color: t.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('No', style: TextStyle(color: t.textSecondary)),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: t.textSecondary),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text(
-              'Sì',
+              'Leave',
               style: TextStyle(
                 color: t.accent,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w900,
               ),
             ),
           ),
@@ -110,15 +109,12 @@ class RoomLobbyPage extends ConsumerWidget {
     }
   }
 }
+
 class _LobbyContent extends ConsumerWidget {
-  final bool canStartMatch;
-  final VoidCallback onStart;
-  final AppTokens t;
+  final double bottomPadding;
 
   const _LobbyContent({
-    required this.canStartMatch,
-    required this.onStart,
-    required this.t,
+    required this.bottomPadding,
   });
 
   @override
@@ -126,48 +122,37 @@ class _LobbyContent extends ConsumerWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-
         final isWide = width >= 900;
         final padding = width < 500 ? 12.0 : 20.0;
         final maxWidth = width >= 1200 ? 1100.0 : 900.0;
 
         return SafeArea(
+          bottom: false,
           child: SingleChildScrollView(
-            padding: EdgeInsets.all(padding),
+            padding: EdgeInsets.fromLTRB(
+              padding,
+              padding,
+              padding,
+              bottomPadding,
+            ),
             child: Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: maxWidth),
-                child: Column(
+                child: isWide
+                    ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: ConfigColumn(ref: ref)),
+                    const SizedBox(width: 24),
+                    Expanded(child: PlayersColumn(ref: ref)),
+                  ],
+                )
+                    : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-
-                    /// ───── CONFIG + PLAYERS ─────
-                    if (isWide)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(child: ConfigColumn(ref: ref)),
-                          const SizedBox(width: 24),
-                          Expanded(child: PlayersColumn(ref: ref)),
-                        ],
-                      )
-                    else
-                      Column(
-                        children: [
-                          ConfigColumn(ref: ref),
-                          const SizedBox(height: 20),
-                          PlayersColumn(ref: ref),
-                        ],
-                      ),
-
-                    const SizedBox(height: 24),
-
-                    /// ───── START BUTTON ─────
-                    _StartButton(
-                      enabled: canStartMatch,
-                      onPressed: onStart,
-                      t: t,
-                    ),
+                    ConfigColumn(ref: ref),
+                    const SizedBox(height: 20),
+                    PlayersColumn(ref: ref),
                   ],
                 ),
               ),
@@ -179,23 +164,79 @@ class _LobbyContent extends ConsumerWidget {
   }
 }
 
-class _StartButton extends StatelessWidget {
-  final bool enabled;
-  final VoidCallback onPressed;
-  final AppTokens t;
+class _BottomLobbyControls extends StatelessWidget {
+  final bool canStartMatch;
+  final VoidCallback onStart;
 
-  const _StartButton({
-    required this.enabled,
-    required this.onPressed,
-    required this.t,
+  const _BottomLobbyControls({
+    required this.canStartMatch,
+    required this.onStart,
   });
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+          decoration: BoxDecoration(
+            color: t.surface.withOpacity(0.96),
+            border: Border(
+              top: BorderSide(color: t.border),
+            ),
+            boxShadow: [
+              BoxShadow(
+                blurRadius: 24,
+                offset: const Offset(0, -8),
+                color: Colors.black.withOpacity(0.18),
+              ),
+            ],
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: Row(
+                children: [
+                  const AddPlayerButton(),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _StartButton(
+                      enabled: canStartMatch,
+                      onPressed: onStart,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StartButton extends StatelessWidget {
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  const _StartButton({
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+
     return SizedBox(
-      height: 48,
+      height: 52,
       child: ElevatedButton(
-        onPressed: enabled ? onPressed : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: t.accent,
           foregroundColor: t.accentFg,
@@ -203,9 +244,10 @@ class _StartButton extends StatelessWidget {
           disabledForegroundColor: t.textMuted,
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: AppTokens.r10,
+            borderRadius: AppTokens.r16,
           ),
         ),
+        onPressed: enabled ? onPressed : null,
         child: const Text(
           'START MATCH',
           style: TextStyle(

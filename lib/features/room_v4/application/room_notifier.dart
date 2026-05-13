@@ -5,10 +5,13 @@
 // ANTI-REGRESSION: Mantenere timer di passaggio turno (3.5 secondi)
 
 import 'dart:async';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../match_sync/data/services/local_match_sync_service.dart';
 import '../../match_sync/domain/entities/local_match_record.dart';
+import '../bot/bot_controller.dart';
+import '../bot/bot_level.dart';
 import '../domain/game_types/cricket_rules.dart';
 import '../domain/models/dart_throw.dart';
 import '../domain/models/game_config.dart';
@@ -39,7 +42,7 @@ class RoomState {
   final String? matchWinnerId;
   final bool showResultOverlay;
   final LocalMatchSyncStatus? matchSaveStatus;
-
+  final DateTime? matchStartTime;
   // 🆕 GameState derivato dal builderState (per UI)
   final GameState? gameState;
 
@@ -62,6 +65,7 @@ class RoomState {
     this.matchWinnerId,
     this.showResultOverlay = false,
     this.matchSaveStatus,
+    this.matchStartTime,
   });
 
   List<String> get playerIds => players.map((p) => p.id).toList();
@@ -69,8 +73,11 @@ class RoomState {
   bool get canStartMatch {
     if (players.isEmpty) return false;
     if (teamSize > 1) {
-      if (players.length < teamSize * 2) return false;
-      if (players.length % teamSize != 0) return false;
+      final realPlayers = players.where((p) => !p.id.startsWith('bot_')).length;
+      final totalPlayers = players.length;
+      if (totalPlayers < teamSize * 2) return false;
+      if (totalPlayers % teamSize != 0) return false;
+      if (realPlayers == 0) return false;
     }
     return true;
   }
@@ -90,6 +97,8 @@ class RoomState {
     String? matchWinnerId,
     bool? showResultOverlay,
     LocalMatchSyncStatus? matchSaveStatus,
+    DateTime? matchStartTime,  // ← AGGIUNGI QUI
+
   }) {
     return RoomState(
       status: status ?? this.status,
@@ -106,6 +115,8 @@ class RoomState {
       matchWinnerId: matchWinnerId ?? this.matchWinnerId,
       showResultOverlay: showResultOverlay ?? this.showResultOverlay,
       matchSaveStatus: matchSaveStatus ?? this.matchSaveStatus,
+      matchStartTime: matchStartTime ?? this.matchStartTime,  // ← AGGIUNGI QUI
+
     );
   }
 }
@@ -115,6 +126,8 @@ class RoomNotifier extends StateNotifier<RoomState> {
   Timer? _turnPassProgressTimer;
   List<MatchBuilderState> _history = [];
   static const int _maxHistorySize = 30;
+  late final BotController _botController;
+
   void _saveToHistory() {
     if (state.builderState != null) {
       _history.add(state.builderState!);
@@ -140,7 +153,7 @@ class RoomNotifier extends StateNotifier<RoomState> {
     _cancelTurnPassTimer();
   }
 
-  static const Duration turnPassDuration = Duration(milliseconds: 300); //tempo passaggio turno
+  static const Duration turnPassDuration = Duration(milliseconds: 3500); //tempo passaggio turno
   static const Duration progressInterval = Duration(milliseconds: 50);
 
   RoomNotifier()
@@ -150,6 +163,7 @@ class RoomNotifier extends StateNotifier<RoomState> {
     players: [],
     teamSize: 0,
   )) {
+    _botController = BotController(this);
     _createEmptyState();
   }
 
@@ -279,6 +293,15 @@ class RoomNotifier extends StateNotifier<RoomState> {
         errorMessage: null,
       );
       print("🔍 [ROUND] STATO FINALE - state.gameState.currentRoundNumber = ${state.gameState?.currentRoundNumber}");
+
+      // 🔥 Attiva bot subito dopo un dardo (se necessario)
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final currentGameState = state.gameState;
+        if (currentGameState != null && currentGameState.currentPlayerId.startsWith('bot_')) {
+          print('🤖 [ROOM] Dopo throwDart - attivo bot per: ${currentGameState.currentPlayerId}');
+          _botController.startBotIfNeeded(currentGameState);
+        }
+      });
 
       _checkAndStartTurnPassTimer();
     } catch (e) {
@@ -465,6 +488,7 @@ class RoomNotifier extends StateNotifier<RoomState> {
         legNumber: builderState.currentLegNumber,
         rounds: finalLegRounds,
         winnerId: legWinnerId,
+        winnerName: _getPlayerName(legWinnerId),
         winningScore: currentTurn.score,
         startTime: builderState.currentLegRounds.isNotEmpty
             ? builderState.currentLegRounds.first.timestamp
@@ -564,9 +588,7 @@ class RoomNotifier extends StateNotifier<RoomState> {
             id: 'match_${DateTime.now().millisecondsSinceEpoch}',
             sets: finalMatchSets,
             winnerId: matchWinnerId,
-            startTime: builderState.matchSets.isNotEmpty
-                ? builderState.matchSets.first.startTime
-                : DateTime.now(),
+            startTime: state.matchStartTime ?? DateTime.now(),  // ← usa quello salvato
             endTime: DateTime.now(),
           );
 
@@ -761,8 +783,18 @@ class RoomNotifier extends StateNotifier<RoomState> {
       isWaitingForTurnPass: false,
       turnPassProgress: 0.0,
     );
-  } // ← Chiude il metodo _commitCurrentTurnAndAdvance
 
+    // 15. Attiva bot se necessario (dopo che l'UI si è aggiornata)
+    print('🤖 [ROOM] Post-commit: verifico se attivare bot');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final currentGameState = state.gameState;
+      print('🤖 [ROOM] currentGameState: ${currentGameState != null}');
+      if (currentGameState != null) {
+        print('🤖 [ROOM] Chiamo startBotIfNeeded per player: ${currentGameState.currentPlayerId}');
+        _botController.startBotIfNeeded(currentGameState);
+      }
+    });
+  } // ← Chiude il metodo _commitCurrentTurnAndAdvance
 
 
   // ============================================================
@@ -819,6 +851,15 @@ class RoomNotifier extends StateNotifier<RoomState> {
         gameState: _convertToGameState(builderState),
         status: AppStatus.success,
       );
+
+      // 🔥 Se il primo giocatore è un bot, attivalo subito
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final currentGameState = state.gameState;
+        if (currentGameState != null && currentGameState.currentPlayerId.startsWith('bot_')) {
+          print('🤖 [ROOM] _recreateMatch - primo giocatore è un bot: ${currentGameState.currentPlayerId}');
+          _botController.startBotIfNeeded(currentGameState);
+        }
+      });
     } catch (e) {
       state = state.copyWith(
         status: AppStatus.error,
@@ -838,6 +879,12 @@ class RoomNotifier extends StateNotifier<RoomState> {
     final newPlayers = [...state.players, newPlayer];
     state = state.copyWith(players: newPlayers);
     _recreateMatch();
+  }
+
+  void addBot(BotLevel level) {
+    final botId = 'bot_${level.name}_${DateTime.now().millisecondsSinceEpoch}';
+    final botName = '🤖 ${level.displayName}';
+    addPlayer(botId, botName, true);
   }
 
   void removePlayer(String playerId) {
@@ -878,8 +925,19 @@ class RoomNotifier extends StateNotifier<RoomState> {
 
   void startMatch() {
     _history.clear();  // ← AGGIUNGI QUESTA RIGA
-
+    state = state.copyWith(
+      matchStartTime: DateTime.now(),
+    );
     _recreateMatch();
+
+    // 🔥 Attiva bot subito dopo l'inizio del match, se il primo giocatore è un bot
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final currentGameState = state.gameState;
+      if (currentGameState != null && currentGameState.currentPlayerId.startsWith('bot_')) {
+        print('🤖 [ROOM] Inizio match - primo giocatore è un bot: ${currentGameState.currentPlayerId}');
+        _botController.startBotIfNeeded(currentGameState);
+      }
+    });
   }
 
   void resetAll() {
