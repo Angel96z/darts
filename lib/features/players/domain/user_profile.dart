@@ -8,6 +8,33 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+// ========== AVATAR SYSTEM ==========
+// Aggiungi questa enum e modifica UserProfile
+
+enum AvatarId {
+  avatar1(1, 'assets/avatars/avatar_1.png'),
+  avatar2(2, 'assets/avatars/avatar_2.png'),
+  avatar3(3, 'assets/avatars/avatar_3.png'),
+  avatar4(4, 'assets/avatars/avatar_4.png'),
+  avatar5(5, 'assets/avatars/avatar_5.png'),
+  avatar6(6, 'assets/avatars/avatar_6.png'),
+  avatar7(7, 'assets/avatars/avatar_7.png'),
+  avatar8(8, 'assets/avatars/avatar_8.png');
+
+  final int id;
+  final String assetPath;
+
+  const AvatarId(this.id, this.assetPath);
+
+  static AvatarId fromId(int? id) {
+    return values.firstWhere(
+          (a) => a.id == id,
+      orElse: () => avatar1,
+    );
+  }
+
+  static List<AvatarId> get all => values;
+}
 
 @immutable
 class UserProfile {
@@ -22,6 +49,7 @@ class UserProfile {
   final String? avatarUrl;
   final UserPreferences preferences;
   final UserAggregatedStats stats;
+  final int? avatarId;
 
   const UserProfile({
     required this.uid,
@@ -32,11 +60,18 @@ class UserProfile {
     required this.createdAt,
     required this.updatedAt,
     this.avatarUrl,
+    this.avatarId,
     this.preferences = const UserPreferences(),
     this.stats = const UserAggregatedStats(),
   });
 
   // ========== GETTER CALCOLATI ==========
+  // GETTER per avatar
+  String get avatarAssetPath {
+    return AvatarId.fromId(avatarId).assetPath;
+  }
+
+  bool get hasCustomAvatar => avatarId != null;
 
   String get fullName => '$firstName $lastName';
 
@@ -92,6 +127,7 @@ class UserProfile {
       avatarUrl: map['avatarUrl']?.toString(),
       preferences: UserPreferences.fromMap(map['preferences'] as Map<String, dynamic>? ?? {}),
       stats: UserAggregatedStats.fromMap(map['stats'] as Map<String, dynamic>? ?? {}),
+      avatarId: map['avatarId'] as int?,
     );
   }
 
@@ -103,6 +139,9 @@ class UserProfile {
     UserPreferences? preferences,
     UserAggregatedStats? stats,
     DateTime? updatedAt,
+    int? avatarId,
+
+
   }) {
     return UserProfile(
       uid: uid,
@@ -115,6 +154,8 @@ class UserProfile {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       preferences: preferences ?? this.preferences,
       stats: stats ?? this.stats,
+      avatarId: avatarId ?? this.avatarId,
+
     );
   }
 }
@@ -125,12 +166,14 @@ class UserPreferences {
   final bool notificationsEnabled;
   final bool soundEffectsEnabled;
   final bool hapticFeedbackEnabled;
+  final int? avatarId;
 
   const UserPreferences({
     this.themeMode = ThemeMode.system,
     this.notificationsEnabled = true,
     this.soundEffectsEnabled = true,
     this.hapticFeedbackEnabled = true,
+    this.avatarId,
   });
 
   Map<String, dynamic> toMap() {
@@ -139,6 +182,7 @@ class UserPreferences {
       'notificationsEnabled': notificationsEnabled,
       'soundEffectsEnabled': soundEffectsEnabled,
       'hapticFeedbackEnabled': hapticFeedbackEnabled,
+      'avatarId': avatarId,
     };
   }
 

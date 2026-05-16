@@ -12,6 +12,7 @@ import '../../features/stats/presentation/pages/stats_home_screen.dart';
 import '../../features/stats/presentation/pages/training_screen.dart';
 import '../../features/game/domain/entities/training_mode.dart';
 import '../../features/players/presentation/widgets/profile_panel.dart';
+import '../../features/string_test/presentation/string_test_page.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -99,6 +100,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             _buildCard(icon: Icons.bar_chart, title: 'Statistiche', subtitle: 'Analizza i tuoi progressi e performance', onTap: _navigateToStats, showBadge: false),
             const SizedBox(height: 20),
             const ConsigliCarouselWidget(), // importa il widget
+            const SizedBox(height: 20), // Aggiunto per spaziatura
+
+            // CARD PER STRING TEST
+            _buildCard(
+              icon: Icons.text_fields_outlined, // Icona adatta per i testi
+              title: 'String Test',
+              subtitle: 'Test architettura Gold Standard',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const StringTestPage()),
+                );
+              },
+              showBadge: true, // Messo a true così lo vedi subito!
+            ),
 // Dopo gli altri card
             _buildCard(
               icon: Icons.admin_panel_settings,

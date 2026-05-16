@@ -6,6 +6,7 @@
 /// ANTI-REGRESSION: Mantenere Firebase init, sync, stats, userProvider, container.
 
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -64,6 +65,7 @@ class _DartsStartupGateState extends State<_DartsStartupGate> {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
+      FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: true);
 
       _update(0.42, 'VERIFICO ACCESSO...');
       final user = await FirebaseAuth.instance.authStateChanges().first;

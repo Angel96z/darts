@@ -209,6 +209,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
                           mode: widget.mode,
                           initialSessionId: feedbackResult.savedSessionId,
                           initialTarget: scoreController.target,
+                          showAppBar: true,
                         ),
                       ),
                     );

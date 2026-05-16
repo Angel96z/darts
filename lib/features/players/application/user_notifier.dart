@@ -177,6 +177,105 @@ class UserNotifier extends StateNotifier<UserState> {
   void reset() {
     state = const UserState();
   }
+
+  // Aggiungi questi metodi alla classe UserNotifier
+
+  /// Elimina account
+  Future<void> deleteAccount() async {
+    if (state.isLoading) return;
+
+    state = state.copyWith(status: AppStatus.loading, failure: null);
+
+    try {
+      await _repository.deleteAccount();
+      state = const UserState(); // Reset completo
+    } catch (e) {
+      final failure = e is Failure ? e : ProfileSaveFailure(technicalDetails: e.toString());
+      state = state.copyWith(status: AppStatus.error, failure: failure);
+    }
+  }
+
+  /// Aggiorna avatar
+  Future<void> updateAvatarId(int? avatarId) async {
+    if (state.isLoading) return;
+
+    state = state.copyWith(status: AppStatus.loading, failure: null);
+
+    try {
+      await _repository.updateAvatarId(avatarId);
+
+      final updatedProfile = state.profile?.copyWith(avatarId: avatarId);
+      state = state.copyWith(profile: updatedProfile, status: AppStatus.success);
+    } catch (e) {
+      final failure = e is Failure ? e : ProfileSaveFailure(technicalDetails: e.toString());
+      state = state.copyWith(status: AppStatus.error, failure: failure);
+    }
+  }
+
+  /// Invia verifica email
+  Future<void> sendVerificationEmail() async {
+    if (state.isLoading) return;
+
+    state = state.copyWith(status: AppStatus.loading, failure: null);
+
+    try {
+      await _repository.sendEmailVerification();
+      state = state.copyWith(status: AppStatus.success);
+    } catch (e) {
+      final failure = e is Failure ? e : ProfileSaveFailure(technicalDetails: e.toString());
+      state = state.copyWith(status: AppStatus.error, failure: failure);
+    }
+  }
+
+  /// Aggiorna stato verifica email
+  Future<bool> refreshEmailVerification() async {
+    try {
+      final isVerified = await _repository.checkEmailVerified();
+      if (isVerified && state.profile != null) {
+        // Ricarica profilo se appena verificato
+        await loadProfile();
+      }
+      return isVerified;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Cambia password
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    if (state.isLoading) return;
+
+    state = state.copyWith(status: AppStatus.loading, failure: null);
+
+    try {
+      await _repository.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      state = state.copyWith(status: AppStatus.success);
+    } catch (e) {
+      final failure = e is Failure ? e : AuthFailure(message: e.toString());
+      state = state.copyWith(status: AppStatus.error, failure: failure);
+    }
+  }
+
+  /// Reset password (dimenticata)
+  Future<void> resetPassword(String email) async {
+    if (state.isLoading) return;
+
+    state = state.copyWith(status: AppStatus.loading, failure: null);
+
+    try {
+      await _repository.sendPasswordResetEmail(email);
+      state = state.copyWith(status: AppStatus.success);
+    } catch (e) {
+      final failure = e is Failure ? e : AuthFailure(message: e.toString());
+      state = state.copyWith(status: AppStatus.error, failure: failure);
+    }
+  }
 }
 
 final userProvider = StateNotifierProvider<UserNotifier, UserState>((ref) {

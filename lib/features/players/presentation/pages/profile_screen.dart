@@ -1,5 +1,7 @@
-/// File: profile_screen.dart
-/// Schermata profilo con modifica inline di nome, cognome, nickname
+/// FILE: profile_screen.dart
+/// TARGET: Schermata profilo completa con avatar, cambio password, eliminazione account
+/// LOGIC GOAL: Gestione profilo utente con tutte le funzionalità
+/// REACTION: Modifica campi, avatar, password, statistiche, reset dati, eliminazione account
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -11,11 +13,15 @@ import '../../../stats/domain/services/stats_aggregator_service.dart';
 import '../../../stats/shared/stats_repository.dart';
 import '../../application/user_notifier.dart';
 import '../../domain/user_profile.dart';
+import 'avatar_selector_screen.dart';
+import 'change_password_screen.dart';
+
 enum _ResetDataTarget {
   training,
   x01,
   cricket,
 }
+
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
@@ -34,6 +40,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _isSaving = false;
   bool _isRefreshingStats = false;
   bool _isResettingGameData = false;
+  bool _isDeletingAccount = false;
 
   String _originalFirstName = '';
   String _originalLastName = '';
@@ -178,24 +185,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
-  Future<void> _sendPasswordReset(BuildContext context, String email) async {
-    try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Email per cambio password inviata")));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Errore: $e")));
-    }
-  }
-
   Future<void> _refreshStats() async {
     setState(() => _isRefreshingStats = true);
     try {
-      // 🔥 NON forceFullRecalc! Lascia che sia incrementale
       await StatsAggregatorService.instance.updateUserStats(forceFullRecalc: false);
       ref.invalidate(userProvider);
-      // Ricarica il profilo per sicurezza
       await ref.read(userProvider.notifier).loadProfile();
 
       if (!mounted) return;
@@ -212,15 +206,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
-
   Future<void> _showResetGameDataOverlay() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Devi essere autenticato per resettare i dati'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('Devi essere autenticato per resettare i dati'), backgroundColor: Colors.red),
       );
       return;
     }
@@ -261,11 +251,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   Expanded(
                     child: Text(
                       'Reset dati giochi',
-                      style: TextStyle(
-                        color: t.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
+                      style: TextStyle(color: t.textPrimary, fontSize: 18, fontWeight: FontWeight.w800),
                     ),
                   ),
                 ],
@@ -279,11 +265,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
                       child: Text(
                         'Seleziona quali dati eliminare dal tuo profilo. L’azione è definitiva.',
-                        style: TextStyle(
-                          color: t.textSecondary,
-                          fontSize: 13,
-                          height: 1.35,
-                        ),
+                        style: TextStyle(color: t.textSecondary, fontSize: 13, height: 1.35),
                       ),
                     ),
                     _buildResetTargetTile(
@@ -367,43 +349,90 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Reset completato. Elementi eliminati: $deletedCount'),
-          backgroundColor: Colors.green,
-        ),
+        SnackBar(content: Text('Reset completato. Elementi eliminati: $deletedCount'), backgroundColor: Colors.green),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Errore reset dati: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Errore reset dati: $e'), backgroundColor: Colors.red),
       );
     } finally {
       if (mounted) setState(() => _isResettingGameData = false);
     }
   }
 
+  // 🔥 NUOVA FUNZIONE: Eliminazione account completa
+  Future<void> _deleteAccount() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final t = AppTokens.of(ctx);
+        return AlertDialog(
+          title: const Text("Elimina account"),
+          content: const Text(
+            "⚠️ Questa azione è IRREVERSIBILE.\n\n"
+                "Tutti i tuoi dati verranno eliminati definitivamente:\n"
+                "• Profilo personale\n"
+                "• Partite (X01 e Cricket)\n"
+                "• Sessioni di training\n"
+                "• Statistiche\n\n"
+                "Sei sicuro di voler procedere?",
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Annulla")),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text("ELIMINA DEFINITIVAMENTE", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
+    // Mostra dialog di caricamento
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    setState(() => _isDeletingAccount = true);
+
+    try {
+      final notifier = ref.read(userProvider.notifier);
+      await notifier.deleteAccount();
+
+      if (mounted) {
+        Navigator.pop(context); // Chiudi dialog loading
+        Navigator.popUntil(context, (route) => route.isFirst);
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Chiudi dialog loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Errore eliminazione account: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isDeletingAccount = false);
+    }
+  }
 
   Future<int> _deleteCollection(CollectionReference<Map<String, dynamic>> collection) async {
     var deletedCount = 0;
-
     while (true) {
       final snapshot = await collection.limit(400).get();
       if (snapshot.docs.isEmpty) break;
-
       final batch = FirebaseFirestore.instance.batch();
       for (final doc in snapshot.docs) {
         batch.delete(doc.reference);
       }
-
       await batch.commit();
       deletedCount += snapshot.docs.length;
-
       if (snapshot.docs.length < 400) break;
     }
-
     return deletedCount;
   }
 
@@ -417,7 +446,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         return const ['cricket_matches'];
     }
   }
-
 
   Widget _buildResetTargetTile({
     required AppTokens t,
@@ -442,19 +470,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         secondary: Icon(_resetTargetIcon(target), color: selected ? t.red : t.textMuted),
         title: Text(
           _resetTargetLabel(target),
-          style: TextStyle(
-            color: selected ? t.red : t.textPrimary,
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-          ),
+          style: TextStyle(color: selected ? t.red : t.textPrimary, fontSize: 14, fontWeight: FontWeight.w800),
         ),
         subtitle: Text(
           _resetTargetSubtitle(target),
-          style: TextStyle(
-            color: t.textSecondary,
-            fontSize: 12,
-            height: 1.25,
-          ),
+          style: TextStyle(color: t.textSecondary, fontSize: 12, height: 1.25),
         ),
       ),
     );
@@ -493,6 +513,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
+  // 🔥 NUOVO WIDGET: Avatar tile
+  Widget _buildAvatarTile(AppTokens t, UserProfile? profile) {
+    return ListTile(
+      leading: CircleAvatar(
+        radius: 24,
+        backgroundColor: t.surfaceHigh,
+        backgroundImage: profile?.avatarId != null ? AssetImage(profile!.avatarAssetPath) : null,
+        child: profile?.avatarId == null ? Icon(Icons.person, color: t.textMuted) : null,
+      ),
+      title: Text('Avatar', style: TextStyle(color: t.textPrimary)),
+      subtitle: Text('Cambia la tua immagine profilo', style: TextStyle(color: t.textSecondary, fontSize: 12)),
+      trailing: Icon(Icons.chevron_right, color: t.accent),
+      onTap: () {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const AvatarSelectorScreen()));
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
@@ -520,14 +558,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             padding: const EdgeInsets.all(16),
             children: [
               const SizedBox(height: 12),
-              Center(
-                child: CircleAvatar(
-                  radius: 48,
-                  backgroundColor: t.accent.withOpacity(0.1),
-                  child: Text(profile?.initials ?? '?', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: t.accent)),
+              // 🔥 AVATAR CON IMMAGINE DINAMICA
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AvatarSelectorScreen()));
+                },
+                child: Center(
+                  child: CircleAvatar(
+                    radius: 48,
+                    backgroundColor: t.accent.withOpacity(0.1),
+                    backgroundImage: profile?.avatarId != null ? AssetImage(profile!.avatarAssetPath) : null,
+                    child: profile?.avatarId == null
+                        ? Text(profile?.initials ?? '?', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: t.accent))
+                        : null,
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
+              Center(
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AvatarSelectorScreen()));
+                  },
+                  child: Text('Cambia avatar', style: TextStyle(color: t.accent, fontSize: 12)),
+                ),
+              ),
+              const SizedBox(height: 4),
               Center(child: Text(profile?.displayName ?? email.split('@').first, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: t.textPrimary))),
               const SizedBox(height: 8),
               Center(child: Text(email, style: TextStyle(fontSize: 14, color: t.textSecondary))),
@@ -539,6 +595,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
                 child: Column(
                   children: [
+                    // 🔥 AVATAR TILE (alternativa all'editing)
+                    _buildAvatarTile(t, profile),
+                    Divider(color: t.divider, height: 1, indent: 56),
                     _buildEditableTile(
                       t: t,
                       icon: Icons.person_outline,
@@ -596,10 +655,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         child: Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                'Statistiche carriera',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: t.textPrimary),
-                              ),
+                              child: Text('Statistiche carriera', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: t.textPrimary)),
                             ),
                             if (!_isRefreshingStats)
                               IconButton(
@@ -608,11 +664,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 tooltip: 'Ricalcola statistiche',
                               )
                             else
-                              SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: t.accent),
-                              ),
+                              SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: t.accent)),
                           ],
                         ),
                       ),
@@ -634,6 +686,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
 
               const SizedBox(height: 24),
+
+              // 🔥 NUOVA CARD: Cambio password
+              Card(
+                color: t.surface,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
+                child: ListTile(
+                  leading: Icon(Icons.lock_outline, color: t.accent),
+                  title: Text('Cambia password', style: TextStyle(color: t.textPrimary)),
+                  trailing: Icon(Icons.chevron_right, color: t.textMuted),
+                  onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
               // Card reset dati giochi
               Card(
                 color: t.surface,
@@ -643,67 +712,59 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 child: ListTile(
                   leading: Icon(Icons.restart_alt_rounded, color: t.orange),
-                  title: Text(
-                    'Reset dati giochi',
-                    style: TextStyle(
-                      color: t.textPrimary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'Elimina dati Training, X01 e Cricket dal profilo',
-                    style: TextStyle(color: t.textSecondary),
-                  ),
+                  title: Text('Reset dati giochi', style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.w700)),
+                  subtitle: Text('Elimina dati Training, X01 e Cricket dal profilo', style: TextStyle(color: t.textSecondary)),
                   trailing: Icon(Icons.chevron_right, color: t.orange),
                   onTap: _isResettingGameData ? null : _showResetGameDataOverlay,
                 ),
               ),
 
-              const SizedBox(height: 24),
-              // Card sicurezza
+              const SizedBox(height: 8),
+
+              // Card reset password (via email)
               Card(
                 color: t.surface,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
                 child: ListTile(
-                  leading: Icon(Icons.lock_reset, color: t.accent),
-                  title: Text('Reset password', style: TextStyle(color: t.textPrimary)),
+                  leading: Icon(Icons.email, color: t.accent),
+                  title: Text('Reset password via email', style: TextStyle(color: t.textPrimary)),
+                  subtitle: Text('Riceverai un link per reimpostare la password', style: TextStyle(color: t.textSecondary, fontSize: 12)),
                   trailing: Icon(Icons.chevron_right, color: t.textMuted),
-                  onTap: () => _sendPasswordReset(context, email),
+                  onTap: () async {
+                    try {
+                      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Email per reset password inviata"), backgroundColor: Colors.green),
+                      );
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Errore: $e"), backgroundColor: Colors.red),
+                      );
+                    }
+                  },
                 ),
               ),
 
               const SizedBox(height: 24),
 
-              // Card eliminazione
+              // 🔥 CARD ELIMINAZIONE ACCOUNT (VERSIONE COMPLETA)
               Card(
                 color: t.surface,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.red.withOpacity(0.3))),
                 child: ListTile(
                   leading: Icon(Icons.delete_forever, color: t.red),
-                  title: Text('Elimina account', style: TextStyle(color: t.red)),
+                  title: Text('Elimina account', style: TextStyle(color: t.red, fontWeight: FontWeight.w600)),
+                  subtitle: Text('Elimina definitivamente profilo e dati', style: TextStyle(color: t.textSecondary, fontSize: 12)),
                   trailing: Icon(Icons.chevron_right, color: t.red),
-                  onTap: () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text("Elimina account"),
-                        content: const Text("Vuoi eliminare definitivamente il tuo account? Tutti i dati andranno persi."),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Annulla")),
-                          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Elimina", style: TextStyle(color: Colors.red))),
-                        ],
-                      ),
-                    );
-                    if (confirm == true) {
-                      await user?.delete();
-                      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
-                    }
-                  },
+                  onTap: _isDeletingAccount ? null : _deleteAccount,
                 ),
               ),
+              const SizedBox(height: 40),
             ],
           ),
-          if (_isSaving || _isResettingGameData)
+          if (_isSaving || _isResettingGameData || _isDeletingAccount)
             Container(
               color: Colors.black.withOpacity(0.5),
               child: const Center(child: CircularProgressIndicator()),
@@ -753,6 +814,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           : IconButton(icon: Icon(Icons.edit, color: t.accent, size: 20), onPressed: onEdit, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
     );
   }
+
   Widget _buildStatTile(AppTokens t, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -766,4 +828,3 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 }
-

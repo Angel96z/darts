@@ -1,9 +1,8 @@
-/// File: register_screen.dart
-/// TARGET: Schermata registrazione con campi estesi (nome, cognome, nickname)
-/// LOGIC GOAL: Creare utente Firebase Auth + salvare profilo in Firestore
-/// REACTION: Mostra loading durante registrazione, errore in caso di fallimento
+/// FILE: register_screen.dart
+/// TARGET: Schermata registrazione con invio verifica email
+/// LOGIC GOAL: Creare utente Firebase Auth + salvare profilo + inviare verifica email
+/// REACTION: Dopo registrazione, reindirizza a schermata attesa verifica
 /// ERROR STRATEGY: Messaggi specifici per ogni tipo di errore Firebase
-/// ANTI-REGRESSION: Mantenere comportamento originale, aggiungere campi obbligatori
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -12,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app_theme.dart';
 import '../../data/user_repository.dart';
 import '../../domain/user_profile.dart';
+import 'email_verification_screen.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -77,15 +77,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       final repository = UserRepository();
       await repository.upsertProfile(profile);
 
+      // 🔥 3. Invia email di verifica
+      await user.sendEmailVerification();
+
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Registrazione completata! Benvenuto!')),
+      // 🔥 4. Reindirizza a schermata verifica (invece di tornare indietro)
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => EmailVerificationScreen(email: email),
+        ),
       );
-
-      // La navigazione avverrà automaticamente tramite authStateChanges
-      Navigator.pop(context);
-
     } on FirebaseAuthException catch (e) {
       String message;
       switch (e.code) {
@@ -135,15 +138,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 const SizedBox(height: 16),
                 Text(
                   'Crea il tuo account',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: t.textPrimary,
-                  ),
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: t.textPrimary),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-
                 // Nome
                 TextFormField(
                   controller: _firstNameController,
@@ -157,14 +155,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     fillColor: t.surface,
                   ),
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Inserisci il nome';
-                    }
+                    if (value == null || value.trim().isEmpty) return 'Inserisci il nome';
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
-
                 // Cognome
                 TextFormField(
                   controller: _lastNameController,
@@ -178,14 +173,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     fillColor: t.surface,
                   ),
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Inserisci il cognome';
-                    }
+                    if (value == null || value.trim().isEmpty) return 'Inserisci il cognome';
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
-
                 // Nickname
                 TextFormField(
                   controller: _nicknameController,
@@ -199,14 +191,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     fillColor: t.surface,
                   ),
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Inserisci un nickname';
-                    }
+                    if (value == null || value.trim().isEmpty) return 'Inserisci un nickname';
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
-
                 // Email
                 TextFormField(
                   controller: _emailController,
@@ -220,17 +209,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     fillColor: t.surface,
                   ),
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Inserisci l\'email';
-                    }
-                    if (!value.contains('@')) {
-                      return 'Email non valida';
-                    }
+                    if (value == null || value.trim().isEmpty) return 'Inserisci l\'email';
+                    if (!value.contains('@')) return 'Email non valida';
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
-
                 // Password
                 TextFormField(
                   controller: _passwordController,
@@ -240,10 +224,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     labelText: 'Password *',
                     prefixIcon: Icon(Icons.lock_outline, color: t.accent),
                     suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                        color: t.textSecondary,
-                      ),
+                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: t.textSecondary),
                       onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     ),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -251,17 +232,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     fillColor: t.surface,
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Inserisci la password';
-                    }
-                    if (value.length < 6) {
-                      return 'Minimo 6 caratteri';
-                    }
+                    if (value == null || value.isEmpty) return 'Inserisci la password';
+                    if (value.length < 6) return 'Minimo 6 caratteri';
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
-
                 // Conferma password
                 TextFormField(
                   controller: _confirmPasswordController,
@@ -271,10 +247,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     labelText: 'Conferma password *',
                     prefixIcon: Icon(Icons.lock_outline, color: t.accent),
                     suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                        color: t.textSecondary,
-                      ),
+                      icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility, color: t.textSecondary),
                       onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                     ),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -282,26 +255,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     fillColor: t.surface,
                   ),
                   validator: (value) {
-                    if (value != _passwordController.text) {
-                      return 'Le password non coincidono';
-                    }
+                    if (value != _passwordController.text) return 'Le password non coincidono';
                     return null;
                   },
                 ),
                 const SizedBox(height: 24),
-
-                // Error message
                 if (_errorMessage != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),
-                    child: Text(
-                      _errorMessage!,
-                      style: TextStyle(color: t.red, fontSize: 14),
-                      textAlign: TextAlign.center,
-                    ),
+                    child: Text(_errorMessage!, style: TextStyle(color: t.red, fontSize: 14), textAlign: TextAlign.center),
                   ),
-
-                // Bottone registra
                 ElevatedButton(
                   onPressed: _isLoading ? null : _register,
                   style: ElevatedButton.styleFrom(
@@ -311,22 +274,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: _isLoading
-                      ? SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: t.accentFg),
-                  )
+                      ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: t.accentFg))
                       : const Text('REGISTRATI', style: TextStyle(fontSize: 16)),
                 ),
                 const SizedBox(height: 16),
-
-                // Link per tornare al login
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    'Hai già un account? Accedi',
-                    style: TextStyle(color: t.accent),
-                  ),
+                  child: Text('Hai già un account? Accedi', style: TextStyle(color: t.accent)),
                 ),
               ],
             ),

@@ -145,6 +145,131 @@ class UserRepository {
       throw ProfileSaveFailure(message: 'Errore eliminazione profilo', technicalDetails: e.toString());
     }
   }
+  // Aggiungi questi metodi alla classe UserRepository
+
+  /// Elimina completamente account utente (Auth + Firestore)
+  Future<void> deleteAccount() async {
+    final user = _auth.currentUser;
+    if (user == null) throw const AuthFailure(message: 'Utente non autenticato');
+
+    final uid = user.uid;
+
+    try {
+      // 1. Elimina tutte le sottocollezioni dell'utente
+      final userDoc = _firestore.collection('users').doc(uid);
+
+      // Sottocollezioni da eliminare
+      final subcollections = [
+        'profile',
+        'matches',
+        'training_sessions',
+        'x01_matches',
+        'cricket_matches',
+      ];
+
+      for (final sub in subcollections) {
+        await _deleteCollection(userDoc.collection(sub));
+      }
+
+      // 2. Elimina documento utente principale
+      await userDoc.delete();
+
+      // 3. Elimina account Firebase Auth
+      await user.delete();
+
+    } catch (e) {
+      throw ProfileSaveFailure(
+        message: 'Errore eliminazione account',
+        technicalDetails: e.toString(),
+      );
+    }
+  }
+
+  /// Helper per eliminare collezione in batch
+  Future<void> _deleteCollection(CollectionReference<Map<String, dynamic>> collection) async {
+    while (true) {
+      final snapshot = await collection.limit(400).get();
+      if (snapshot.docs.isEmpty) break;
+
+      final batch = _firestore.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+
+      if (snapshot.docs.length < 400) break;
+    }
+  }
+
+  /// Aggiorna avatar ID
+  Future<void> updateAvatarId(int? avatarId) async {
+    final uid = _currentUid;
+    await _profileRef(uid).update({
+      'avatarId': avatarId,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Invia email di verifica
+  Future<void> sendEmailVerification() async {
+    final user = _auth.currentUser;
+    if (user == null) throw const AuthFailure(message: 'Utente non autenticato');
+    if (user.emailVerified) return;
+
+    try {
+      await user.sendEmailVerification();
+    } catch (e) {
+      throw ProfileSaveFailure(
+        message: 'Errore invio verifica email',
+        technicalDetails: e.toString(),
+      );
+    }
+  }
+
+  /// Verifica se email è verificata (con refresh)
+  Future<bool> checkEmailVerified() async {
+    await _auth.currentUser?.reload();
+    return _auth.currentUser?.emailVerified ?? false;
+  }
+
+  /// Cambia password (richiede reautenticazione)
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw const AuthFailure(message: 'Utente non autenticato');
+    if (user.email == null) throw const AuthFailure(message: 'Email non disponibile');
+
+    try {
+      // Reautentica
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+      await user.reauthenticateWithCredential(credential);
+
+      // Cambia password
+      await user.updatePassword(newPassword);
+
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'wrong-password') {
+        throw const AuthFailure(message: 'Password corrente errata');
+      }
+      throw AuthFailure(message: e.message ?? 'Errore cambio password');
+    } catch (e) {
+      throw AuthFailure(message: e.toString());
+    }
+  }
+
+  /// Invia reset password (già presente, ma la aggiungo per completezza)
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } catch (e) {
+      throw AuthFailure(message: 'Errore invio reset password');
+    }
+  }
 }
 
 final userRepositoryProvider = Provider<UserRepository>((ref) {

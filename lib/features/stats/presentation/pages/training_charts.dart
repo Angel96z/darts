@@ -1116,52 +1116,40 @@ class TrainingCharts {
       return dartIndexes.contains(1) &&
           dartIndexes.contains(2) &&
           dartIndexes.contains(3);
-    })
-        .toList();
-
-    if (turns.isEmpty) return _empty();
-
-    final varianceByTurn = turns.map((turn) {
-      final avgMm =
-          turn.map((e) => e.distanceMm).reduce((a, b) => a + b) / turn.length;
-
-      return turn
-          .map((e) => pow(e.distanceMm - avgMm, 2).toDouble())
-          .reduce((a, b) => a + b) /
-          turn.length;
     }).toList();
 
-    final maxVariance = varianceByTurn.fold<double>(
-      0,
-          (previous, value) => value > previous ? value : previous,
-    );
+    if (turns.isEmpty) return _empty();
 
     final points = <UnifiedStatsPoint>[];
 
     for (int i = 0; i < turns.length; i++) {
       final turn = turns[i];
       final hits = turn.where((e) => e.sector == target).length;
-      final avgMm =
-          turn.map((e) => e.distanceMm).reduce((a, b) => a + b) / turn.length;
+      final avgMm = turn.map((e) => e.distanceMm).reduce((a, b) => a + b) / turn.length;
 
-      final consistency = maxVariance == 0
-          ? 100.0
-          : (1 - (varianceByTurn[i] / maxVariance)).clamp(0.0, 1.0) * 100.0;
+      final variance = turn
+          .map((e) => pow(e.distanceMm - avgMm, 2).toDouble())
+          .reduce((a, b) => a + b) /
+          turn.length;
+      final stdDevMm = sqrt(variance);
+
+      final maxAcceptableMm = _maxDispersionForTarget(target);  // ← nome cambiato
+      double consistency = (1 - (stdDevMm / maxAcceptableMm)).clamp(0.0, 1.0) * 100.0;
+      consistency = consistency.roundToDouble();
 
       points.add(
         UnifiedStatsPoint(
           x: i + 1.0,
           y: consistency,
           label: 'Turno ${i + 1}',
-          detail:
-          'Turno ${i + 1} • Hit $hits/3 • Distanza media ${avgMm.toStringAsFixed(1)} mm • Controllo ${consistency.toStringAsFixed(0)}%',
+          detail: 'Turno ${i + 1} • Hit $hits/3 • Distanza media ${avgMm.toStringAsFixed(1)} mm • Dispersione ${stdDevMm.toStringAsFixed(1)} mm • Controllo ${consistency.toStringAsFixed(0)}%',
         ),
       );
     }
 
     return UnifiedStatsChart(
       title: 'Controllo nel tempo',
-      subtitle: 'Stabilità delle 3 frecce nei turni completi.',
+      subtitle: 'Compattezza del gruppo (dispersione in mm) - più alto è meglio',
       points: points,
       mode: UnifiedStatsChartMode.lineAndPoints,
       xAxisLabel: 'turno',
@@ -1169,17 +1157,31 @@ class TrainingCharts {
       minYValue: 0,
       maxYValue: 100,
       infoTitle: 'Controllo nel tempo',
-      infoText:
-      'Misura quanto le 3 frecce di ogni turno restano compatte tra loro. Un valore alto indica un turno stabile e ripetibile; un valore basso indica più dispersione.',
+      infoText: 'Misura quanto le 3 frecce sono raggruppate tra loro. '
+          'Più il valore è alto, più il gruppo è compatto. '
+          'Una dispersione < 10mm è eccellente, 10-20mm è buono, > 20mm indica instabilità.',
       advice: const [
-        'Linea alta e stabile = gesto sotto controllo.',
-        'Crolli improvvisi = perdita di ritmo, postura o rilascio.',
-        'Se il controllo cala dopo buoni turni, inserisci un reset respiratorio.',
-        'Non guardare solo le hit: un turno senza hit ma compatto indica correzione tecnica più semplice.',
+        '🎯 Dispersione < 10mm = controllo eccellente (livello professionista)',
+        '📊 Dispersione 10-20mm = buon controllo, lavora sulla ripetibilità',
+        '⚠️ Dispersione > 20mm = priorità: stabilizzare il gesto',
+        '💡 Se il controllo cala, verifica postura e rilascio',
       ],
     );
   }
 
+  /// Restituisce la dispersione massima accettabile (in mm) per il target
+  static double _maxDispersionForTarget(String target) {
+    if (target == 'BULL' || target == '25') {
+      return 10.0;   // 10mm di dispersione = 100% scarso se supera
+    }
+    if (target.startsWith('T')) {
+      return 15.0;   // 15mm di dispersione massima accettabile
+    }
+    if (target.startsWith('D')) {
+      return 25.0;
+    }
+    return 30.0;     // Singoli
+  }
   /// Funzione: descrive in modo semplice questo blocco di logica.
   static List<List<DartThrow>> _buildTurns(List<DartThrow> throws) {
     final orderedThrows = _sortThrowsChronologically(throws);
@@ -1213,11 +1215,6 @@ class TrainingCharts {
   }) {
     if (turns.isEmpty) return [];
 
-    final maxMm = turns
-        .expand((t) => t)
-        .map((t) => t.distanceMm)
-        .fold(0.0, (p, v) => v > p ? v : p);
-
     final raw = <_TurnMetricRaw>[];
     for (int i = 0; i < turns.length; i++) {
       final turn = turns[i];
@@ -1227,35 +1224,59 @@ class TrainingCharts {
           .map((t) => pow(t.distanceMm - avgMm, 2).toDouble())
           .reduce((a, b) => a + b) /
           turn.length;
-      raw.add(_TurnMetricRaw(turnNumber: i + 1, hits: hits, hitRate: (hits / 3) * 100, avgMm: avgMm, variance: variance));
+      final stdDevMm = sqrt(variance);  // ← Calcola la deviazione standard in mm
+
+      raw.add(_TurnMetricRaw(
+        turnNumber: i + 1,
+        hits: hits,
+        hitRate: (hits / 3) * 100,
+        avgMm: avgMm,
+        variance: variance,
+        stdDevMm: stdDevMm,  // ← Aggiungi questo campo
+      ));
     }
 
-    final maxVariance = raw.fold(0.0, (p, e) => e.variance > p ? e.variance : p);
-    final minMm = raw.fold<double>(raw.first.avgMm, (p, e) => e.avgMm < p ? e.avgMm : p);
-    final maxAvgMm = raw.fold<double>(raw.first.avgMm, (p, e) => e.avgMm > p ? e.avgMm : p);
+    // 🔧 CALCOLO PRECISIONE: usa scala assoluta (mm)
+    // La precisione è inversamente proporzionale alla distanza dal target
+    // 0mm = 100%, 50mm = 0% (oltre 50mm è completamente fuori bersaglio)
+    const maxAcceptableDistance = 50.0;  // mm
 
+    // 🔧 CALCOLO CONTROLLO: usa dispersione assoluta (mm)
+    // Usa la stessa logica di consistencyTrend ma normalizzata
     final sessionDurations = showSessionTime ? _buildSessionDurations(turns) : <int, Duration>{};
 
-    /// Funzione: descrive in modo semplice questo blocco di logica.
     return raw.map((r) {
-      final consistencyNorm = maxVariance == 0 ? 100.0 : (1 - (r.variance / maxVariance)).clamp(0.0, 1.0) * 100;
-      final precisionForChart = maxAvgMm == minMm ? 100.0 : (1 - ((r.avgMm - minMm) / (maxAvgMm - minMm))).clamp(0.0, 1.0) * 100;
-      final score = r.hitRate * 0.6 +
-          ((maxMm == 0 ? 0 : (1 - r.avgMm / maxMm)) * 100) * 0.3 +
-          consistencyNorm * 0.1;
+      // 1. HIT RATE: già in percentuale 0-100 (OK)
+      final hitRate = r.hitRate;
+
+      // 2. PRECISIONE: basata sulla distanza media dal target
+      final precisionScore = (1 - (r.avgMm / maxAcceptableDistance))
+          .clamp(0.0, 1.0) * 100;
+
+      // 3. CONTROLLO (CONSISTENZA): basato sulla dispersione (stdDev)
+      final maxAcceptableDispersion = _maxDispersionForTarget(target);
+      final consistencyScore = (1 - (r.stdDevMm / maxAcceptableDispersion))
+          .clamp(0.0, 1.0) * 100;
+
+      // 4. SCORE TURNO: pesi rivisti (hit 40%, precisione 35%, controllo 25%)
+      // Meno peso al controllo perché è più difficile da ottenere
+      final score = (hitRate * 0.4) + (precisionScore * 0.35) + (consistencyScore * 0.25);
+
       return _TurnMetric(
         turnNumber: r.turnNumber,
         hits: r.hits,
-        hitRate: r.hitRate,
+        hitRate: hitRate,
         avgMm: r.avgMm,
         variance: r.variance,
-        consistencyNorm: consistencyNorm,
-        precisionForChart: precisionForChart,
+        consistencyNorm: consistencyScore,  // ← Ora è in scala assoluta!
+        precisionForChart: precisionScore,
         score: score,
         sessionDuration: sessionDurations[r.turnNumber],
       );
     }).toList();
   }
+
+
 
   static Map<int, Duration> _buildSessionDurations(List<List<DartThrow>> turns) {
     final out = <int, Duration>{};
@@ -2195,20 +2216,22 @@ class _SimpleLegend extends StatelessWidget {
   }
 }
 
+// Aggiorna anche _TurnMetricRaw per includere stdDevMm
 class _TurnMetricRaw {
   final int turnNumber;
   final int hits;
   final double hitRate;
   final double avgMm;
   final double variance;
+  final double stdDevMm;  // ← NUOVO
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
   const _TurnMetricRaw({
     required this.turnNumber,
     required this.hits,
     required this.hitRate,
     required this.avgMm,
     required this.variance,
+    required this.stdDevMm,
   });
 }
 

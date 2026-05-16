@@ -43,10 +43,9 @@ class DartsApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themeModeNotifier = ValueNotifier<ThemeMode>(ThemeMode.system);
-
+    // ✅ USA IL ThemeController GLOBALE che già esiste nel tuo codice
     return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeModeNotifier,
+      valueListenable: ThemeController.themeMode,  // ✅ usa quello globale
       builder: (context, mode, _) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
