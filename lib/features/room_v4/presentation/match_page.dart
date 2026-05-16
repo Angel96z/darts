@@ -6,6 +6,7 @@ import '../application/room_notifier.dart';
 import '../domain/models/game_config.dart';
 import '../domain/models/game_state.dart';
 import '../domain/models/player_info.dart';
+import 'match_result/presentation/match_result_page.dart';
 import 'widgets/cricket_board.dart';
 import 'widgets/cricket_keyboard.dart';
 import 'widgets/player_score_card.dart';
@@ -30,11 +31,16 @@ class MatchPage extends ConsumerWidget {
     final teamSize     = ref.watch(roomNotifierProvider.select((s) => s.teamSize));
     final builderState = ref.watch(roomNotifierProvider.select((s) => s.builderState));
 
-    ref.listen(roomNotifierProvider.select((s) => s.showResultOverlay), (prev, next) {
+    ref.listen(roomNotifierProvider.select((s) => s.matchFinished), (prev, next) {
       if (next == true && prev == false) {
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (context.mounted) Navigator.pop(context);
-        });
+        if (context.mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const MatchResultPage(), // o la tua pagina risultato
+            ),
+          );
+        }
       }
     });
 

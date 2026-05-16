@@ -22,6 +22,17 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  // 🔥 ID UTENTI AUTORIZZATI PER ADMIN CONSIGLI
+  static const Set<String> _adminUserIds = {
+    'P6nsNSF0F5djBCJJR9kyTzYuO3f2',
+    // Aggiungi altri admin qui se necessario
+  };
+
+  bool get _isAdmin {
+    final user = FirebaseAuth.instance.currentUser;
+    return user != null && _adminUserIds.contains(user.uid);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -51,6 +62,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final user = FirebaseAuth.instance.currentUser;
+    final isLoggedIn = user != null;
+    final isAdmin = isLoggedIn && _adminUserIds.contains(user.uid);
 
     ref.listen<AppLinkState>(appLinkCoordinatorProvider, (prev, next) {
       final hasPendingRoom = next.pendingRoomId != null && next.pendingRoomId!.isNotEmpty;
@@ -88,49 +102,91 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ],
       ),
       endDrawer: const ProfilePanel(),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            _buildCard(icon: Icons.center_focus_weak, title: 'Training', subtitle: 'Practice mode & bullseye training', onTap: _navigateToTraining, showBadge: false),
-            const SizedBox(height: 20),
-            _buildCard(icon: Icons.sports_esports, title: 'Match', subtitle: 'X01 • Cricket', onTap: _navigateToRoomLobby, showBadge: false),
-            const SizedBox(height: 20),
-            _buildCard(icon: Icons.bar_chart, title: 'Statistiche', subtitle: 'Analizza i tuoi progressi e performance', onTap: _navigateToStats, showBadge: false),
-            const SizedBox(height: 20),
-            const ConsigliCarouselWidget(), // importa il widget
-            const SizedBox(height: 20), // Aggiunto per spaziatura
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isDesktop = constraints.maxWidth >= 800;
 
-            // CARD PER STRING TEST
-            _buildCard(
-              icon: Icons.text_fields_outlined, // Icona adatta per i testi
-              title: 'String Test',
-              subtitle: 'Test architettura Gold Standard',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const StringTestPage()),
-                );
-              },
-              showBadge: true, // Messo a true così lo vedi subito!
-            ),
-// Dopo gli altri card
-            _buildCard(
-              icon: Icons.admin_panel_settings,
-              title: 'Admin Consigli',
-              subtitle: 'Gestisci le frasi motivazionali',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ConsigliAdminScreen()),
-                );
-              },
-              showBadge: false,
-            ),
-          ],
-        ),
+          if (!isDesktop) {
+            // Layout mobile originale
+            return Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  _buildCard(icon: Icons.center_focus_weak, title: 'Training', subtitle: 'Practice mode & bullseye training', onTap: _navigateToTraining, showBadge: false),
+                  const SizedBox(height: 20),
+                  _buildCard(icon: Icons.sports_esports, title: 'Match', subtitle: 'X01 • Cricket', onTap: _navigateToRoomLobby, showBadge: false),
+                  const SizedBox(height: 20),
+                  _buildCard(icon: Icons.bar_chart, title: 'Statistiche', subtitle: 'Analizza i tuoi progressi e performance', onTap: _navigateToStats, showBadge: false),
+                  const SizedBox(height: 20),
+                  if (FirebaseAuth.instance.currentUser != null) ...[
+                    const ConsigliCarouselWidget(),
+                    const SizedBox(height: 20),
+                  ],
+                  if (_isAdmin) ...[
+                    _buildCard(
+                      icon: Icons.admin_panel_settings,
+                      title: 'Admin Consigli',
+                      subtitle: 'Gestisci le frasi motivazionali',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ConsigliAdminScreen()),
+                        );
+                      },
+                      showBadge: false,
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ],
+              ),
+            );
+          }
 
+          // Layout desktop: card con larghezza limitata e centrate
+          final user = FirebaseAuth.instance.currentUser;
+          final isLoggedIn = user != null;
+          final isAdmin = isLoggedIn && _adminUserIds.contains(user.uid);
+
+          return Center(
+            child: SizedBox(
+              width: 540, // Larghezza massima delle card in desktop
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildCard(icon: Icons.center_focus_weak, title: 'Training', subtitle: 'Practice mode & bullseye training', onTap: _navigateToTraining, showBadge: false),
+                    const SizedBox(height: 20),
+                    _buildCard(icon: Icons.sports_esports, title: 'Match', subtitle: 'X01 • Cricket', onTap: _navigateToRoomLobby, showBadge: false),
+                    const SizedBox(height: 20),
+                    _buildCard(icon: Icons.bar_chart, title: 'Statistiche', subtitle: 'Analizza i tuoi progressi e performance', onTap: _navigateToStats, showBadge: false),
+                    const SizedBox(height: 20),
+                    if (isLoggedIn) ...[
+                      const ConsigliCarouselWidget(),
+                      const SizedBox(height: 20),
+                    ],
+                    if (isAdmin) ...[
+                      _buildCard(
+                        icon: Icons.admin_panel_settings,
+                        title: 'Admin Consigli',
+                        subtitle: 'Gestisci le frasi motivazionali',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ConsigliAdminScreen()),
+                          );
+                        },
+                        showBadge: false,
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

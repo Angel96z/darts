@@ -22,6 +22,7 @@ import '../domain/models/game_state.dart';
 import '../domain/models/match.dart';
 import '../domain/models/round.dart';
 import '../domain/rules/base_rules.dart';
+import '../presentation/match_result/domain/match_result_state.dart';
 import 'match_builder.dart';
 import 'game_logic.dart';
 import '../domain/models/set.dart';
@@ -40,12 +41,12 @@ class RoomState {
   final MatchBuilderState? builderState;
   final Match? completedMatch;
   final String? matchWinnerId;
-  final bool showResultOverlay;
+  final bool matchFinished;
+  final MatchResultState? matchResult;
   final LocalMatchSyncStatus? matchSaveStatus;
   final DateTime? matchStartTime;
   // 🆕 GameState derivato dal builderState (per UI)
   final GameState? gameState;
-
   // stato del timer di passaggio turno
   final bool isWaitingForTurnPass;
   final double turnPassProgress;
@@ -63,7 +64,8 @@ class RoomState {
     this.turnPassProgress = 0.0,
     this.completedMatch,
     this.matchWinnerId,
-    this.showResultOverlay = false,
+    this.matchFinished = false,
+    this.matchResult,
     this.matchSaveStatus,
     this.matchStartTime,
   });
@@ -96,9 +98,10 @@ class RoomState {
     Match? completedMatch,
     String? matchWinnerId,
     bool? showResultOverlay,
+    bool? matchFinished,
+    MatchResultState? matchResult,
     LocalMatchSyncStatus? matchSaveStatus,
-    DateTime? matchStartTime,  // ← AGGIUNGI QUI
-
+    DateTime? matchStartTime,
   }) {
     return RoomState(
       status: status ?? this.status,
@@ -113,10 +116,10 @@ class RoomState {
       turnPassProgress: turnPassProgress ?? this.turnPassProgress,
       completedMatch: completedMatch ?? this.completedMatch,
       matchWinnerId: matchWinnerId ?? this.matchWinnerId,
-      showResultOverlay: showResultOverlay ?? this.showResultOverlay,
+      matchFinished: matchFinished ?? this.matchFinished,
+      matchResult: matchResult ?? this.matchResult,
       matchSaveStatus: matchSaveStatus ?? this.matchSaveStatus,
-      matchStartTime: matchStartTime ?? this.matchStartTime,  // ← AGGIUNGI QUI
-
+      matchStartTime: matchStartTime ?? this.matchStartTime,
     );
   }
 }
@@ -599,7 +602,7 @@ class RoomNotifier extends StateNotifier<RoomState> {
           state = state.copyWith(
             completedMatch: match,
             matchWinnerId: matchWinnerId,
-            showResultOverlay: true,
+            matchFinished: true,
           );
 
           print("📊 FINAL MATCH - sets: ${finalMatchSets.length}");
@@ -924,13 +927,21 @@ class RoomNotifier extends StateNotifier<RoomState> {
   }
 
   void startMatch() {
-    _history.clear();  // ← AGGIUNGI QUESTA RIGA
+    _cancelTurnPassTimer();
+    _history.clear();
+
+    // Resetta TUTTO lo stato del match prima di ricrearlo
     state = state.copyWith(
+      builderState: null,
+      gameState: null,
+      completedMatch: null,
+      matchWinnerId: null,
+      matchFinished: false,
       matchStartTime: DateTime.now(),
     );
+
     _recreateMatch();
 
-    // 🔥 Attiva bot subito dopo l'inizio del match, se il primo giocatore è un bot
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final currentGameState = state.gameState;
       if (currentGameState != null && currentGameState.currentPlayerId.startsWith('bot_')) {
@@ -960,13 +971,6 @@ class RoomNotifier extends StateNotifier<RoomState> {
   void dispose() {
     _cancelTurnPassTimer();
     super.dispose();
-  }
-  void closeResultOverlay() {
-    state = state.copyWith(
-      completedMatch: null,
-      matchWinnerId: null,
-      showResultOverlay: false,
-    );
   }
 
 // ============================================================

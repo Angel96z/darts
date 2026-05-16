@@ -81,7 +81,7 @@ class TeamSelector extends ConsumerWidget {
 }
 
 /// Bottone del carousel (stile unificato con ConfigColumn)
-class _CarouselButton extends StatelessWidget {
+class _CarouselButton extends StatefulWidget {
   final VoidCallback? onTap;
   final IconData icon;
   final bool isActive;
@@ -93,21 +93,35 @@ class _CarouselButton extends StatelessWidget {
   });
 
   @override
+  State<_CarouselButton> createState() => _CarouselButtonState();
+}
+
+class _CarouselButtonState extends State<_CarouselButton> {
+  bool _isPressed = false;
+
+  @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
 
     return GestureDetector(
-      onTap: onTap,
+      onTapDown: widget.isActive ? (_) => setState(() => _isPressed = true) : null,
+      onTapUp: widget.isActive ? (_) => setState(() => _isPressed = false) : null,
+      onTapCancel: widget.isActive ? () => setState(() => _isPressed = false) : null,
+      onTap: widget.onTap,
       behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 150),
-          opacity: isActive ? 1.0 : 0.25,
-          child: Icon(
-            icon,
-            size: 20,
-            color: isActive ? t.accent : t.textMuted,
+      child: AnimatedScale(
+        scale: _isPressed && widget.isActive ? 0.85 : 1.0,
+        duration: const Duration(milliseconds: 80),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 150),
+            opacity: widget.isActive ? 1.0 : 0.25,
+            child: Icon(
+              widget.icon,
+              size: 20,
+              color: widget.isActive ? t.accent : t.textMuted,
+            ),
           ),
         ),
       ),

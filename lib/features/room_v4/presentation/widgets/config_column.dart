@@ -142,7 +142,7 @@ class _Carousel<T> extends StatelessWidget {
   }
 }
 
-class _CarouselButton extends StatelessWidget {
+class _CarouselButton extends StatefulWidget {
   final VoidCallback? onTap;
   final IconData icon;
   final bool isActive;
@@ -154,35 +154,57 @@ class _CarouselButton extends StatelessWidget {
   });
 
   @override
+  State<_CarouselButton> createState() => _CarouselButtonState();
+}
+
+class _CarouselButtonState extends State<_CarouselButton> {
+  bool _isPressed = false;
+
+  @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
 
     return GestureDetector(
-      onTap: onTap,
+      onTapDown: widget.isActive ? (_) => setState(() => _isPressed = true) : null,
+      onTapUp: widget.isActive ? (_) => setState(() => _isPressed = false) : null,
+      onTapCancel: widget.isActive ? () => setState(() => _isPressed = false) : null,
+      onTap: widget.onTap,
       behavior: HitTestBehavior.opaque,
-      child: SizedBox(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 100),
         width: 48,
         height: 48,
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 150),
-          opacity: isActive ? 1.0 : 0.25,
-          child: Icon(
-            icon,
-            size: 20,
-            color: isActive ? t.accent : t.textMuted,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: _isPressed && widget.isActive
+              ? t.accent.withOpacity(0.2)
+              : Colors.transparent,
+        ),
+        child: Center(
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 150),
+            opacity: widget.isActive ? 1.0 : 0.25,
+            child: AnimatedScale(
+              scale: _isPressed && widget.isActive ? 0.85 : 1.0,
+              duration: const Duration(milliseconds: 100),
+              child: Icon(
+                widget.icon,
+                size: 20,
+                color: widget.isActive ? t.accent : t.textMuted,
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 }
-
 /// ─────────────────────────────────────────────
 /// TOGGLE MODERNO (checkbox elegante)
 /// Icona check + label
 /// ─────────────────────────────────────────────
 
-class _ModernToggle extends StatelessWidget {
+class _ModernToggle extends StatefulWidget {
   final String label;
   final bool value;
   final ValueChanged<bool> onChanged;
@@ -194,54 +216,67 @@ class _ModernToggle extends StatelessWidget {
   });
 
   @override
+  State<_ModernToggle> createState() => _ModernToggleState();
+}
+
+class _ModernToggleState extends State<_ModernToggle> {
+  bool _isPressed = false;
+
+  @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
 
     return GestureDetector(
-      onTap: () => onChanged(!value),
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapCancel: () => setState(() => _isPressed = false),
+      onTap: () => widget.onChanged(!widget.value),
       behavior: HitTestBehavior.opaque,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 40,
-            height: 40,
-            child: Center(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: value ? t.accent : Colors.transparent,
-                  border: Border.all(
-                    color: value ? t.accent : t.border,
-                    width: 1.5,
+      child: AnimatedScale(
+        scale: _isPressed ? 0.96 : 1.0,
+        duration: const Duration(milliseconds: 80),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 40,
+              height: 40,
+              child: Center(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: widget.value ? t.accent : Colors.transparent,
+                    border: Border.all(
+                      color: widget.value ? t.accent : t.border,
+                      width: 1.5,
+                    ),
                   ),
+                  child: widget.value
+                      ? Icon(Icons.check, size: 20, color: t.accentFg)
+                      : null,
                 ),
-                child: value
-                    ? Icon(Icons.check, size: 20, color: t.accentFg)
-                    : null,
               ),
             ),
-          ),
-          if (label.isNotEmpty) ...[
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: value ? FontWeight.w700 : FontWeight.w500,
-                color: value ? t.accent : t.textPrimary,
+            if (widget.label.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: widget.value ? FontWeight.w700 : FontWeight.w500,
+                  color: widget.value ? t.accent : t.textPrimary,
+                ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
 }
-
 /// ─────────────────────────────────────────────
 /// LABEL ROW (label + child, usata ovunque)
 /// ─────────────────────────────────────────────

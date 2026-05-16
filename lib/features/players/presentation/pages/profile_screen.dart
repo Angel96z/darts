@@ -532,6 +532,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
     final userState = ref.watch(userProvider);
@@ -552,224 +553,42 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text("Profilo"), backgroundColor: t.surface, elevation: 0),
-      body: Stack(
-        children: [
-          ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              const SizedBox(height: 12),
-              // 🔥 AVATAR CON IMMAGINE DINAMICA
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AvatarSelectorScreen()));
-                },
-                child: Center(
-                  child: CircleAvatar(
-                    radius: 48,
-                    backgroundColor: t.accent.withOpacity(0.1),
-                    backgroundImage: profile?.avatarId != null ? AssetImage(profile!.avatarAssetPath) : null,
-                    child: profile?.avatarId == null
-                        ? Text(profile?.initials ?? '?', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: t.accent))
-                        : null,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AvatarSelectorScreen()));
-                  },
-                  child: Text('Cambia avatar', style: TextStyle(color: t.accent, fontSize: 12)),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Center(child: Text(profile?.displayName ?? email.split('@').first, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: t.textPrimary))),
-              const SizedBox(height: 8),
-              Center(child: Text(email, style: TextStyle(fontSize: 14, color: t.textSecondary))),
-              const SizedBox(height: 24),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isDesktop = constraints.maxWidth >= 800;
 
-              // Card dati personali
-              Card(
-                color: t.surface,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
-                child: Column(
+          if (!isDesktop) {
+            // Layout mobile originale
+            return _buildMobileLayout(t, profile, userState, email, firstName, lastName, nickname);
+          }
+
+          // Layout desktop: due colonne
+          return Center(
+            child: SizedBox(
+              width: 1100, // Larghezza massima contenitore desktop
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 🔥 AVATAR TILE (alternativa all'editing)
-                    _buildAvatarTile(t, profile),
-                    Divider(color: t.divider, height: 1, indent: 56),
-                    _buildEditableTile(
-                      t: t,
-                      icon: Icons.person_outline,
-                      label: 'Nome',
-                      value: firstName,
-                      isEditing: _isEditingFirstName,
-                      controller: _firstNameController,
-                      onEdit: () => _startEditFirstName(firstName),
-                      onCancel: _cancelEditFirstName,
-                      onSave: _saveFirstName,
-                      placeholder: 'Inserisci il tuo nome',
+                    // COLONNA SINISTRA - Azioni (40%)
+                    Expanded(
+                      flex: 4,
+                      child: _buildActionsColumn(t, profile, email, firstName, lastName, nickname, userState),
                     ),
-                    Divider(color: t.divider, height: 1, indent: 56),
-                    _buildEditableTile(
-                      t: t,
-                      icon: Icons.person_outline,
-                      label: 'Cognome',
-                      value: lastName,
-                      isEditing: _isEditingLastName,
-                      controller: _lastNameController,
-                      onEdit: () => _startEditLastName(lastName),
-                      onCancel: _cancelEditLastName,
-                      onSave: _saveLastName,
-                      placeholder: 'Inserisci il tuo cognome',
-                    ),
-                    Divider(color: t.divider, height: 1, indent: 56),
-                    _buildEditableTile(
-                      t: t,
-                      icon: Icons.tag,
-                      label: 'Nickname',
-                      value: nickname,
-                      isEditing: _isEditingNickname,
-                      controller: _nicknameController,
-                      onEdit: () => _startEditNickname(nickname),
-                      onCancel: _cancelEditNickname,
-                      onSave: _saveNickname,
-                      placeholder: 'Inserisci il tuo nickname',
-                    ),
+                    const SizedBox(width: 24),
+                    // COLONNA DESTRA - Statistiche carriera (60%)
+                    if (profile?.stats != null)
+                      Expanded(
+                        flex: 6,
+                        child: _buildStatsColumn(t, profile!),
+                      ),
                   ],
                 ),
               ),
-
-              const SizedBox(height: 24),
-
-              // Card statistiche carriera
-              if (profile?.stats != null)
-                Card(
-                  color: t.surface,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text('Statistiche carriera', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: t.textPrimary)),
-                            ),
-                            if (!_isRefreshingStats)
-                              IconButton(
-                                icon: Icon(Icons.refresh, color: t.accent, size: 20),
-                                onPressed: _refreshStats,
-                                tooltip: 'Ricalcola statistiche',
-                              )
-                            else
-                              SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: t.accent)),
-                          ],
-                        ),
-                      ),
-                      Divider(color: t.divider, height: 1),
-                      _buildStatTile(t, 'Partite giocate', '${profile!.stats.totalMatches}'),
-                      _buildStatTile(t, 'Partite vinte', '${profile.stats.totalMatchesWon} (${profile.stats.winRate.toStringAsFixed(0)}%)'),
-                      _buildStatTile(t, 'Sessioni training', '${profile.stats.totalTrainingSessions}'),
-                      _buildStatTile(t, 'Tiri training', '${profile.stats.totalTrainingThrows}'),
-                      _buildStatTile(t, 'Miglior leg (dardi)', profile.stats.bestLegDarts == 999 ? '-' : '${profile.stats.bestLegDarts}'),
-                      _buildStatTile(t, 'Media X01 migliore', profile.stats.bestX01Average.toStringAsFixed(1)),
-                      _buildStatTile(t, 'MPR Cricket migliore', profile.stats.bestCricketMPR.toStringAsFixed(2)),
-                      _buildStatTile(t, '180', '${profile.stats.total180s}'),
-                      _buildStatTile(t, '140+', '${profile.stats.total140s}'),
-                      _buildStatTile(t, '100+', '${profile.stats.total100s}'),
-                      _buildStatTile(t, 'Checkout totali', '${profile.stats.totalCheckouts}'),
-                      _buildStatTile(t, 'Miglior checkout', '${profile.stats.bestCheckout}'),
-                    ],
-                  ),
-                ),
-
-              const SizedBox(height: 24),
-
-              // 🔥 NUOVA CARD: Cambio password
-              Card(
-                color: t.surface,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
-                child: ListTile(
-                  leading: Icon(Icons.lock_outline, color: t.accent),
-                  title: Text('Cambia password', style: TextStyle(color: t.textPrimary)),
-                  trailing: Icon(Icons.chevron_right, color: t.textMuted),
-                  onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
-                  },
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              // Card reset dati giochi
-              Card(
-                color: t.surface,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: t.orange.withOpacity(0.35)),
-                ),
-                child: ListTile(
-                  leading: Icon(Icons.restart_alt_rounded, color: t.orange),
-                  title: Text('Reset dati giochi', style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.w700)),
-                  subtitle: Text('Elimina dati Training, X01 e Cricket dal profilo', style: TextStyle(color: t.textSecondary)),
-                  trailing: Icon(Icons.chevron_right, color: t.orange),
-                  onTap: _isResettingGameData ? null : _showResetGameDataOverlay,
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              // Card reset password (via email)
-              Card(
-                color: t.surface,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
-                child: ListTile(
-                  leading: Icon(Icons.email, color: t.accent),
-                  title: Text('Reset password via email', style: TextStyle(color: t.textPrimary)),
-                  subtitle: Text('Riceverai un link per reimpostare la password', style: TextStyle(color: t.textSecondary, fontSize: 12)),
-                  trailing: Icon(Icons.chevron_right, color: t.textMuted),
-                  onTap: () async {
-                    try {
-                      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Email per reset password inviata"), backgroundColor: Colors.green),
-                      );
-                    } catch (e) {
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Errore: $e"), backgroundColor: Colors.red),
-                      );
-                    }
-                  },
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // 🔥 CARD ELIMINAZIONE ACCOUNT (VERSIONE COMPLETA)
-              Card(
-                color: t.surface,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.red.withOpacity(0.3))),
-                child: ListTile(
-                  leading: Icon(Icons.delete_forever, color: t.red),
-                  title: Text('Elimina account', style: TextStyle(color: t.red, fontWeight: FontWeight.w600)),
-                  subtitle: Text('Elimina definitivamente profilo e dati', style: TextStyle(color: t.textSecondary, fontSize: 12)),
-                  trailing: Icon(Icons.chevron_right, color: t.red),
-                  onTap: _isDeletingAccount ? null : _deleteAccount,
-                ),
-              ),
-              const SizedBox(height: 40),
-            ],
-          ),
-          if (_isSaving || _isResettingGameData || _isDeletingAccount)
-            Container(
-              color: Colors.black.withOpacity(0.5),
-              child: const Center(child: CircularProgressIndicator()),
             ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -823,6 +642,442 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         children: [
           Text(label, style: TextStyle(color: t.textSecondary, fontSize: 14)),
           Text(value, style: TextStyle(color: t.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+  Widget _buildMobileLayout(AppTokens t, UserProfile? profile, UserState userState, String email, String firstName, String lastName, String nickname) {
+    return Stack(
+      children: [
+        ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            const SizedBox(height: 12),
+            // Avatar
+            GestureDetector(
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const AvatarSelectorScreen()));
+              },
+              child: Center(
+                child: CircleAvatar(
+                  radius: 48,
+                  backgroundColor: t.accent.withOpacity(0.1),
+                  backgroundImage: profile?.avatarId != null ? AssetImage(profile!.avatarAssetPath) : null,
+                  child: profile?.avatarId == null
+                      ? Text(profile?.initials ?? '?', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: t.accent))
+                      : null,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: TextButton(
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AvatarSelectorScreen()));
+                },
+                child: Text('Cambia avatar', style: TextStyle(color: t.accent, fontSize: 12)),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Center(child: Text(profile?.displayName ?? email.split('@').first, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: t.textPrimary))),
+            const SizedBox(height: 8),
+            Center(child: Text(email, style: TextStyle(fontSize: 14, color: t.textSecondary))),
+            const SizedBox(height: 24),
+
+            // Card dati personali
+            Card(
+              color: t.surface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
+              child: Column(
+                children: [
+                  _buildAvatarTile(t, profile),
+                  Divider(color: t.divider, height: 1, indent: 56),
+                  _buildEditableTile(
+                    t: t,
+                    icon: Icons.person_outline,
+                    label: 'Nome',
+                    value: firstName,
+                    isEditing: _isEditingFirstName,
+                    controller: _firstNameController,
+                    onEdit: () => _startEditFirstName(firstName),
+                    onCancel: _cancelEditFirstName,
+                    onSave: _saveFirstName,
+                    placeholder: 'Inserisci il tuo nome',
+                  ),
+                  Divider(color: t.divider, height: 1, indent: 56),
+                  _buildEditableTile(
+                    t: t,
+                    icon: Icons.person_outline,
+                    label: 'Cognome',
+                    value: lastName,
+                    isEditing: _isEditingLastName,
+                    controller: _lastNameController,
+                    onEdit: () => _startEditLastName(lastName),
+                    onCancel: _cancelEditLastName,
+                    onSave: _saveLastName,
+                    placeholder: 'Inserisci il tuo cognome',
+                  ),
+                  Divider(color: t.divider, height: 1, indent: 56),
+                  _buildEditableTile(
+                    t: t,
+                    icon: Icons.tag,
+                    label: 'Nickname',
+                    value: nickname,
+                    isEditing: _isEditingNickname,
+                    controller: _nicknameController,
+                    onEdit: () => _startEditNickname(nickname),
+                    onCancel: _cancelEditNickname,
+                    onSave: _saveNickname,
+                    placeholder: 'Inserisci il tuo nickname',
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Statistiche carriera
+            if (profile?.stats != null)
+              Card(
+                color: t.surface,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text('Statistiche carriera', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: t.textPrimary)),
+                          ),
+                          if (!_isRefreshingStats)
+                            IconButton(
+                              icon: Icon(Icons.refresh, color: t.accent, size: 20),
+                              onPressed: _refreshStats,
+                              tooltip: 'Ricalcola statistiche',
+                            )
+                          else
+                            SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: t.accent)),
+                        ],
+                      ),
+                    ),
+                    Divider(color: t.divider, height: 1),
+                    _buildStatTile(t, 'Partite giocate', '${profile!.stats.totalMatches}'),
+                    _buildStatTile(t, 'Partite vinte', '${profile.stats.totalMatchesWon} (${profile.stats.winRate.toStringAsFixed(0)}%)'),
+                    _buildStatTile(t, 'Sessioni training', '${profile.stats.totalTrainingSessions}'),
+                    _buildStatTile(t, 'Tiri training', '${profile.stats.totalTrainingThrows}'),
+                    _buildStatTile(t, 'Miglior leg (dardi)', profile.stats.bestLegDarts == 999 ? '-' : '${profile.stats.bestLegDarts}'),
+                    _buildStatTile(t, 'Media X01 migliore', profile.stats.bestX01Average.toStringAsFixed(1)),
+                    _buildStatTile(t, 'MPR Cricket migliore', profile.stats.bestCricketMPR.toStringAsFixed(2)),
+                    _buildStatTile(t, '180', '${profile.stats.total180s}'),
+                    _buildStatTile(t, '140+', '${profile.stats.total140s}'),
+                    _buildStatTile(t, '100+', '${profile.stats.total100s}'),
+                    _buildStatTile(t, 'Checkout totali', '${profile.stats.totalCheckouts}'),
+                    _buildStatTile(t, 'Miglior checkout', '${profile.stats.bestCheckout}'),
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 24),
+
+            // Cambio password
+            Card(
+              color: t.surface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
+              child: ListTile(
+                leading: Icon(Icons.lock_outline, color: t.accent),
+                title: Text('Cambia password', style: TextStyle(color: t.textPrimary)),
+                trailing: Icon(Icons.chevron_right, color: t.textMuted),
+                onTap: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
+                },
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // Reset dati giochi
+            Card(
+              color: t.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: t.orange.withOpacity(0.35)),
+              ),
+              child: ListTile(
+                leading: Icon(Icons.restart_alt_rounded, color: t.orange),
+                title: Text('Reset dati giochi', style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.w700)),
+                subtitle: Text('Elimina dati Training, X01 e Cricket dal profilo', style: TextStyle(color: t.textSecondary)),
+                trailing: Icon(Icons.chevron_right, color: t.orange),
+                onTap: _isResettingGameData ? null : _showResetGameDataOverlay,
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // Reset password via email
+            Card(
+              color: t.surface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
+              child: ListTile(
+                leading: Icon(Icons.email, color: t.accent),
+                title: Text('Reset password via email', style: TextStyle(color: t.textPrimary)),
+                subtitle: Text('Riceverai un link per reimpostare la password', style: TextStyle(color: t.textSecondary, fontSize: 12)),
+                trailing: Icon(Icons.chevron_right, color: t.textMuted),
+                onTap: () async {
+                  try {
+                    await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Email per reset password inviata"), backgroundColor: Colors.green),
+                    );
+                  } catch (e) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Errore: $e"), backgroundColor: Colors.red),
+                    );
+                  }
+                },
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Elimina account
+            Card(
+              color: t.surface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.red.withOpacity(0.3))),
+              child: ListTile(
+                leading: Icon(Icons.delete_forever, color: t.red),
+                title: Text('Elimina account', style: TextStyle(color: t.red, fontWeight: FontWeight.w600)),
+                subtitle: Text('Elimina definitivamente profilo e dati', style: TextStyle(color: t.textSecondary, fontSize: 12)),
+                trailing: Icon(Icons.chevron_right, color: t.red),
+                onTap: _isDeletingAccount ? null : _deleteAccount,
+              ),
+            ),
+            const SizedBox(height: 40),
+          ],
+        ),
+        if (_isSaving || _isResettingGameData || _isDeletingAccount)
+          Container(
+            color: Colors.black.withOpacity(0.5),
+            child: const Center(child: CircularProgressIndicator()),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildActionsColumn(AppTokens t, UserProfile? profile, String email, String firstName, String lastName, String nickname, UserState userState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Avatar
+        Center(
+          child: Column(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AvatarSelectorScreen()));
+                },
+                child: CircleAvatar(
+                  radius: 56,
+                  backgroundColor: t.accent.withOpacity(0.1),
+                  backgroundImage: profile?.avatarId != null ? AssetImage(profile!.avatarAssetPath) : null,
+                  child: profile?.avatarId == null
+                      ? Text(profile?.initials ?? '?', style: TextStyle(fontSize: 42, fontWeight: FontWeight.bold, color: t.accent))
+                      : null,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AvatarSelectorScreen()));
+                },
+                child: Text('Cambia avatar', style: TextStyle(color: t.accent, fontSize: 13)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Center(
+          child: Column(
+            children: [
+              Text(profile?.displayName ?? email.split('@').first, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: t.textPrimary)),
+              const SizedBox(height: 4),
+              Text(email, style: TextStyle(fontSize: 13, color: t.textSecondary)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Card dati personali
+        Card(
+          color: t.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
+          child: Column(
+            children: [
+              _buildAvatarTile(t, profile),
+              Divider(color: t.divider, height: 1, indent: 56),
+              _buildEditableTile(
+                t: t,
+                icon: Icons.person_outline,
+                label: 'Nome',
+                value: firstName,
+                isEditing: _isEditingFirstName,
+                controller: _firstNameController,
+                onEdit: () => _startEditFirstName(firstName),
+                onCancel: _cancelEditFirstName,
+                onSave: _saveFirstName,
+                placeholder: 'Inserisci il tuo nome',
+              ),
+              Divider(color: t.divider, height: 1, indent: 56),
+              _buildEditableTile(
+                t: t,
+                icon: Icons.person_outline,
+                label: 'Cognome',
+                value: lastName,
+                isEditing: _isEditingLastName,
+                controller: _lastNameController,
+                onEdit: () => _startEditLastName(lastName),
+                onCancel: _cancelEditLastName,
+                onSave: _saveLastName,
+                placeholder: 'Inserisci il tuo cognome',
+              ),
+              Divider(color: t.divider, height: 1, indent: 56),
+              _buildEditableTile(
+                t: t,
+                icon: Icons.tag,
+                label: 'Nickname',
+                value: nickname,
+                isEditing: _isEditingNickname,
+                controller: _nicknameController,
+                onEdit: () => _startEditNickname(nickname),
+                onCancel: _cancelEditNickname,
+                onSave: _saveNickname,
+                placeholder: 'Inserisci il tuo nickname',
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Cambio password
+        Card(
+          color: t.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
+          child: ListTile(
+            leading: Icon(Icons.lock_outline, color: t.accent),
+            title: Text('Cambia password', style: TextStyle(color: t.textPrimary)),
+            trailing: Icon(Icons.chevron_right, color: t.textMuted),
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
+            },
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        // Reset dati giochi
+        Card(
+          color: t.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: t.orange.withOpacity(0.35)),
+          ),
+          child: ListTile(
+            leading: Icon(Icons.restart_alt_rounded, color: t.orange),
+            title: Text('Reset dati giochi', style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.w700)),
+            subtitle: Text('Elimina dati Training, X01 e Cricket', style: TextStyle(color: t.textSecondary, fontSize: 12)),
+            trailing: Icon(Icons.chevron_right, color: t.orange),
+            onTap: _isResettingGameData ? null : _showResetGameDataOverlay,
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        // Reset password via email
+        Card(
+          color: t.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
+          child: ListTile(
+            leading: Icon(Icons.email, color: t.accent),
+            title: Text('Reset password via email', style: TextStyle(color: t.textPrimary)),
+            subtitle: Text('Riceverai un link per reimpostare', style: TextStyle(color: t.textSecondary, fontSize: 12)),
+            trailing: Icon(Icons.chevron_right, color: t.textMuted),
+            onTap: () async {
+              try {
+                await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Email per reset password inviata"), backgroundColor: Colors.green),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Errore: $e"), backgroundColor: Colors.red),
+                );
+              }
+            },
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Elimina account
+        Card(
+          color: t.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.red.withOpacity(0.3))),
+          child: ListTile(
+            leading: Icon(Icons.delete_forever, color: t.red),
+            title: Text('Elimina account', style: TextStyle(color: t.red, fontWeight: FontWeight.w600)),
+            subtitle: Text('Elimina definitivamente profilo e dati', style: TextStyle(color: t.textSecondary, fontSize: 12)),
+            trailing: Icon(Icons.chevron_right, color: t.red),
+            onTap: _isDeletingAccount ? null : _deleteAccount,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatsColumn(AppTokens t, UserProfile profile) {
+    return Card(
+      color: t.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text('Statistiche carriera', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: t.textPrimary)),
+                ),
+                if (!_isRefreshingStats)
+                  IconButton(
+                    icon: Icon(Icons.refresh, color: t.accent, size: 20),
+                    onPressed: _refreshStats,
+                    tooltip: 'Ricalcola statistiche',
+                  )
+                else
+                  SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: t.accent)),
+              ],
+            ),
+          ),
+          Divider(color: t.divider, height: 1),
+          _buildStatTile(t, 'Partite giocate', '${profile.stats.totalMatches}'),
+          _buildStatTile(t, 'Partite vinte', '${profile.stats.totalMatchesWon} (${profile.stats.winRate.toStringAsFixed(0)}%)'),
+          _buildStatTile(t, 'Sessioni training', '${profile.stats.totalTrainingSessions}'),
+          _buildStatTile(t, 'Tiri training', '${profile.stats.totalTrainingThrows}'),
+          _buildStatTile(t, 'Miglior leg (dardi)', profile.stats.bestLegDarts == 999 ? '-' : '${profile.stats.bestLegDarts}'),
+          _buildStatTile(t, 'Media X01 migliore', profile.stats.bestX01Average.toStringAsFixed(1)),
+          _buildStatTile(t, 'MPR Cricket migliore', profile.stats.bestCricketMPR.toStringAsFixed(2)),
+          _buildStatTile(t, '180', '${profile.stats.total180s}'),
+          _buildStatTile(t, '140+', '${profile.stats.total140s}'),
+          _buildStatTile(t, '100+', '${profile.stats.total100s}'),
+          _buildStatTile(t, 'Checkout totali', '${profile.stats.totalCheckouts}'),
+          _buildStatTile(t, 'Miglior checkout', '${profile.stats.bestCheckout}'),
         ],
       ),
     );

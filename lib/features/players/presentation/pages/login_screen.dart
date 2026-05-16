@@ -1,8 +1,5 @@
 /// FILE: login_screen.dart
-/// TARGET: Schermata login con verifica email obbligatoria e recupero password
-/// LOGIC GOAL: Login con Firebase Auth + blocco se email non verificata
-/// REACTION: Mostra loading, errore, link per password dimenticata
-/// ERROR STRATEGY: Messaggi specifici per ogni tipo di errore Firebase
+/// TARGET: Schermata login SENZA verifica email obbligatoria
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -47,46 +44,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         password: passwordController.text.trim(),
       );
 
-      // 🔥 VERIFICA EMAIL OBBLIGATORIA
-      await userCredential.user?.reload();
-      if (!(userCredential.user?.emailVerified ?? true)) {
-        await FirebaseAuth.instance.signOut();
-        setState(() {
-          error = "Email non verificata. Controlla la tua casella email.";
-          loading = false;
-        });
-        return;
+      // 🔥 NESSUN CONTROLLO EMAIL VERIFICATA - LOGIN SEMPRE CONSENTITO
+
+      if (mounted) {
+        setState(() => loading = false);
       }
 
       if (mounted && Navigator.canPop(context)) {
         Navigator.pop(context, true);
       }
+
     } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
       String message;
       switch (e.code) {
-        case "user-not-found":
-          message = "Utente non trovato";
-          break;
-        case "wrong-password":
-          message = "Password errata";
-          break;
-        case "invalid-email":
-          message = "Email non valida";
-          break;
-        case "user-disabled":
-          message = "Account disabilitato";
-          break;
-        case "too-many-requests":
-          message = "Troppi tentativi. Riprova più tardi";
-          break;
-        default:
-          message = e.message ?? "Errore login";
+        case "user-not-found": message = "Utente non trovato"; break;
+        case "wrong-password": message = "Password errata"; break;
+        case "invalid-email": message = "Email non valida"; break;
+        case "user-disabled": message = "Account disabilitato"; break;
+        case "too-many-requests": message = "Troppi tentativi. Riprova più tardi"; break;
+        default: message = e.message ?? "Errore login";
       }
-      setState(() => error = message);
+      setState(() {
+        error = message;
+        loading = false;
+      });
     } catch (e) {
-      setState(() => error = "Errore inatteso");
-    } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted) {
+        setState(() {
+          error = "Errore inatteso";
+          loading = false;
+        });
+      }
     }
   }
 
@@ -157,7 +147,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // 🔥 LINK PASSWORD DIMENTICATA
                   TextButton(
                     onPressed: () {
                       Navigator.push(

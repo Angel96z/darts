@@ -507,52 +507,9 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
   }
 
   Widget _statsSection() {
-    final t = AppTokens.of(context);
-    final throws = _getFilteredThrows();
-
     return Padding(
       padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          _clusterTitle('PRECISIONE', t),
-          _buildUnifiedPrecisionTrendChart(throws),
-
-          TrainingCharts.distanceAnalysis(throws, _target),
-          TrainingCharts.directionalBias(throws),
-          const SizedBox(height: 4),
-          _clusterTitle('PERFORMANCE', t),
-          TrainingCharts.hitTrend(throws, _target),
-          TrainingCharts.dartBreakdown(throws, _target),
-          TrainingCharts.streak(throws, _target),
-          const SizedBox(height: 4),
-          _clusterTitle('CONTROLLO', t),
-          TrainingCharts.consistencyTrend(throws, _target),
-          TrainingCharts.relationalPerformance(
-            throws,
-            _target,
-            showSessionTime: _mode == StatsMode.period,
-          ),
-          const SizedBox(height: 4),
-          _clusterTitle('RIEPILOGO', t),
-          TrainingCharts.performanceScore(throws, _target),
-          TrainingCharts.ringDistribution(throws, _target),
-          const SizedBox(height: 4),
-          _clusterTitle('SESSIONI', t),
-          FutureBuilder<List<TrainingSessionStats>>(
-            future: _loadSessionsForActivePeriod(),
-            builder: (context, snapshot) {
-              final sessions = snapshot.data ?? const <TrainingSessionStats>[];
-              final points = sessions.map(_toSessionPoint).toList();
-              return Column(
-                children: [
-                  TrainingCharts.topSessions(points),
-                  TrainingCharts.worstSessions(points),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
+      child: _statsSectionContent(_getFilteredThrows()),
     );
   }
   Widget _buildUnifiedPrecisionTrendChart(List<DartThrow> throws) {
@@ -968,60 +925,120 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
   }
 
   Widget _buildDesktopLayout() {
+    final throws = _getFilteredThrows();
+
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: AspectRatio(
-                aspectRatio: 1,
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: _buildStats(),
+        // COLONNA SINISTRA - BOARD (45% larghezza, min 400, max 600)
+        SizedBox(
+          width: MediaQuery.of(context).size.width * 0.65,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: _buildStats(),
+                  ),
+                  Positioned(
+                    left: 20,
+                    top: 40,
+                    child: Column(
+                      children: [
+                        _viewBtn('H', StatsViewType.heatmap),
+                        const SizedBox(height: 8),
+                        _viewBtn('A', StatsViewType.accuracy),
+                        const SizedBox(height: 8),
+                        _viewBtn('P', StatsViewType.precision),
+                        const SizedBox(height: 8),
+                        _viewBtn('B', StatsViewType.bias),
+                        const SizedBox(height: 8),
+                        _viewBtn('DB', StatsViewType.directionalBias),
+                      ],
                     ),
-                    Positioned(
-                      left: 20,
-                      top: 40,
-                      child: Column(
-                        children: [
-                          _viewBtn('H', StatsViewType.heatmap),
-                          const SizedBox(height: 8),
-                          _viewBtn('A', StatsViewType.accuracy),
-                          const SizedBox(height: 8),
-                          _viewBtn('P', StatsViewType.precision),
-                          const SizedBox(height: 8),
-                          _viewBtn('B', StatsViewType.bias),
-                          const SizedBox(height: 8),
-                          _viewBtn('DB', StatsViewType.directionalBias),
-                        ],
-                      ),
+                  ),
+                  Positioned(
+                    right: 0,
+                    top: 40,
+                    child: Column(
+                      children: [
+                        _filterBtn('T', null),
+                        const SizedBox(height: 8),
+                        _filterBtn('1', 1),
+                        const SizedBox(height: 8),
+                        _filterBtn('2', 2),
+                        const SizedBox(height: 8),
+                        _filterBtn('3', 3),
+                      ],
                     ),
-                    Positioned(
-                      right: 0,
-                      top: 40,
-                      child: Column(
-                        children: [
-                          _filterBtn('T', null),
-                          const SizedBox(height: 8),
-                          _filterBtn('1', 1),
-                          const SizedBox(height: 8),
-                          _filterBtn('2', 2),
-                          const SizedBox(height: 8),
-                          _filterBtn('3', 3),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+            ),
+          ),
+        ),
+
+        // COLONNA DESTRA - STATISTICHE SCROLLABILI (resto della larghezza)
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(12),
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              children: [
+                // RIUTILIZZA TUTTO QUELLO CHE GIÀ ESISTE IN _statsSection()
+                _statsSectionContent(throws),
+              ],
             ),
           ),
         ),
       ],
     );
   }
+
+// Aggiungi QUESTO metodo (estraiamo il contenuto da _statsSection)
+  Widget _statsSectionContent(List<DartThrow> throws) {
+    final t = AppTokens.of(context);
+
+    return Column(
+      children: [
+        _clusterTitle('PRECISIONE', t),
+        _buildUnifiedPrecisionTrendChart(throws),
+        TrainingCharts.distanceAnalysis(throws, _target),
+        TrainingCharts.directionalBias(throws),
+
+        _clusterTitle('PERFORMANCE', t),
+        TrainingCharts.hitTrend(throws, _target),
+        TrainingCharts.dartBreakdown(throws, _target),
+        TrainingCharts.streak(throws, _target),
+
+        _clusterTitle('CONTROLLO', t),
+        TrainingCharts.consistencyTrend(throws, _target),
+        TrainingCharts.relationalPerformance(throws, _target, showSessionTime: _mode == StatsMode.period),
+
+        _clusterTitle('RIEPILOGO', t),
+        TrainingCharts.performanceScore(throws, _target),
+        TrainingCharts.ringDistribution(throws, _target),
+
+        _clusterTitle('SESSIONI', t),
+        FutureBuilder<List<TrainingSessionStats>>(
+          future: _loadSessionsForActivePeriod(),
+          builder: (context, snapshot) {
+            final sessions = snapshot.data ?? const <TrainingSessionStats>[];
+            final points = sessions.map(_toSessionPoint).toList();
+            return Column(
+              children: [
+                TrainingCharts.topSessions(points),
+                TrainingCharts.worstSessions(points),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
   Widget _buildMobileLayout() {
     return Stack(
       children: [

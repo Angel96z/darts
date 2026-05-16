@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app_theme.dart';
 import '../application/room_notifier.dart';
 import 'match_page.dart';
-import 'match_result/presentation/match_result_overlay.dart';
 import 'widgets/config_column.dart';
 import 'widgets/players_column.dart';
 
@@ -39,16 +38,15 @@ class RoomLobbyPage extends ConsumerWidget {
           onPressed: () => _onBackPressed(context, ref),
         ),
       ),
-      body: Stack(
+      body: Column(
         children: [
-          _LobbyContent(
-            bottomPadding: _bottomControlsHeight + 120,
+          Expanded(
+            child: _LobbyContent(),
           ),
           _BottomLobbyControls(
             canStartMatch: state.canStartMatch,
             onStart: () => _startMatch(context, ref),
           ),
-          const MatchResultOverlay(),
         ],
       ),
     );
@@ -111,11 +109,7 @@ class RoomLobbyPage extends ConsumerWidget {
 }
 
 class _LobbyContent extends ConsumerWidget {
-  final double bottomPadding;
-
-  const _LobbyContent({
-    required this.bottomPadding,
-  });
+  const _LobbyContent();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -126,35 +120,30 @@ class _LobbyContent extends ConsumerWidget {
         final padding = width < 500 ? 12.0 : 20.0;
         final maxWidth = width >= 1200 ? 1100.0 : 900.0;
 
-        return SafeArea(
-          bottom: false,
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              padding,
-              padding,
-              padding,
-              bottomPadding,
-            ),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxWidth),
-                child: isWide
-                    ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: ConfigColumn(ref: ref)),
-                    const SizedBox(width: 24),
-                    Expanded(child: PlayersColumn(ref: ref)),
-                  ],
-                )
-                    : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    ConfigColumn(ref: ref),
-                    const SizedBox(height: 20),
-                    PlayersColumn(ref: ref),
-                  ],
-                ),
+        return SingleChildScrollView(
+          padding: EdgeInsets.all(padding),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: maxWidth,
+                minHeight: constraints.maxHeight,
+              ),
+              child: isWide
+                  ? Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: ConfigColumn(ref: ref)),
+                  const SizedBox(width: 24),
+                  Expanded(child: PlayersColumn(ref: ref)),
+                ],
+              )
+                  : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ConfigColumn(ref: ref),
+                  const SizedBox(height: 20),
+                  PlayersColumn(ref: ref),
+                ],
               ),
             ),
           ),
@@ -177,42 +166,37 @@ class _BottomLobbyControls extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
 
-    return Positioned(
-      left: 0,
-      right: 0,
-      bottom: 0,
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+      decoration: BoxDecoration(
+        color: t.surface.withOpacity(0.96),
+        border: Border(
+          top: BorderSide(color: t.border),
+        ),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 24,
+            offset: const Offset(0, -8),
+            color: Colors.black.withOpacity(0.18),
+          ),
+        ],
+      ),
       child: SafeArea(
         top: false,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-          decoration: BoxDecoration(
-            color: t.surface.withOpacity(0.96),
-            border: Border(
-              top: BorderSide(color: t.border),
-            ),
-            boxShadow: [
-              BoxShadow(
-                blurRadius: 24,
-                offset: const Offset(0, -8),
-                color: Colors.black.withOpacity(0.18),
-              ),
-            ],
-          ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1100),
-              child: Row(
-                children: [
-                  const AddPlayerButton(),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _StartButton(
-                      enabled: canStartMatch,
-                      onPressed: onStart,
-                    ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1100),
+            child: Row(
+              children: [
+                const AddPlayerButton(),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _StartButton(
+                    enabled: canStartMatch,
+                    onPressed: onStart,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
