@@ -1,6 +1,6 @@
 {
-    "name": "darts",
-    "short_name": "darts",
+    "name": "My Darts",
+    "short_name": "My Darts",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#090910",

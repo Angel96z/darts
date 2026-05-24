@@ -3,7 +3,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../room_v4/domain/models/player_turn.dart';
-import '../../../stats/domain/services/stats_aggregator_service.dart';
 import '../../domain/entities/local_match_record.dart';
 import '../../domain/entities/match_stats.dart';
 import '../../domain/repositories/match_repository_interface.dart';
@@ -106,10 +105,6 @@ class MatchRepository implements MatchRepositoryInterface {
         }
       }
     }
-
-    // 🔥 Aggiorna statistiche carriera DOPO il salvataggio del match
-    await StatsAggregatorService.instance.updateUserStats();
-
     return matchRef.id;
   }
 

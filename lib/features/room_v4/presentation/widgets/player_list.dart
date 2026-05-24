@@ -89,57 +89,78 @@ class _TeamListView extends StatelessWidget {
       children: teams.asMap().entries.map((entry) {
         final ti = entry.key;
         final team = entry.value;
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          decoration: BoxDecoration(
-            color: t.surfaceHigh,
-            borderRadius: AppTokens.r12,
-            border: Border.all(color: t.accent.withValues(alpha: 0.15)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // HEADER DEL TEAM
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: t.accent.withValues(alpha: 0.08),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    topRight: Radius.circular(12),
-                  ),
-                ),
-                child: Text(
-                  'TEAM ${ti + 1}',
-                  style: t.labelCaps(t.accent),
-                ),
-              ),
-              // LISTA GIOCATORI DEL TEAM
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  children: team.map((p) {
-                    final gi = players.indexWhere((x) => x.id == p.id);
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: _PlayerRow(
-                        index: gi,
-                        player: p,
-                        total: players.length,
-                        ref: ref,
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ],
-          ),
+        return TeamBlock(
+          teamIndex: ti,
+          team: team,
+          players: players,
+          ref: ref,
         );
       }).toList(),
     );
   }
 }
 
+// Nuovo widget separato per il team block
+class TeamBlock extends StatelessWidget {
+  final int teamIndex;
+  final List<PlayerInfo> team;
+  final List<PlayerInfo> players;
+  final WidgetRef ref;
+
+  const TeamBlock({
+    super.key,
+    required this.teamIndex,
+    required this.team,
+    required this.players,
+    required this.ref,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: t.surfaceHigh,
+        borderRadius: AppTokens.r12,
+        border: Border.all(color: t.accent.withOpacity(0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header semplificato
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+            child: Text(
+              'TEAM ${teamIndex + 1}',
+              style: t.labelCaps(t.accent),
+            ),
+          ),
+          const Divider(height: 1),
+          // Lista giocatori
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              children: team.map((p) {
+                final gi = players.indexWhere((x) => x.id == p.id);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: _PlayerRow(
+                    index: gi,
+                    player: p,
+                    total: players.length,
+                    ref: ref,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 // ─── Riga giocatore ───────────────────────────────────────────────
 
 class _PlayerRow extends StatefulWidget {

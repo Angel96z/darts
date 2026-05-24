@@ -10,6 +10,8 @@ enum LocalMatchSyncStatus {
   syncing,
   synced,
   failed,
+  pendingDelete,
+  failedDelete,
 }
 
 class LocalMatchRecord {
@@ -25,7 +27,21 @@ class LocalMatchRecord {
   final Map<String, int> setsWon;
   final DateTime startTime;
   final DateTime endTime;
+
+  /// Timestamp locale di creazione record.
+  /// Serve per ordinamento, debug e sync offline-first.
+  final DateTime createdAt;
+
+  /// Timestamp logico dell'ultima modifica locale/remota accettata.
+  /// Per match non modificabili normalmente coincide con endTime.
+  final DateTime updatedAt;
+
+  /// Timestamp di eliminazione logica locale.
+  /// Se valorizzato, il record non deve essere mostrato in UI.
+  final DateTime? deletedAt;
+
   final int totalTurns;
+
   final int totalDarts;
   final Map<String, dynamic> gameConfig;
   final Map<String, dynamic> matchConfig;
@@ -55,6 +71,9 @@ class LocalMatchRecord {
     required this.setsWon,
     required this.startTime,
     required this.endTime,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    this.deletedAt,
     required this.totalTurns,
     required this.totalDarts,
     required this.gameConfig,
@@ -68,9 +87,8 @@ class LocalMatchRecord {
     required this.matchSets,
     this.legCricketMarks = const {},
     this.legCricketPoints = const {},
-
-
-  });
+  })  : createdAt = createdAt ?? startTime,
+        updatedAt = updatedAt ?? endTime;
 
   Map<String, dynamic> toMap() {
     // Serializza playerTurns in Map
@@ -92,6 +110,9 @@ class LocalMatchRecord {
       'setsWon': setsWon,
       'startTime': startTime.toIso8601String(),
       'endTime': endTime.toIso8601String(),
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'deletedAt': deletedAt?.toIso8601String(),
       'totalTurns': totalTurns,
       'totalDarts': totalDarts,
       'gameConfig': gameConfig,
@@ -158,6 +179,15 @@ class LocalMatchRecord {
       setsWon: Map<String, int>.from(map['setsWon']),
       startTime: DateTime.parse(map['startTime']),
       endTime: DateTime.parse(map['endTime']),
+      createdAt: map['createdAt'] != null
+          ? DateTime.parse(map['createdAt'])
+          : DateTime.parse(map['startTime']),
+      updatedAt: map['updatedAt'] != null
+          ? DateTime.parse(map['updatedAt'])
+          : DateTime.parse(map['endTime']),
+      deletedAt: map['deletedAt'] != null
+          ? DateTime.parse(map['deletedAt'])
+          : null,
       totalTurns: map['totalTurns'],
       totalDarts: map['totalDarts'],
       gameConfig: Map<String, dynamic>.from(map['gameConfig']),
@@ -186,6 +216,10 @@ class LocalMatchRecord {
     LocalMatchSyncStatus? syncStatus,
     int? retryCount,
     DateTime? lastSyncAttempt,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    DateTime? deletedAt,
+    bool clearDeletedAt = false,
     Map<String, List<PlayerTurn>>? playerTurns,
     List<Map<String, dynamic>>? matchSets,
     Map<String, Map<String, Map<int, int>>>? legCricketMarks,
@@ -204,6 +238,9 @@ class LocalMatchRecord {
       setsWon: setsWon,
       startTime: startTime,
       endTime: endTime,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
       totalTurns: totalTurns,
       totalDarts: totalDarts,
       gameConfig: gameConfig,
@@ -218,6 +255,38 @@ class LocalMatchRecord {
       legCricketMarks: legCricketMarks ?? this.legCricketMarks,
       legCricketPoints: legCricketPoints ?? this.legCricketPoints,
     );
+  }
+
+  bool get isPendingUpload =>
+      syncStatus == LocalMatchSyncStatus.pending ||
+          syncStatus == LocalMatchSyncStatus.failed;
+
+  bool get isPendingDelete =>
+      syncStatus == LocalMatchSyncStatus.pendingDelete ||
+          syncStatus == LocalMatchSyncStatus.failedDelete;
+
+  bool get isSynced => syncStatus == LocalMatchSyncStatus.synced;
+
+  bool get isSyncing => syncStatus == LocalMatchSyncStatus.syncing;
+
+  bool get isVisible => deletedAt == null && !isPendingDelete;
+
+  bool get hasRemoteId => remoteId != null && remoteId!.trim().isNotEmpty;
+
+  bool get canRetryNow {
+    if (isSyncing || isSynced) return false;
+    if (lastSyncAttempt == null) return true;
+
+    final retryDelaySeconds = switch (retryCount) {
+      <= 0 => 0,
+      1 => 5,
+      2 => 15,
+      3 => 30,
+      4 => 60,
+      _ => 120,
+    };
+
+    return DateTime.now().difference(lastSyncAttempt!).inSeconds >= retryDelaySeconds;
   }
 }
 

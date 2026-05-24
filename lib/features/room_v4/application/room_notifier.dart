@@ -156,7 +156,7 @@ class RoomNotifier extends StateNotifier<RoomState> {
     _cancelTurnPassTimer();
   }
 
-  static const Duration turnPassDuration = Duration(milliseconds: 3500); //tempo passaggio turno
+  static const Duration turnPassDuration = Duration(milliseconds: 3000); //tempo passaggio turno
   static const Duration progressInterval = Duration(milliseconds: 50);
 
   RoomNotifier()
@@ -1072,12 +1072,13 @@ class RoomNotifier extends StateNotifier<RoomState> {
       'legCount': state.matchConfig.legCount,
     };
 
-    // 🔥 IMPORTANTE: SALVA PRIMA IL MATCH PER OTTENERE IL remoteId
-    // Creiamo un record temporaneo senza remoteId
+    // Ogni giocatore Firebase ha un record locale separato.
+    // Non usare solo match.id: in multi-player causerebbe collisioni locali.
+    final localRecordId = '${match.id}_${player.id}';
+
     final tempRecord = LocalMatchRecord(
-      localId: match.id,  // ← USA match.id come localId (UGUALE PER TUTTI)
-      remoteId: null,
-      mode: state.gameConfig.type == GameType.x01 ? 'x01' : 'cricket',
+      localId: localRecordId,
+      remoteId: null,      mode: state.gameConfig.type == GameType.x01 ? 'x01' : 'cricket',
       winnerId: winnerId,
       winnerName: _getPlayerName(winnerId),
       playerIds: state.playerIds,
@@ -1087,6 +1088,8 @@ class RoomNotifier extends StateNotifier<RoomState> {
       setsWon: builderState.setsWon,
       startTime: match.startTime,
       endTime: match.endTime ?? DateTime.now(),
+      createdAt: match.startTime,
+      updatedAt: match.endTime ?? DateTime.now(),
       totalTurns: playerTurns.length,
       totalDarts: totalDarts,
       gameConfig: gameConfigMap,
@@ -1099,10 +1102,18 @@ class RoomNotifier extends StateNotifier<RoomState> {
     );
 
     // 🔥 SALVA E OTTIENI IL remoteId (lo stesso per tutti i giocatori)
-    final result = await LocalMatchSyncService.instance.saveMatch(tempRecord);
+    debugPrint('📤 CALLING saveMatch with localId: ${tempRecord.localId}');
+    try {
+      final result = await LocalMatchSyncService.instance.saveMatch(tempRecord);
+      debugPrint('📤 saveMatch result: $result');
+    } catch (e, stack) {
+      debugPrint('❌ saveMatch FAILED: $e');
+      debugPrint('Stack trace: $stack');
+      rethrow;
+    }
 
-    // 🔥 ORA recupera il record salvato per avere il remoteId
-    final savedRecord = await LocalMatchSyncService.instance.getById(match.id);
+    // Recupera il record salvato per verificare eventuale remoteId.
+    final savedRecord = await LocalMatchSyncService.instance.getById(localRecordId);
 
     if (savedRecord != null && savedRecord.remoteId != null) {
       // Il remoteId è lo stesso per tutti i giocatori!

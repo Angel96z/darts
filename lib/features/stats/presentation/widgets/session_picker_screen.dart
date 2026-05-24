@@ -1,6 +1,8 @@
 // session_picker_screen.dart
 /// Widget riutilizzabile per selezionare sessioni (Training o Match)
 
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -52,11 +54,43 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
   late Future<List<T>> _future;
   bool _isSelectionMode = false;
   final Set<String> _selectedIds = <String>{};
+  final List<StreamSubscription<dynamic>> _subscriptions = [];
 
   @override
   void initState() {
     super.initState();
     _future = _loadSessions();
+    _attachSyncListeners();
+  }
+
+  @override
+  void dispose() {
+    for (final subscription in _subscriptions) {
+      subscription.cancel();
+    }
+    super.dispose();
+  }
+
+  void _attachSyncListeners() {
+    switch (widget.type) {
+      case SessionType.training:
+        _subscriptions.add(
+          LocalTrainingSyncService.instance.onSyncStatusChanged.listen((_) {
+            if (!mounted) return;
+            _reload();
+          }),
+        );
+        break;
+
+      case SessionType.match:
+        _subscriptions.add(
+          LocalMatchSyncService.instance.onSyncStatusChanged.listen((_) {
+            if (!mounted) return;
+            _reload();
+          }),
+        );
+        break;
+    }
   }
 
   Future<List<T>> _loadSessions() async {
@@ -436,58 +470,32 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
       _selectedIds.clear();
     });
 
-    final user = FirebaseAuth.instance.currentUser;
-    final batch = FirebaseFirestore.instance.batch();
-
-    for (final id in idsToDelete) {
-      if (widget.type == SessionType.training) {
-        if (user != null) {
-          final trainingRef = FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .collection('trainings')
-              .doc(id);
-          batch.delete(trainingRef);
-
-          final throwsQuery = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .collection('throws')
-              .where('trainingId', isEqualTo: id)
-              .get();
-
-          for (final throwDoc in throwsQuery.docs) {
-            batch.delete(throwDoc.reference);
+    try {
+      switch (widget.type) {
+        case SessionType.training:
+          for (final id in idsToDelete) {
+            await LocalTrainingSyncService.instance.deleteRecord(id);
           }
-        }
+          break;
 
-        await LocalTrainingSyncService.instance.deleteRecord(id);
-      } else {
-        final match = await LocalMatchSyncService.instance.getById(id);
-
-        if (user != null && match != null) {
-          final remoteId = match.remoteId ?? id;
-          final mode = match.mode.toLowerCase();
-          final collectionName = mode == 'x01' ? 'x01_matches' : 'cricket_matches';
-
-          final matchRef = FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .collection(collectionName)
-              .doc(remoteId);
-
-          batch.delete(matchRef);
-        }
-
-        await LocalMatchSyncService.instance.deleteRecord(id);
+        case SessionType.match:
+          for (final id in idsToDelete) {
+            await LocalMatchSyncService.instance.deleteRecord(id);
+          }
+          break;
       }
-    }
 
-    if (user != null && idsToDelete.isNotEmpty) {
-      await batch.commit();
+      if (!mounted) return;
+      _reload();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Errore eliminazione sessioni: $e'),
+        ),
+      );
+      _reload();
     }
-
-    _reload();
   }
 
   void _reload() {
@@ -688,10 +696,16 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
       final matchStatus = session.syncStatus;
       if (matchStatus == null) return null;
       switch (matchStatus) {
-        case LocalMatchSyncStatus.synced: return LocalTrainingSyncStatus.synced;
-        case LocalMatchSyncStatus.pending: return LocalTrainingSyncStatus.pending;
-        case LocalMatchSyncStatus.syncing: return LocalTrainingSyncStatus.syncing;
-        case LocalMatchSyncStatus.failed: return LocalTrainingSyncStatus.failed;
+        case LocalMatchSyncStatus.synced:
+          return LocalTrainingSyncStatus.synced;
+        case LocalMatchSyncStatus.pending:
+        case LocalMatchSyncStatus.pendingDelete:
+          return LocalTrainingSyncStatus.pending;
+        case LocalMatchSyncStatus.syncing:
+          return LocalTrainingSyncStatus.syncing;
+        case LocalMatchSyncStatus.failed:
+        case LocalMatchSyncStatus.failedDelete:
+          return LocalTrainingSyncStatus.failed;
       }
     }
     return null;

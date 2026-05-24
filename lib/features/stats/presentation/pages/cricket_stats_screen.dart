@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -5,11 +7,14 @@ import 'package:intl/intl.dart';
 import '../../../../app_theme.dart';
 import '../../../match_sync/data/services/local_match_sync_service.dart';
 import '../../../match_sync/domain/entities/local_match_record.dart';
+import '../../../room_v4/domain/models/game_config.dart';
+import '../../../room_v4/presentation/room_lobby_page.dart';
 import '../../cricket_dart_extractor.dart';
 import '../../shared/stats_filter.dart';
 import '../widgets/match_session_stats.dart';
 import '../widgets/session_picker_screen.dart';
 import '../widgets/stats_filter_bar.dart';
+import '../widgets/unified_stats_chart.dart';
 
 class CricketStatsController extends ChangeNotifier {
   final _extractor = const CricketDartExtractor();
@@ -44,7 +49,9 @@ class CricketStatsController extends ChangeNotifier {
 
     try {
       final all = await LocalMatchSyncService.instance.getAllRecords();
-      _allMatches = all.where((m) => m.mode == 'cricket').toList();
+      _allMatches = all
+          .where((m) => m.mode == 'cricket' && m.isVisible)
+          .toList();
       _allMatches.sort((a, b) => b.startTime.compareTo(a.startTime));
       _applyFilter();
     } catch (e) {
@@ -152,6 +159,7 @@ class CricketStatsScreen extends StatefulWidget {
 class _CricketStatsScreenState extends State<CricketStatsScreen>
     with AutomaticKeepAliveClientMixin {
   late final CricketStatsController _controller;
+  StreamSubscription<dynamic>? _syncSubscription;
 
   @override
   bool get wantKeepAlive => true;
@@ -161,10 +169,16 @@ class _CricketStatsScreenState extends State<CricketStatsScreen>
     super.initState();
     _controller = CricketStatsController();
     _controller.loadMatches();
+
+    _syncSubscription = LocalMatchSyncService.instance.onSyncStatusChanged.listen((_) {
+      if (!mounted) return;
+      _controller.loadMatches();
+    });
   }
 
   @override
   void dispose() {
+    _syncSubscription?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -273,6 +287,20 @@ class _CricketStatsScreenState extends State<CricketStatsScreen>
                     subtitle: 'Gioca almeno una partita Cricket per vedere le statistiche.',
                     color: t.textMuted,
                     t: t,
+                    action: FilledButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const RoomLobbyPage(
+                              initialGameType: GameType.cricket,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: const Text('Gioca a Cricket'),
+                    ),
                   );
                 }
 
@@ -466,24 +494,21 @@ class _CricketImpactSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: t.surface,
-        borderRadius: AppTokens.r16,
-        border: Border.all(color: t.border),
+    return UnifiedStatsCard(
+      title: 'WIN VS LOSE',
+      subtitle: 'Confronto tra leg vinti e leg persi su marker e round medi',
+      info: const UnifiedStatsInfoData(
+        title: 'Come leggere la sezione',
+        text: 'Questa sezione confronta i leg vinti e persi nel Cricket usando marker medi e round medi. Serve a capire se vinci perché marchi meglio, chiudi prima o mantieni più ritmo nei settori.',
+        advice: [
+          'Se AVG marker vinti è più alto, nei leg buoni colpisci meglio i settori Cricket.',
+          'Se AVG round persi è alto, chiudi o marchi troppo lentamente.',
+          'Usa questo confronto per capire se il problema è precisione o ritmo.',
+        ],
       ),
-      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _CricketStatsSectionHeader(
-            title: 'WIN VS LOSE',
-            subtitle: 'Confronto tra leg vinti e leg persi su marker e round medi',
-            onInfo: () => _openInfo(context),
-            onReset: () {},
-            t: t,
-          ),
           DecoratedBox(
             decoration: BoxDecoration(
               color: t.surfaceHigh,
@@ -535,141 +560,6 @@ class _CricketImpactSummaryCard extends StatelessWidget {
       ),
     );
   }
-
-  void _openInfo(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: t.overlay,
-      barrierColor: Colors.black.withOpacity(0.55),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.info_rounded, color: t.accent, size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Come leggere la sezione',
-                        style: TextStyle(
-                          color: t.textPrimary,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Questa sezione confronta i leg vinti e persi: quanti ne hai giocati, quanti marker produci mediamente e quanti round servono.',
-                  style: TextStyle(
-                    color: t.textSecondary,
-                    fontSize: 13,
-                    height: 1.35,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text('CONSIGLI', style: t.labelCaps(t.textMuted)),
-                const SizedBox(height: 8),
-                _CricketAdviceRow(
-                  t: t,
-                  text: 'Se AVG marker persi è vicino ai vinti, perdi leg combattuti.',
-                ),
-                _CricketAdviceRow(
-                  t: t,
-                  text: 'Se AVG round persi è alto, chiudi o marchi troppo lentamente.',
-                ),
-                _CricketAdviceRow(
-                  t: t,
-                  text: 'Usa questo confronto per capire se il problema è precisione o ritmo.',
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _CricketStatsSectionHeader extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final VoidCallback onInfo;
-  final VoidCallback onReset;
-  final AppTokens t;
-
-  const _CricketStatsSectionHeader({
-    required this.title,
-    required this.subtitle,
-    required this.onInfo,
-    required this.onReset,
-    required this.t,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 14, 10, 12),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: t.accent.withOpacity(0.16),
-              borderRadius: AppTokens.r12,
-              border: Border.all(color: t.accent.withOpacity(0.38)),
-            ),
-            child: Icon(Icons.show_chart_rounded, color: t.accent, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: t.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: t.textSecondary,
-                    fontSize: 12,
-                    height: 1.2,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            tooltip: 'Info',
-            onPressed: onInfo,
-            icon: Icon(Icons.info_outline_rounded, color: t.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _CricketMetricCell extends StatelessWidget {
@@ -714,96 +604,6 @@ class _CricketMetricCell extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: t.bodySmall(t.textMuted),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CricketAdviceRow extends StatelessWidget {
-  final AppTokens t;
-  final String text;
-
-  const _CricketAdviceRow({
-    required this.t,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.check_circle_rounded, color: t.green, size: 16),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                color: t.textPrimary,
-                fontSize: 12.5,
-                height: 1.3,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ImpactMetricTile extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  final AppTokens t;
-
-  const _ImpactMetricTile({
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.t,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(11),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
-          borderRadius: AppTokens.r10,
-          border: Border.all(color: color.withOpacity(0.28)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color,
-                fontSize: 22,
-                height: 1,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: t.textSecondary,
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-              ),
             ),
           ],
         ),
@@ -1212,96 +1012,6 @@ class _TargetSummary {
   }
 }
 
-class _TargetRow extends StatelessWidget {
-  final _TargetSummary summary;
-  final AppTokens t;
-
-  const _TargetRow({
-    required this.summary,
-    required this.t,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 9),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: t.divider)),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 44,
-            child: Text(
-              summary.label,
-              style: TextStyle(
-                color: t.textPrimary,
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                _TinyChip(label: 'D', value: '${summary.darts}', t: t),
-                _TinyChip(label: 'M', value: '${summary.marks}', t: t),
-                _TinyChip(label: 'MU', value: '${summary.effectiveMarks}', t: t),
-                _TinyChip(label: 'P', value: '${summary.points}', t: t),
-                _TinyChip(label: 'Close', value: summary.closedLegs == 0 ? '-' : _num(summary.avgDartsToClose), t: t),
-                _TinyChip(label: 'Avg', value: summary.rawCloseAverage == 0 ? '-' : _num(summary.rawCloseAverage), t: t),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MatchRow extends StatelessWidget {
-  final LocalMatchRecord match;
-  final VoidCallback? onTap;
-  final AppTokens t;
-
-  const _MatchRow({
-    required this.match,
-    required this.onTap,
-    required this.t,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: AppTokens.r8,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: t.divider)),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(DateFormat('dd/MM/yyyy HH:mm').format(match.startTime), style: _bodyBoldStyle(t)),
-                  const SizedBox(height: 2),
-                  Text('Vincitore: ${match.winnerName}', maxLines: 1, overflow: TextOverflow.ellipsis, style: _smallStyle(t.textMuted)),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right_rounded, color: t.textMuted),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _SectionCard extends StatelessWidget {
   final String title;
   final Widget child;
@@ -1315,24 +1025,21 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: t.surface,
-        borderRadius: AppTokens.r16,
-        border: Border.all(color: t.border),
+    return UnifiedStatsCard(
+      title: title.toUpperCase(),
+      subtitle: 'Tabella rendimento settori Cricket',
+      info: const UnifiedStatsInfoData(
+        title: 'Come leggere la tabella',
+        text: 'Questa tabella confronta il rendimento dei settori Cricket: marker prodotti, chiusura del settore e distribuzione tra singoli, doppi e tripli.',
+        advice: [
+          'Controlla i settori con pochi marker per capire dove perdi precisione.',
+          'Confronta S, D e T per capire se il problema è nella mira base o nei moltiplicatori.',
+          'Nei leg persi cerca i settori che restano indietro più spesso.',
+        ],
       ),
-      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _CricketStatsSectionHeader(
-            title: title.toUpperCase(),
-            subtitle: 'Tabella rendimento settori Cricket',
-            onInfo: () => _openInfo(context),
-            onReset: () {},
-            t: t,
-          ),
           DecoratedBox(
             decoration: BoxDecoration(
               color: t.surfaceHigh,
@@ -1363,169 +1070,8 @@ class _SectionCard extends StatelessWidget {
       ),
     );
   }
-
-  void _openInfo(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: t.overlay,
-      barrierColor: Colors.black.withOpacity(0.55),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.info_rounded, color: t.accent, size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Come leggere la tabella',
-                        style: TextStyle(
-                          color: t.textPrimary,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Ogni riga rappresenta un settore Cricket. AVG misura i marker medi, Close misura le freccette medie per chiudere il settore, S/D/T mostrano la distribuzione dei moltiplicatori.',
-                  style: TextStyle(
-                    color: t.textSecondary,
-                    fontSize: 13,
-                    height: 1.35,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text('CONSIGLI', style: t.labelCaps(t.textMuted)),
-                const SizedBox(height: 8),
-                _CricketAdviceRow(
-                  t: t,
-                  text: 'AVG basso indica poca produzione marker su quel settore.',
-                ),
-                _CricketAdviceRow(
-                  t: t,
-                  text: 'Close alto indica che impieghi troppe freccette per chiudere.',
-                ),
-                _CricketAdviceRow(
-                  t: t,
-                  text: 'Confronta vinti e persi per capire quali settori decidono il leg.',
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
 
-class _MetricTile extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color? color;
-  final AppTokens t;
-
-  const _MetricTile({
-    required this.label,
-    required this.value,
-    required this.t,
-    this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 104,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: t.surfaceHigh,
-        borderRadius: AppTokens.r8,
-        border: Border.all(color: t.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: color ?? t.textPrimary)),
-          const SizedBox(height: 2),
-          Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: _smallStyle(t.textMuted)),
-        ],
-      ),
-    );
-  }
-}
-
-class _BigStat extends StatelessWidget {
-  final String label;
-  final String value;
-  final String hint;
-  final AppTokens t;
-
-  const _BigStat({
-    required this.label,
-    required this.value,
-    required this.hint,
-    required this.t,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(11),
-      decoration: BoxDecoration(
-        color: t.surfaceHigh,
-        borderRadius: AppTokens.r8,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(value, style: TextStyle(fontSize: 24, height: 1, fontWeight: FontWeight.w900, color: t.textPrimary)),
-          const SizedBox(height: 6),
-          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: t.textSecondary)),
-          const SizedBox(height: 2),
-          Text(hint, maxLines: 2, overflow: TextOverflow.ellipsis, style: _smallStyle(t.textMuted)),
-        ],
-      ),
-    );
-  }
-}
-
-class _MiniLine extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color? color;
-  final AppTokens t;
-
-  const _MiniLine({
-    required this.label,
-    required this.value,
-    required this.t,
-    this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 7),
-      child: Row(
-        children: [
-          Expanded(child: Text(label, style: TextStyle(fontSize: 12, color: t.textSecondary, fontWeight: FontWeight.w600))),
-          Text(value, style: TextStyle(fontSize: 13, color: color ?? t.textPrimary, fontWeight: FontWeight.w900)),
-        ],
-      ),
-    );
-  }
-}
 
 class _TinyChip extends StatelessWidget {
   final String label;
@@ -1599,21 +1145,6 @@ class _StateMessage extends StatelessWidget {
   }
 }
 
-TextStyle _titleStyle(AppTokens t) {
-  return TextStyle(
-    color: t.textPrimary,
-    fontSize: 18,
-    fontWeight: FontWeight.w900,
-  );
-}
-
-TextStyle _sectionTitleStyle(AppTokens t) {
-  return TextStyle(
-    color: t.textPrimary,
-    fontSize: 14,
-    fontWeight: FontWeight.w900,
-  );
-}
 
 TextStyle _bodyBoldStyle(AppTokens t) {
   return TextStyle(
@@ -1634,9 +1165,4 @@ TextStyle _smallStyle(Color color) {
 String _num(double value) {
   if (value.isNaN || value.isInfinite) return '0.0';
   return value.toStringAsFixed(1);
-}
-
-String _pct(double value) {
-  if (value.isNaN || value.isInfinite) return '0%';
-  return '${value.toStringAsFixed(1)}%';
 }

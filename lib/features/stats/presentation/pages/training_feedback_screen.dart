@@ -143,7 +143,7 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
 
     setState(() {
       _overlayState = OverlayState.loading;
-      _overlayMessage = 'Saving session...';
+      _overlayMessage = 'Salvataggio sessione...';
     });
 
     try {
@@ -155,16 +155,28 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
         switch (saveResult.status) {
           case LocalTrainingSyncStatus.pending:
             _overlayState = OverlayState.pending;
-            _overlayMessage = 'Saved offline. It will sync automatically';
+            _overlayMessage = 'Salvata offline. Verrà sincronizzata automaticamente';
             break;
+
           case LocalTrainingSyncStatus.synced:
             _overlayState = OverlayState.success;
-            _overlayMessage = 'Session saved successfully';
+            _overlayMessage = 'Sessione salvata con successo';
             break;
-          case LocalTrainingSyncStatus.failed:
+
           case LocalTrainingSyncStatus.syncing:
+            _overlayState = OverlayState.pending;
+            _overlayMessage = 'Salvataggio sessione...';
+            break;
+
+          case LocalTrainingSyncStatus.failed:
             _overlayState = OverlayState.error;
-            _overlayMessage = 'Saved. Sync failed';
+            _overlayMessage = 'Salvata. Sincronizzazione fallita';
+            break;
+
+          case LocalTrainingSyncStatus.pendingDelete:
+          case LocalTrainingSyncStatus.failedDelete:
+            _overlayState = OverlayState.error;
+            _overlayMessage = 'Stato salvataggio non valido';
             break;
         }
       });
@@ -243,7 +255,7 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                         child: Text(
-                        'Back to home',
+                        'Torna alla home',
                           style: t.bodyBold(t.textPrimary),
                         ),
                       ),
@@ -269,7 +281,7 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                         child: Text(
-    'Go to stats',
+    'Vai alle statistiche',
                           style: t.bodyBold(t.accentFg),
                         ),
                       ),
@@ -294,7 +306,7 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: Text(
-            'Session feedback',
+            'Feedback sessione',
           style: TextStyle(color: t.textPrimary),
         ),
         backgroundColor: t.surface,
@@ -315,7 +327,7 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
               children: [
                 // Commento in alto
                 Text(
-            'Comment (optional)',
+            'Commento (opzionale)',
             style: t.bodyBold(t.textSecondary),
                 ),
                 const SizedBox(height: 8),
@@ -325,7 +337,7 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
                   maxLines: 5,
                   style: t.bodySmall(t.textPrimary),
                   decoration: InputDecoration(
-                    hintText: 'Write your thoughts...',
+                    hintText: 'Scrivi tue considerazioni...',
                     hintStyle: t.bodySmall(t.textMuted),
                     filled: true,
                     fillColor: t.surfaceHigh,
@@ -352,7 +364,7 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
 
                 // Valutazioni
                 Text(
-                    'Ratings (optional)',
+                    'Valutazioni (opzionali)',
                   style: t.bodyBold(t.textPrimary),
                 ),
                 const SizedBox(height: 16),
@@ -360,9 +372,9 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
                 // Carousel per le valutazioni
                 _ratingCarousel('🎯 Focus', _focus, (v) => setState(() => _focus = v)),
                 _ratingCarousel('😰 Stress', _stress, (v) => setState(() => _stress = v)),
-                _ratingCarousel('⚡ Physical energy', _energia, (v) => setState(() => _energia = v)),
-                _ratingCarousel('💪 Confidence', _fiducia, (v) => setState(() => _fiducia = v)),
-                _ratingCarousel('📱 Distractions', _distrazioni, (v) => setState(() => _distrazioni = v)),
+                _ratingCarousel('⚡ Energia', _energia, (v) => setState(() => _energia = v)),
+                _ratingCarousel('💪 Fiducia', _fiducia, (v) => setState(() => _fiducia = v)),
+                _ratingCarousel('📱 Distrazioni', _distrazioni, (v) => setState(() => _distrazioni = v)),
 
                 const SizedBox(height: 24),
 
@@ -380,7 +392,7 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
                       ),
                     ),
                     child: const Text(
-                      'Save session',
+                      'Salva sessione',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                   ),

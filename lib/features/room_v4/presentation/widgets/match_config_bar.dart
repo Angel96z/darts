@@ -44,11 +44,11 @@ class MatchConfigBar extends ConsumerWidget {
 
     // Modalità match (set e leg)
     if (matchConfig.mode == MatchMode.firstTo) {
-      configLines.add('primo a ${matchConfig.setsToWin} set');
-      configLines.add('primo a ${matchConfig.legsToWin} leg');
+      configLines.add('First to ${matchConfig.setsToWin} set');
+      configLines.add('- ${matchConfig.legsToWin} leg');
     } else {
-      configLines.add('meglio di ${matchConfig.setCount} set');
-      configLines.add('meglio di ${matchConfig.legCount} leg');
+      configLines.add('Best of ${matchConfig.setCount} set');
+      configLines.add('- ${matchConfig.legCount} leg');
     }
 
     // Cut Throat (Cricket)

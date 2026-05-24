@@ -1,16 +1,19 @@
 /// File: local_training_sync_service.dart
 /// Sincronizzazione bidirezionale COMPLETA per sessioni di training
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../game/domain/entities/dart_models.dart';
+import '../../domain/services/stats_aggregator_service.dart';
 import '../repositories_impl/training_repository.dart';
 
 enum LocalTrainingSyncStatus {
@@ -18,6 +21,8 @@ enum LocalTrainingSyncStatus {
   syncing,
   synced,
   failed,
+  pendingDelete,
+  failedDelete,
 }
 
 class LocalTrainingSaveResult {
@@ -37,6 +42,17 @@ class LocalTrainingRecord {
   final String target;
   final DateTime startTime;
   final DateTime endTime;
+
+  /// Timestamp locale di creazione record.
+  final DateTime createdAt;
+
+  /// Timestamp logico dell'ultima modifica locale/remota accettata.
+  final DateTime updatedAt;
+
+  /// Timestamp di eliminazione logica locale.
+  /// Se valorizzato, il record non deve essere mostrato in UI.
+  final DateTime? deletedAt;
+
   final List<DartThrow> throwsList;
   final LocalTrainingSyncStatus syncStatus;
   final int retryCount;
@@ -55,6 +71,9 @@ class LocalTrainingRecord {
     required this.target,
     required this.startTime,
     required this.endTime,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    this.deletedAt,
     required this.throwsList,
     required this.syncStatus,
     this.retryCount = 0,
@@ -65,13 +84,18 @@ class LocalTrainingRecord {
     this.fiducia,
     this.distrazioni,
     this.commento,
-  });
+  })  : createdAt = createdAt ?? startTime,
+        updatedAt = updatedAt ?? endTime;
 
   LocalTrainingRecord copyWith({
     String? remoteId,
     LocalTrainingSyncStatus? syncStatus,
     int? retryCount,
     DateTime? lastSyncAttempt,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    DateTime? deletedAt,
+    bool clearDeletedAt = false,
     int? focus,
     int? stress,
     int? energia,
@@ -87,6 +111,9 @@ class LocalTrainingRecord {
       target: target,
       startTime: startTime,
       endTime: endTime,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
       throwsList: throwsList ?? this.throwsList,
       syncStatus: syncStatus ?? this.syncStatus,
       retryCount: retryCount ?? this.retryCount,
@@ -108,6 +135,9 @@ class LocalTrainingRecord {
       'target': target,
       'startTime': startTime.toIso8601String(),
       'endTime': endTime.toIso8601String(),
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'deletedAt': deletedAt?.toIso8601String(),
       'throwsList': throwsList.map((t) => {
         'dx': t.position.dx,
         'dy': t.position.dy,
@@ -145,6 +175,15 @@ class LocalTrainingRecord {
       target: map['target'],
       startTime: DateTime.parse(map['startTime']),
       endTime: DateTime.parse(map['endTime']),
+      createdAt: map['createdAt'] != null
+          ? DateTime.parse(map['createdAt'])
+          : DateTime.parse(map['startTime']),
+      updatedAt: map['updatedAt'] != null
+          ? DateTime.parse(map['updatedAt'])
+          : DateTime.parse(map['endTime']),
+      deletedAt: map['deletedAt'] != null
+          ? DateTime.parse(map['deletedAt'])
+          : null,
       throwsList: (map['throwsList'] as List).map((e) {
         return DartThrow(
           position: Offset(e['dx'], e['dy']),
@@ -179,6 +218,38 @@ class LocalTrainingRecord {
       commento: map['commento']?.toString(),
     );
   }
+
+  bool get isPendingUpload =>
+      syncStatus == LocalTrainingSyncStatus.pending ||
+          syncStatus == LocalTrainingSyncStatus.failed;
+
+  bool get isPendingDelete =>
+      syncStatus == LocalTrainingSyncStatus.pendingDelete ||
+          syncStatus == LocalTrainingSyncStatus.failedDelete;
+
+  bool get isSynced => syncStatus == LocalTrainingSyncStatus.synced;
+
+  bool get isSyncing => syncStatus == LocalTrainingSyncStatus.syncing;
+
+  bool get isVisible => deletedAt == null && !isPendingDelete;
+
+  bool get hasRemoteId => remoteId != null && remoteId!.trim().isNotEmpty;
+
+  bool get canRetryNow {
+    if (isSyncing || isSynced) return false;
+    if (lastSyncAttempt == null) return true;
+
+    final retryDelaySeconds = switch (retryCount) {
+      <= 0 => 0,
+      1 => 5,
+      2 => 15,
+      3 => 30,
+      4 => 60,
+      _ => 120,
+    };
+
+    return DateTime.now().difference(lastSyncAttempt!).inSeconds >= retryDelaySeconds;
+  }
 }
 
 class LocalTrainingSyncService {
@@ -192,6 +263,12 @@ class LocalTrainingSyncService {
   final Uuid _uuid = const Uuid();
 
   bool _running = false;
+
+  final _syncStatusController =
+  StreamController<Map<String, LocalTrainingSyncStatus>>.broadcast();
+
+  Stream<Map<String, LocalTrainingSyncStatus>> get onSyncStatusChanged =>
+      _syncStatusController.stream;
 
   static Future<void> initialize(TrainingRepository repo) async {
     instance = LocalTrainingSyncService._internal(repo);
@@ -265,6 +342,8 @@ class LocalTrainingSyncService {
       target: target,
       startTime: start,
       endTime: end,
+      createdAt: start,
+      updatedAt: end,
       throwsList: List.from(throwsList),
       syncStatus: LocalTrainingSyncStatus.pending,
       retryCount: 0,
@@ -293,9 +372,16 @@ class LocalTrainingSyncService {
     if (!await _checkBackendConnection()) return;
 
     _running = true;
-    await _pushLocalToRemote();
-    await _pullRemoteToLocal();
-    _running = false;
+    try {
+      final pushedSomething = await _pushLocalToRemote();
+      final pulledSomething = await _pullRemoteToLocal();
+
+      if (pushedSomething || pulledSomething) {
+        await StatsAggregatorService.instance.updateUserStats();
+      }
+    } finally {
+      _running = false;
+    }
   }
 
   Future<LocalTrainingRecord?> getById(String id) async {
@@ -307,7 +393,9 @@ class LocalTrainingSyncService {
   }
 
   Future<List<LocalTrainingRecord>> getAllRecords() async {
-    return await _getAll();
+    final all = await _getAll();
+
+    return all.where((record) => record.isVisible).toList();
   }
 
   Future<void> deleteRecord(String id) async {
@@ -317,77 +405,65 @@ class LocalTrainingSyncService {
 
     final record = all[index];
 
-    // Elimina dal backend se esiste remoteId
+    all[index] = record.copyWith(
+      syncStatus: LocalTrainingSyncStatus.pendingDelete,
+      deletedAt: DateTime.now(),
+    );
+
+    await _saveAll(all);
+
+    _syncStatusController.add({
+      record.localId: LocalTrainingSyncStatus.pendingDelete,
+    });
+
     if (record.remoteId != null) {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final db = FirebaseFirestore.instance;
-        final trainingRef = db
-            .collection('users')
-            .doc(user.uid)
-            .collection('trainings')
-            .doc(record.remoteId);
-
-        // Elimina il training
-        await trainingRef.delete();
-
-        // Elimina i throws associati
-        final throwsSnapshot = await trainingRef.collection('throws').get();
-        final batch = db.batch();
-        for (final throwDoc in throwsSnapshot.docs) {
-          batch.delete(throwDoc.reference);
-        }
-        await batch.commit();
-      }
+      _syncStatusController.add({
+        record.remoteId!: LocalTrainingSyncStatus.pendingDelete,
+      });
     }
 
-    // Elimina dal locale
-    all.removeAt(index);
-    await _saveAll(all);
+    await syncAll();
   }
 
   Future<void> deleteRecords(List<String> ids) async {
     if (ids.isEmpty) return;
 
+    final idSet = ids.toSet();
     final all = await _getAll();
-    final toDelete = <LocalTrainingRecord>[];
-    final toKeep = <LocalTrainingRecord>[];
+    var changed = false;
 
-    for (final record in all) {
-      if (ids.contains(record.localId) || ids.contains(record.remoteId)) {
-        toDelete.add(record);
-      } else {
-        toKeep.add(record);
+    for (var i = 0; i < all.length; i++) {
+      final record = all[i];
+      final matches = idSet.contains(record.localId) ||
+          (record.remoteId != null && idSet.contains(record.remoteId));
+
+      if (!matches || record.isPendingDelete) continue;
+
+      all[i] = record.copyWith(
+        syncStatus: LocalTrainingSyncStatus.pendingDelete,
+        deletedAt: DateTime.now(),
+      );
+
+      changed = true;
+
+      _syncStatusController.add({
+        record.localId: LocalTrainingSyncStatus.pendingDelete,
+      });
+
+      if (record.remoteId != null) {
+        _syncStatusController.add({
+          record.remoteId!: LocalTrainingSyncStatus.pendingDelete,
+        });
       }
     }
 
-    if (toDelete.isEmpty) return;
+    if (!changed) return;
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final db = FirebaseFirestore.instance;
-
-      for (final record in toDelete) {
-        if (record.remoteId != null) {
-          final trainingRef = db
-              .collection('users')
-              .doc(user.uid)
-              .collection('trainings')
-              .doc(record.remoteId);
-
-          final throwsSnapshot = await trainingRef.collection('throws').get();
-          final batch = db.batch();
-          batch.delete(trainingRef);
-          for (final throwDoc in throwsSnapshot.docs) {
-            batch.delete(throwDoc.reference);
-          }
-          await batch.commit();
-        }
-      }
-    }
-
-    await _saveAll(toKeep);
+    await _saveAll(all);
+    await syncAll();
   }
+
+
   Future<int> deleteAllRecords() async {
     final all = await _getAll();
     if (all.isEmpty) return 0;
@@ -461,80 +537,193 @@ class LocalTrainingSyncService {
           .collection('users')
           .limit(1)
           .get(const GetOptions(source: Source.server))
-          .timeout(const Duration(seconds: 3));
+          .timeout(const Duration(seconds: 3));  Future<bool> _checkBackendConnection() async {
+        try {
+          final connectivity = await Connectivity()
+              .checkConnectivity()
+              .timeout(const Duration(milliseconds: 700));
+
+          if (connectivity.contains(ConnectivityResult.none)) {
+            return false;
+          }
+
+          await FirebaseFirestore.instance
+              .collection('users')
+              .limit(1)
+              .get(const GetOptions(source: Source.server))
+              .timeout(const Duration(milliseconds: 1200));
+
+          return true;
+        } catch (_) {
+          return false;
+        }
+      }
       return true;
     } catch (_) {
       return false;
     }
   }
 
-  Future<void> _pushLocalToRemote() async {
+  Future<bool> _pushLocalToRemote() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+
     final all = await _getAll();
+    var changed = false;
 
     for (int i = 0; i < all.length; i++) {
       final r = all[i];
 
-      if (r.syncStatus == LocalTrainingSyncStatus.synced) continue;
+      if (r.isSynced || r.isSyncing) continue;
+      if (!r.canRetryNow) continue;
 
-      if (r.syncStatus == LocalTrainingSyncStatus.failed) {
-        if (r.retryCount >= _maxRetries) continue;
-        if (r.lastSyncAttempt != null) {
-          final hoursSinceLastAttempt = DateTime.now().difference(r.lastSyncAttempt!).inHours;
-          if (hoursSinceLastAttempt < 1) continue;
+      if (r.isPendingDelete) {
+        final deletingRecord = r.copyWith(
+          syncStatus: LocalTrainingSyncStatus.failedDelete,
+          retryCount: r.retryCount + 1,
+          lastSyncAttempt: DateTime.now(),
+          deletedAt: r.deletedAt ?? DateTime.now(),
+        );
+
+        all[i] = deletingRecord;
+        await _saveAll(all);
+
+        try {
+          if (deletingRecord.hasRemoteId) {
+            await _deleteRemoteTraining(
+              uid: user.uid,
+              remoteId: deletingRecord.remoteId!,
+            );
+          }
+
+          all.removeAt(i);
+          i--;
+          changed = true;
+
+          await _saveAll(all);
+
+          _syncStatusController.add({
+            deletingRecord.localId: LocalTrainingSyncStatus.synced,
+          });
+
+          if (deletingRecord.remoteId != null) {
+            _syncStatusController.add({
+              deletingRecord.remoteId!: LocalTrainingSyncStatus.synced,
+            });
+          }
+        } catch (e) {
+          debugPrint('❌ Delete training remoto fallito per ${deletingRecord.localId}: $e');
+
+          _syncStatusController.add({
+            deletingRecord.localId: LocalTrainingSyncStatus.failedDelete,
+          });
+
+          await _saveAll(all);
         }
+
+        continue;
       }
 
-      all[i] = r.copyWith(
+      if (!r.isPendingUpload) continue;
+
+      final syncingRecord = r.copyWith(
         syncStatus: LocalTrainingSyncStatus.syncing,
         retryCount: r.retryCount + 1,
         lastSyncAttempt: DateTime.now(),
       );
+
+      all[i] = syncingRecord;
       await _saveAll(all);
+
+      _syncStatusController.add({
+        syncingRecord.localId: LocalTrainingSyncStatus.syncing,
+      });
 
       try {
         final id = await _repo.saveTraining(
-          mode: r.mode,
-          target: r.target,
-          startTime: r.startTime,
-          endTime: r.endTime,
-          throwsList: r.throwsList,
-          focus: r.focus,
-          stress: r.stress,
-          energia: r.energia,
-          fiducia: r.fiducia,
-          distrazioni: r.distrazioni,
-          commento: r.commento,
-          trainingIdOverride: r.localId,
+          mode: syncingRecord.mode,
+          target: syncingRecord.target,
+          startTime: syncingRecord.startTime,
+          endTime: syncingRecord.endTime,
+          throwsList: syncingRecord.throwsList,
+          focus: syncingRecord.focus,
+          stress: syncingRecord.stress,
+          energia: syncingRecord.energia,
+          fiducia: syncingRecord.fiducia,
+          distrazioni: syncingRecord.distrazioni,
+          commento: syncingRecord.commento,
+          trainingIdOverride: syncingRecord.localId,
         );
 
-        all[i] = r.copyWith(
+        all[i] = syncingRecord.copyWith(
           remoteId: id,
           syncStatus: LocalTrainingSyncStatus.synced,
           retryCount: 0,
+          lastSyncAttempt: DateTime.now(),
+          updatedAt: DateTime.now(),
         );
-      } catch (e) {
-        debugPrint('❌ Push fallito per ${r.localId}: $e');
-        all[i] = r.copyWith(
-          syncStatus: LocalTrainingSyncStatus.failed,
-        );
-      }
 
-      await _saveAll(all);
+        changed = true;
+        await _saveAll(all);
+
+        _syncStatusController.add({
+          syncingRecord.localId: LocalTrainingSyncStatus.synced,
+        });
+
+        _syncStatusController.add({
+          id: LocalTrainingSyncStatus.synced,
+        });
+      } catch (e) {
+        debugPrint('❌ Push fallito per ${syncingRecord.localId}: $e');
+
+        all[i] = syncingRecord.copyWith(
+          syncStatus: LocalTrainingSyncStatus.failed,
+          lastSyncAttempt: DateTime.now(),
+        );
+
+        await _saveAll(all);
+
+        _syncStatusController.add({
+          syncingRecord.localId: LocalTrainingSyncStatus.failed,
+        });
+      }
     }
+
+    return changed;
   }
 
-  /// 🔥 METODO CORRETTO: PULL COMPLETO CON THROWS
-  Future<void> _pullRemoteToLocal() async {
+  Future<void> _deleteRemoteTraining({
+    required String uid,
+    required String remoteId,
+  }) async {
+    final db = FirebaseFirestore.instance;
+
+    final trainingRef = db
+        .collection('users')
+        .doc(uid)
+        .collection('trainings')
+        .doc(remoteId);
+
+    final throwsSnapshot = await trainingRef.collection('throws').get();
+
+    final batch = db.batch();
+
+    for (final throwDoc in throwsSnapshot.docs) {
+      batch.delete(throwDoc.reference);
+    }
+
+    batch.delete(trainingRef);
+
+    await batch.commit();
+  }
+  /// Pull remoto protetto: aggiunge solo record non presenti e non sovrascrive
+  /// intenzioni locali pendenti.
+  Future<bool> _pullRemoteToLocal() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) return false;
 
     final db = FirebaseFirestore.instance;
     final localRecords = await _getAll();
-    final existingRemoteIds = localRecords
-        .where((r) => r.remoteId != null)
-        .map((r) => r.remoteId!)
-        .toSet();
-
     // Ottieni tutti i training completati dal backend
     final trainingsSnapshot = await db
         .collection('users')
@@ -548,10 +737,27 @@ class LocalTrainingSyncService {
     for (final trainingDoc in trainingsSnapshot.docs) {
       final remoteId = trainingDoc.id;
 
-      // Salta se già presente in locale
-      if (existingRemoteIds.contains(remoteId)) continue;
-
       final data = trainingDoc.data();
+
+      final existingIndex = localRecords.indexWhere((record) {
+        return record.remoteId == remoteId || record.localId == remoteId;
+      });
+
+      if (existingIndex != -1) {
+        final existing = localRecords[existingIndex];
+
+        if (existing.isPendingUpload || existing.isPendingDelete || existing.isSyncing) {
+          continue;
+        }
+
+        final remoteUpdatedAt = data['updatedAt'] is Timestamp
+            ? (data['updatedAt'] as Timestamp).toDate()
+            : ((data['endTime'] as Timestamp?)?.toDate() ?? DateTime.now());
+
+        if (!existing.updatedAt.isBefore(remoteUpdatedAt)) {
+          continue;
+        }
+      }
 
       // 🔥 LEGGI I THROWS DALLA SUBCOLLECTION
       final throwsSnapshot = await trainingDoc.reference
@@ -593,7 +799,13 @@ class LocalTrainingSyncService {
         target: data['target']?.toString() ?? 'T20',
         startTime: (data['startTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
         endTime: (data['endTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
-        throwsList: throwsList, // 🔥 ORA PIENO!
+        createdAt: data['createdAt'] is Timestamp
+            ? (data['createdAt'] as Timestamp).toDate()
+            : ((data['startTime'] as Timestamp?)?.toDate() ?? DateTime.now()),
+        updatedAt: data['updatedAt'] is Timestamp
+            ? (data['updatedAt'] as Timestamp).toDate()
+            : ((data['endTime'] as Timestamp?)?.toDate() ?? DateTime.now()),
+        throwsList: throwsList,
         syncStatus: LocalTrainingSyncStatus.synced,
         retryCount: 0,
         lastSyncAttempt: null,
@@ -605,15 +817,27 @@ class LocalTrainingSyncService {
         commento: data['commento']?.toString(),
       );
 
-      newRecords.add(record);
+      if (existingIndex == -1) {
+        newRecords.add(record);
+      } else {
+        localRecords[existingIndex] = record;
+      }
     }
 
-    if (newRecords.isNotEmpty) {
-      final all = await _getAll();
-      all.addAll(newRecords);
-      await _saveAll(all);
-      debugPrint('✅ Pull completato: ${newRecords.length} nuove sessioni con ${newRecords.fold<int>(0, (sum, r) => sum + r.throwsList.length)} tiri');
+    if (newRecords.isEmpty) {
+      await _saveAll(localRecords);
+      return false;
     }
+
+    localRecords.addAll(newRecords);
+    await _saveAll(localRecords);
+
+    debugPrint(
+      '✅ Pull completato: ${newRecords.length} nuove sessioni con '
+          '${newRecords.fold<int>(0, (sum, r) => sum + r.throwsList.length)} tiri',
+    );
+
+    return true;
   }
 
   Future<List<LocalTrainingRecord>> _getAll() async {

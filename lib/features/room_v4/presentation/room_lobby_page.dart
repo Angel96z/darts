@@ -3,26 +3,56 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app_theme.dart';
 import '../application/room_notifier.dart';
+import '../domain/models/game_config.dart';
 import 'match_page.dart';
 import 'widgets/config_column.dart';
 import 'widgets/players_column.dart';
 
-class RoomLobbyPage extends ConsumerWidget {
-  const RoomLobbyPage({super.key});
+class RoomLobbyPage extends ConsumerStatefulWidget {
+  final GameType? initialGameType;
+
+  const RoomLobbyPage({
+    super.key,
+    this.initialGameType,
+  });
 
   static const double _bottomControlsHeight = 92;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RoomLobbyPage> createState() => _RoomLobbyPageState();
+}
+
+class _RoomLobbyPageState extends ConsumerState<RoomLobbyPage> {
+  bool _initialGameTypeApplied = false;
+
+  @override
+  Widget build(BuildContext context) {
     final t = AppTokens.of(context);
     final state = ref.watch(roomNotifierProvider);
 
+    if (!_initialGameTypeApplied && widget.initialGameType != null) {
+      _initialGameTypeApplied = true;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+
+        final notifier = ref.read(roomNotifierProvider.notifier);
+        switch (widget.initialGameType!) {
+          case GameType.x01:
+            notifier.updateGameConfig(GameConfig.x01());
+            break;
+          case GameType.cricket:
+            notifier.updateGameConfig(GameConfig.cricket());
+            break;
+        }
+      });
+    }
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: t.bg,
       appBar: AppBar(
         title: Text(
-          'Play darts',
+          'Gioca a freccette',
           style: TextStyle(
             color: t.textPrimary,
             fontSize: 16,
@@ -35,7 +65,7 @@ class RoomLobbyPage extends ConsumerWidget {
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: t.textPrimary),
-          onPressed: () => _onBackPressed(context, ref),
+          onPressed: () => _onBackPressed(context),
         ),
       ),
       body: Column(
@@ -45,14 +75,14 @@ class RoomLobbyPage extends ConsumerWidget {
           ),
           _BottomLobbyControls(
             canStartMatch: state.canStartMatch,
-            onStart: () => _startMatch(context, ref),
+            onStart: () => _startMatch(context),
           ),
         ],
       ),
     );
   }
 
-  void _startMatch(BuildContext context, WidgetRef ref) {
+  void _startMatch(BuildContext context) {
     ref.read(roomNotifierProvider.notifier).startMatch();
     Navigator.push(
       context,
@@ -60,7 +90,7 @@ class RoomLobbyPage extends ConsumerWidget {
     );
   }
 
-  Future<void> _onBackPressed(BuildContext context, WidgetRef ref) async {
+  Future<void> _onBackPressed(BuildContext context) async {
     final t = AppTokens.of(context);
 
     final confirm = await showDialog<bool>(
@@ -69,28 +99,28 @@ class RoomLobbyPage extends ConsumerWidget {
         backgroundColor: t.overlay,
         surfaceTintColor: Colors.transparent,
         title: Text(
-          'Leave lobby?',
+          'Certo di voler uscire?',
           style: TextStyle(
             color: t.textPrimary,
             fontWeight: FontWeight.w800,
           ),
         ),
         content: Text(
-          'Players will be removed.',
+          'I giocatori verranno rimossi.',
           style: TextStyle(color: t.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
-              'Cancel',
+              'Annulla',
               style: TextStyle(color: t.textSecondary),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text(
-              'Leave',
+              'Esci',
               style: TextStyle(
                 color: t.accent,
                 fontWeight: FontWeight.w900,
@@ -233,7 +263,7 @@ class _StartButton extends StatelessWidget {
         ),
         onPressed: enabled ? onPressed : null,
         child: const Text(
-          'START MATCH',
+          'INIZIA PARTITA',
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w900,

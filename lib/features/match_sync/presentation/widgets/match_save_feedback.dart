@@ -24,12 +24,12 @@ class MatchSaveFeedback extends StatelessWidget {
 
     switch (status) {
       case LocalMatchSyncStatus.synced:
-        message = '✅ Match salvato con successo!';
+        message = '✅ Partita salvato con successo!';
         icon = Icons.check_circle;
         color = Colors.green;
         break;
       case LocalMatchSyncStatus.pending:
-        message = '⏳ Match salvato in locale. Verrà sincronizzato automaticamente.';
+        message = '⏳ Partita salvato in locale. Verrà sincronizzato automaticamente.';
         icon = Icons.cloud_queue;
         color = Colors.orange;
         break;
@@ -41,6 +41,16 @@ class MatchSaveFeedback extends StatelessWidget {
       case LocalMatchSyncStatus.failed:
         message = '⚠️ Salvataggio fallito. Riprova più tardi.';
         icon = Icons.cloud_off;
+        color = Colors.red;
+        break;
+      case LocalMatchSyncStatus.pendingDelete:
+        message = '🗑️ Eliminazione in attesa di sincronizzazione.';
+        icon = Icons.delete_sweep_outlined;
+        color = Colors.orange;
+        break;
+      case LocalMatchSyncStatus.failedDelete:
+        message = '⚠️ Eliminazione non sincronizzata. Riprova più tardi.';
+        icon = Icons.delete_forever_outlined;
         color = Colors.red;
         break;
     }

@@ -16,32 +16,43 @@ class StatsRepository {
   // Cache
   List<LocalTrainingRecord>? _cachedTrainings;
   List<LocalMatchRecord>? _cachedMatches;
-  DateTime _cacheTimestamp = DateTime.now();
+  DateTime? _trainingsCacheTimestamp;
+  DateTime? _matchesCacheTimestamp;
   static const _cacheDuration = Duration(minutes: 5);
 
   Future<List<LocalTrainingRecord>> getAllTrainings({bool forceRefresh = false}) async {
-    if (!forceRefresh && _cachedTrainings != null && DateTime.now().difference(_cacheTimestamp) < _cacheDuration) {
+    final cacheTime = _trainingsCacheTimestamp;
+    final isCacheValid = cacheTime != null &&
+        DateTime.now().difference(cacheTime) < _cacheDuration;
+
+    if (!forceRefresh && _cachedTrainings != null && isCacheValid) {
       return _cachedTrainings!;
     }
 
     _cachedTrainings = await LocalTrainingSyncService.instance.getAllRecords();
-    _cacheTimestamp = DateTime.now();
+    _trainingsCacheTimestamp = DateTime.now();
     return _cachedTrainings!;
   }
 
   Future<List<LocalMatchRecord>> getAllMatches({bool forceRefresh = false}) async {
-    if (!forceRefresh && _cachedMatches != null && DateTime.now().difference(_cacheTimestamp) < _cacheDuration) {
+    final cacheTime = _matchesCacheTimestamp;
+    final isCacheValid = cacheTime != null &&
+        DateTime.now().difference(cacheTime) < _cacheDuration;
+
+    if (!forceRefresh && _cachedMatches != null && isCacheValid) {
       return _cachedMatches!;
     }
 
     _cachedMatches = await LocalMatchSyncService.instance.getAllRecords();
-    _cacheTimestamp = DateTime.now();
+    _matchesCacheTimestamp = DateTime.now();
     return _cachedMatches!;
   }
 
   void invalidateCache() {
     _cachedTrainings = null;
     _cachedMatches = null;
+    _trainingsCacheTimestamp = null;
+    _matchesCacheTimestamp = null;
   }
 
   // ========== METODI SPECIFICI ==========

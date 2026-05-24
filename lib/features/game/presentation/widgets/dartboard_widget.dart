@@ -386,21 +386,39 @@ class _DartboardPainter extends CustomPainter {
     final validThrows = throws.where((t) => !t.isPass).toList();
     if (validThrows.isEmpty) return;
 
+    final boardCenter = Offset(size.width / 2, size.height / 2);
+    final targetCenter = _getTargetCenter(boardCenter, r);
+
     final mean = Offset(
       validThrows.map((t) => t.position.dx).reduce((a, b) => a + b) / validThrows.length * size.width,
       validThrows.map((t) => t.position.dy).reduce((a, b) => a + b) / validThrows.length * size.height,
     );
 
-    final paint = Paint()
-      ..color = Colors.red
-      ..strokeWidth = r * 0.008;
+    final targetPaint = Paint()
+      ..color = const Color(0xFF2ECC71)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = max(1.5, r * 0.006);
 
-    canvas.drawCircle(mean, r * 0.02, paint);
+    final biasPaint = Paint()
+      ..color = Colors.red
+      ..style = PaintingStyle.fill;
+
+    final linePaint = Paint()
+      ..color = Colors.red.withOpacity(0.75)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = max(1.5, r * 0.005);
+
+    canvas.drawCircle(targetCenter, r * 0.025, targetPaint);
+    canvas.drawLine(targetCenter, mean, linePaint);
+    canvas.drawCircle(mean, r * 0.02, biasPaint);
   }
 
   void _drawDirectionalBias(Canvas canvas, Size size, double r) {
     final validThrows = throws.where((t) => !t.isPass).toList();
     if (validThrows.length < 2) return;
+
+    final boardCenter = Offset(size.width / 2, size.height / 2);
+    final targetCenter = _getTargetCenter(boardCenter, r);
 
     final meanX = validThrows.map((t) => t.position.dx).reduce((a, b) => a + b) / validThrows.length;
     final meanY = validThrows.map((t) => t.position.dy).reduce((a, b) => a + b) / validThrows.length;
@@ -413,6 +431,7 @@ class _DartboardPainter extends CustomPainter {
 
     final centerX = meanX * size.width;
     final centerY = meanY * size.height;
+    final mean = Offset(centerX, centerY);
 
     final halfBandX = max(r * 0.03, stdX * size.width * 2);
     final halfBandY = max(r * 0.03, stdY * size.height * 2);
@@ -428,13 +447,26 @@ class _DartboardPainter extends CustomPainter {
     canvas.drawRect(Rect.fromLTWH(centerX - halfBandX, 0, halfBandX * 2, size.height), fillX);
     canvas.drawRect(Rect.fromLTWH(0, centerY - halfBandY, size.width, halfBandY * 2), fillY);
 
-    final line = Paint()
+    final biasLine = Paint()
+      ..color = Colors.red.withOpacity(0.75)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = max(1.5, r * 0.005);
+
+    final meanLine = Paint()
       ..color = const Color(0xFFE53935)
       ..style = PaintingStyle.stroke
       ..strokeWidth = max(1.5, r * 0.006);
 
-    canvas.drawLine(Offset(centerX, 0), Offset(centerX, size.height), line);
-    canvas.drawLine(Offset(0, centerY), Offset(size.width, centerY), line);
+    final targetPaint = Paint()
+      ..color = const Color(0xFF2ECC71)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = max(1.5, r * 0.006);
+
+    canvas.drawCircle(targetCenter, r * 0.025, targetPaint);
+    canvas.drawLine(targetCenter, mean, biasLine);
+
+    canvas.drawLine(Offset(centerX, 0), Offset(centerX, size.height), meanLine);
+    canvas.drawLine(Offset(0, centerY), Offset(size.width, centerY), meanLine);
   }
 
   void _drawDispersion(Canvas canvas, Size size, double r) {

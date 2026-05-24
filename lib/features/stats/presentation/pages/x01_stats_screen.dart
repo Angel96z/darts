@@ -7,10 +7,11 @@ import 'package:intl/intl.dart' hide TextDirection;
 import '../../../../app_theme.dart';
 import '../../../match_sync/domain/entities/local_match_record.dart';
 import '../../../match_sync/data/services/local_match_sync_service.dart';
+import '../../../room_v4/domain/models/game_config.dart';
 import '../../../room_v4/domain/models/player_turn.dart';
+import '../../../room_v4/presentation/room_lobby_page.dart';
 import '../../../room_v4/presentation/widgets/current_turn_card.dart';
 import '../../x01_dart_extractor.dart';
-import '../widgets/match_history_table.dart';
 import '../../shared/stats_filter.dart';
 import '../widgets/match_session_stats.dart';
 import '../widgets/session_picker_screen.dart';
@@ -113,7 +114,9 @@ class X01StatsController extends ChangeNotifier {
 
     try {
       final allMatches = await LocalMatchSyncService.instance.getAllRecords();
-      final x01Matches = allMatches.where((m) => m.mode == 'x01').toList();
+      final x01Matches = allMatches
+          .where((m) => m.mode == 'x01' && m.isVisible)
+          .toList();
 
       _allMatches.clear();
 
@@ -358,7 +361,7 @@ class _X01StatsWidgetState extends State<X01StatsWidget>
   }
 
   Future<void> _openSessionPicker() async {
-    await Navigator.push<void>(
+    final deletedSomething = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => SessionPickerScreen<MatchSessionStats>(
@@ -377,7 +380,9 @@ class _X01StatsWidgetState extends State<X01StatsWidget>
       ),
     );
 
-    await _controller.loadMatches();
+    if (deletedSomething == true) {
+      await _controller.loadMatches();
+    }
   }
 
   Future<void> _handleSelectorTap() async {
@@ -457,6 +462,20 @@ class _X01StatsWidgetState extends State<X01StatsWidget>
                     subtitle: 'Gioca almeno una partita a X01 per vedere le statistiche.',
                     color: t.textMuted,
                     t: t,
+                    action: FilledButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const RoomLobbyPage(
+                              initialGameType: GameType.x01,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: const Text('Gioca a X01'),
+                    ),
                   );
                 }
 
@@ -606,27 +625,11 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
 
     if (confirmed != true) return;
 
-    final user = FirebaseAuth.instance.currentUser;
-    final batch = FirebaseFirestore.instance.batch();
+    await LocalMatchSyncService.instance.deleteRecords(_selectedIds.toList());
 
-    for (final id in _selectedIds) {
-      if (user != null) {
-        final matchRef = FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('x01_matches')
-            .doc(id);
-        batch.delete(matchRef);
-      }
-    }
+    if (!mounted) return;
 
-    if (user != null && _selectedIds.isNotEmpty) {
-      await batch.commit();
-    }
-
-    if (mounted) {
-      Navigator.pop(context);
-    }
+    Navigator.pop(context, true);
   }
 
   @override
@@ -1272,20 +1275,38 @@ class _StatsPanel extends StatelessWidget {
         .toList();
 
     return UnifiedStatsChart(
-      title: 'ANDAMENTO VISIT DISCESA',
-      subtitle: 'Asse X = progressivo visit. Asse Y = punteggio medio del visit.',
+      title: 'ANDAMENTO TURNI SCORING',
+      subtitle: 'Punti dei turni in fase scoring.',
       points: points,
       mode: UnifiedStatsChartMode.lineAndPoints,
-      xAxisLabel: 'visit',
-      yAxisLabel: 'punti visit',
+      xAxisLabel: 'turno',
+      yAxisLabel: 'punti turno',
       minYValue: 0,
       height: 320,
-      infoTitle: 'Come leggere il grafico',
-      infoText: 'Mostra l’andamento cronologico dei visit in fase di discesa.',
-      advice: const [
-        'Linea crescente: stai aumentando la produzione media nei visit.',
-        'Linea instabile: alterni turni forti e turni deboli.',
-        'Usa pan e zoom per isolare blocchi specifici di partita.',
+      infoTitle:
+      'Come leggere l’andamento dello scoring.',
+      infoText:
+      'Il grafico mostra l’andamento dei turni giocati durante la fase di scoring del leg.\n\n'
+
+          'La linea aiuta a capire continuità, stabilità e cali di ritmo durante la costruzione del leg.\n\n',
+
+      footerText:
+      'Osserva come costruisci il leg nel tempo: continuità, cali di ritmo e qualità dello scoring determinano velocità, pressione e ingresso in checkout.',
+
+      advice: [
+        'Una linea stabile indica continuità di scoring e buona costruzione del leg.',
+
+        'Forti oscillazioni tra turni alti e bassi indicano instabilità nel ritmo di scoring.',
+
+        'Se il grafico parte forte ma cala rapidamente, probabilmente perdi qualità man mano che il leg avanza.',
+
+        'Se migliori nei turni finali della discesa, entri progressivamente nel ritmo partita dopo le prime visite.',
+
+        'Turni molto bassi ripetuti rallentano l’ingresso in checkout e aumentano pressione sulla fase finale.',
+
+        'Confronta questo grafico con i turni zona checkout: una buona discesa dovrebbe ridurre il numero di turni necessari per entrare in chiusura.',
+
+        'Quando la discesa è lenta ma il checkout resta efficiente, il problema principale è nella produzione punti iniziale e non nella chiusura.',
       ],
     );
   }
@@ -1308,15 +1329,15 @@ class _StatsPanel extends StatelessWidget {
           (point) => UnifiedStatsPoint(
         x: point.visitProgressive.toDouble(),
         y: point.value,
-        label: 'Visit ${point.visitProgressive}',
-        detail: 'Visit ${point.visitProgressive}: ${point.value.toStringAsFixed(0)} punti',
+        label: 'Turno ${point.visitProgressive}',
+        detail: 'Turno ${point.visitProgressive}: ${point.value.toStringAsFixed(0)} punti',
       ),
     )
         .toList();
 
     return UnifiedStatsChart(
       title: title,
-      subtitle: 'Asse X = progressivo visit. Asse Y = valore della freccetta.',
+      subtitle: 'Andamento per singola freccetta nei turni di scoring.',
       points: points,
       mode: UnifiedStatsChartMode.lineAndPoints,
       xAxisLabel: 'visit',
@@ -1325,11 +1346,11 @@ class _StatsPanel extends StatelessWidget {
       maxYValue: 60,
       height: 320,
       infoTitle: 'Come leggere il grafico',
-      infoText: 'Mostra la stabilità della singola freccetta nei visit di discesa.',
+      infoText: 'Mostra la stabilità della singola freccetta nei turni di scoring.',
       advice: const [
         'Punti alti e ravvicinati indicano continuità.',
         'Cadute frequenti indicano perdita di controllo su quella freccetta.',
-        'Confronta 1ª, 2ª e 3ª freccetta per capire dove cala la precisione.',
+        'Confronta 1ª, 2ª e 3ª freccetta per capire dove cala o aumenta la precisione.',
       ],
     );
   }
@@ -1433,28 +1454,39 @@ class _TurnScoreDistributionTableState extends State<_TurnScoreDistributionTable
 
     if (rows.isEmpty) return const SizedBox.shrink();
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: widget.t.surface,
-        borderRadius: AppTokens.r16,
-        border: Border.all(color: widget.t.border),
+    return UnifiedStatsCard(
+      title: 'DISTRIBUZIONE PUNTEGGI TURNO',
+      subtitle: 'Analizza i punteggi che produci più spesso.',
+      info: const UnifiedStatsInfoData(
+        title: 'Come leggere la tabella',
+        text:
+        'Ogni riga rappresenta un punteggio ottenuto in partita.\n\n'
+            'La tabella serve a capire quali punteggi fanno davvero parte del tuo gioco reale, quanto sono stabili e quanto spesso riesci a ripeterli sotto pressione.\n\n'
+            'Tot → quante volte realizzi quel punteggio.\n\n'
+            '1 ogni X turni → frequenza reale del punteggio nelle partite.\n\n'
+            'AVG/Leg → quanto spesso quel punteggio compare mediamente in un leg.\n\n'
+            'I punteggi molto frequenti rappresentano le tue abitudini reali di scoring: possono essere punti forti da sfruttare oppure errori ricorrenti da correggere.',
+
+        advice: [
+          'I punteggi più frequenti rappresentano il tuo livello reale sotto pressione partita, non il tuo massimo teorico.',
+
+          'Se i punteggi medi dominano la tabella ma i punteggi alti compaiono raramente, il tuo scoring è stabile ma poco aggressivo.',
+
+          'Se compaiono spesso punteggi sporchi come 26, 41 o 45, abbassa il rischio: cerca prima stabilità sul 20 singolo, poi torna a forzare il triplo.',
+
+          'I punteggi che riesci a ripetere spesso sono quelli su cui puoi costruire il tuo ritmo partita senza forzare.',
+
+          'Se un punteggio alto compare raramente, non dovrebbe ancora diventare il centro del tuo gioco sotto pressione.',
+
+          'Ordina "1 ogni X turni": più il numero è basso, più quel punteggio appartiene davvero al tuo scoring abituale.',
+
+          'Usa la tabella per capire quali numeri puoi aspettarti realisticamente durante un leg, e quali invece richiedono ancora troppo sforzo o precisione.',
+        ],
+
       ),
-      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _X01SummaryHeader(
-            title: 'DISTRIBUZIONE PUNTEGGI TURNO',
-            subtitle: 'Quante volte esce ogni punteggio, percentuale sui turni e presenza nei leg',
-            onInfo: () => _openInfo(context),
-            onReset: () {
-              setState(() {
-                _sortColumnIndex = 0;
-                _sortDescending = true;
-              });
-            },
-          ),
           DecoratedBox(
             decoration: BoxDecoration(
               color: widget.t.surfaceHigh,
@@ -1474,7 +1506,7 @@ class _TurnScoreDistributionTableState extends State<_TurnScoreDistributionTable
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Tabella ordinabile: tocca una colonna per ordinare dal valore più alto o più basso.',
+                    'Ordina le colonne per individuare rapidamente i punteggi che definiscono il tuo ritmo di scoring.',
                     style: widget.t.bodySmall(widget.t.textMuted),
                   ),
                 ),
@@ -1631,71 +1663,6 @@ class _TurnScoreDistributionTableState extends State<_TurnScoreDistributionTable
       ),
     );
   }
-
-  void _openInfo(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: widget.t.overlay,
-      barrierColor: Colors.black.withOpacity(0.55),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.info_rounded, color: widget.t.accent, size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Come leggere la tabella',
-                        style: TextStyle(
-                          color: widget.t.textPrimary,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Ogni riga rappresenta un punteggio realizzato in un turno. Puoi ordinare ogni colonna per trovare subito i punteggi più frequenti, quelli più rari o quelli con maggiore presenza media per leg.',
-                  style: TextStyle(
-                    color: widget.t.textSecondary,
-                    fontSize: 13,
-                    height: 1.35,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text('CONSIGLI', style: widget.t.labelCaps(widget.t.textMuted)),
-                const SizedBox(height: 8),
-                _X01SummaryAdviceRow(
-                  t: widget.t,
-                  text: 'Ordina Tot per capire quali punteggi produci più spesso.',
-                ),
-                _X01SummaryAdviceRow(
-                  t: widget.t,
-                  text: 'Ordina 1 ogni X turni in crescente per vedere i punteggi più ricorrenti.',
-                ),
-                _X01SummaryAdviceRow(
-                  t: widget.t,
-                  text: 'Ordina AVG/Leg per capire quali punteggi entrano più spesso dentro ogni leg.',
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
 
 class _ScoringVisitDartAverageTable extends StatelessWidget {
@@ -1711,23 +1678,25 @@ class _ScoringVisitDartAverageTable extends StatelessWidget {
   Widget build(BuildContext context) {
     final metrics = _ScoringVisitDartAverageMetrics.fromMatches(matches);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: t.surface,
-        borderRadius: AppTokens.r16,
-        border: Border.all(color: t.border),
+    return UnifiedStatsCard(
+      title: 'FASE SCORING',
+      subtitle: 'AVG Turni e freccette, per arrivare in zona checkout.',
+      info: const UnifiedStatsInfoData(
+        title: 'Come leggere la fase di scoring',
+        text:
+            'Turni/leg → quanti turni di scoring ti servono mediamente prima di arrivare in zona checkout.\n\n'
+                'Punti/turno → punteggio medio delle 3 freccette nei turni.\n\n'
+                '1ª, 2ª e 3ª freccetta → mostrano come cambia la qualità di ogni freccetta.',
+        advice: [
+          'Se Turni/leg è alto, impieghi troppo tempo per arrivare in zona checkout: il problema è nella costruzione del leg.',
+          'Se la 1ª freccetta è buona ma la 2ª e la 3ª calano, perdi continuità dopo il primo lancio.',
+          'Se la 1ª freccetta è bassa ma migliori con 2ª e 3ª, parti posizionato male e tendi poi a correggerti durante il turno.',
+          'Se tutte e tre le freccette sono basse, il problema non è una singola freccetta: è il ritmo generale di scoring.',
+        ],
       ),
-      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _X01SummaryHeader(
-            title: 'FASE DISCESA PUNTEGGIO',
-            subtitle: 'Media visit e media per singola freccetta sopra 170',
-            onInfo: () => _openInfo(context),
-            onReset: () {},
-          ),
           DecoratedBox(
             decoration: BoxDecoration(
               color: t.surfaceHigh,
@@ -1736,13 +1705,21 @@ class _ScoringVisitDartAverageTable extends StatelessWidget {
                 bottom: BorderSide(color: t.divider),
               ),
             ),
-            child: Row(
+            child: Column(
               children: [
-                _MetricCell(label: 'AVG visit/leg', value: metrics.scoringVisitsPerLegText, t: t),
-                _MetricCell(label: 'Visit', value: metrics.visitAverageText, t: t),
-                _MetricCell(label: '1ª dart', value: metrics.firstDartAverageText, t: t),
-                _MetricCell(label: '2ª dart', value: metrics.secondDartAverageText, t: t),
-                _MetricCell(label: '3ª dart', value: metrics.thirdDartAverageText, t: t),
+                Row(
+                  children: [
+                    _MetricCell(label: 'Turni/leg', value: metrics.scoringVisitsPerLegText, t: t),
+                    _MetricCell(label: 'Punti/turno', value: metrics.visitAverageText, t: t),
+                  ],
+                ),
+                Row(
+                  children: [
+                    _MetricCell(label: '1ª freccetta', value: metrics.firstDartAverageText, t: t),
+                    _MetricCell(label: '2ª freccetta', value: metrics.secondDartAverageText, t: t),
+                    _MetricCell(label: '3ª freccetta', value: metrics.thirdDartAverageText, t: t),
+                  ],
+                ),
               ],
             ),
           ),
@@ -1755,7 +1732,7 @@ class _ScoringVisitDartAverageTable extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Sezione standardizzata: confronta il rendimento della fase di discesa sopra 170.',
+                    'Leggi lo scoring come fase di costruzione: quanti turni ti servono e quale freccetta sostiene o rompe il ritmo.',
                     style: t.bodySmall(t.textMuted),
                   ),
                 ),
@@ -1766,73 +1743,7 @@ class _ScoringVisitDartAverageTable extends StatelessWidget {
       ),
     );
   }
-
-  void _openInfo(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: t.overlay,
-      barrierColor: Colors.black.withOpacity(0.55),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.info_rounded, color: t.accent, size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Come leggere la sezione',
-                        style: TextStyle(
-                          color: t.textPrimary,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Questa sezione misura la fase di discesa del punteggio, cioè i turni giocati sopra 170. Mantiene separata la media del visit dalla media delle singole freccette.',
-                  style: TextStyle(
-                    color: t.textSecondary,
-                    fontSize: 13,
-                    height: 1.35,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text('CONSIGLI', style: t.labelCaps(t.textMuted)),
-                const SizedBox(height: 8),
-                _X01SummaryAdviceRow(
-                  t: t,
-                  text: 'Se la media visit è bassa, il problema è nella produzione generale del turno.',
-                ),
-                _X01SummaryAdviceRow(
-                  t: t,
-                  text: 'Confronta 1ª, 2ª e 3ª freccetta per capire dove cala la qualità.',
-                ),
-                _X01SummaryAdviceRow(
-                  t: t,
-                  text: 'Se AVG visit/leg è alta, impieghi troppi turni per entrare in zona checkout.',
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
-
 
 class _MetricCell extends StatelessWidget {
   final String label;
@@ -1921,16 +1832,26 @@ class _ScoringVisitDartAverageMetrics {
       playerId: playerId,
     );
 
-    final scoringTurns = dataset.turns.where((turn) => turn.isScoringZone).toList();
-    final scoringDarts = dataset.scoringZoneDarts;
-    final finishedLegs = dataset.legs.where((leg) => leg.isFinished).toList();
-    final scoringVisitsPerLeg = finishedLegs.isEmpty
+    final scoringLegs = dataset.legs
+        .where((leg) => leg.isFinished && leg.startingScore > 170)
+        .toList();
+
+    final scoringTurns = scoringLegs
+        .expand((leg) => leg.scoringTurns)
+        .toList();
+
+    final scoringDarts = scoringTurns
+        .expand((turn) => turn.darts)
+        .toList();
+
+    final scoringVisitsPerLeg = scoringLegs.isEmpty
         ? 0.0
-        : finishedLegs.fold<int>(
+        : scoringLegs.fold<int>(
       0,
           (sum, leg) => sum + leg.scoringTurns.length,
     ) /
-        finishedLegs.length;
+        scoringLegs.length;
+
     final firstDarts = scoringDarts.where((dart) => dart.isFirstDart).toList();
     final secondDarts = scoringDarts.where((dart) => dart.isSecondDart).toList();
     final thirdDarts = scoringDarts.where((dart) => dart.isThirdDart).toList();
@@ -2052,23 +1973,30 @@ class _CheckoutVisitDartAverageTable extends StatelessWidget {
   Widget build(BuildContext context) {
     final metrics = _CheckoutVisitDartAverageMetrics.fromMatches(matches);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: t.surface,
-        borderRadius: AppTokens.r16,
-        border: Border.all(color: t.border),
+    return UnifiedStatsCard(
+      title: 'FASE CHIUSURA',
+      subtitle: 'Punteggio in fase di checkout e % della freccetta che chiude.',
+      footerIcon: Icons.check_circle_outline_rounded,
+      footerText:
+      'Osserva come gestisci il finale del leg: qualità del checkout, numero di turni necessari e freccetta con cui riesci davvero a chiudere.',
+
+      info: const UnifiedStatsInfoData(
+        title: 'Come leggere la fase di chiusura',
+        text:
+            'Turno medio → punteggio medio prodotto nei turni di chiusura.\n\n'
+            'AVG turni close → quanti turni servono mediamente per completare la fase di checkout e chiudere.\n\n'
+            '1ª, 2ª e 3ª freccetta punti → rendimento medio delle singole freccette in zona checkout.\n\n'
+            'Close 1ª, 2ª e 3ª → con quale freccetta chiudi più spesso.',
+        advice: [
+          'Se AVG turni close è alto, arrivi in checkout ma impieghi troppi turni per chiudere.',
+          'Se i punti delle freccette sono bassi, la zona checkout non sta creando abbastanza pressione.',
+          'Se una freccetta ha una percentuale close molto più alta, probabilmente è quella con cui sei più lucido o più stabile sul doppio.',
+          'Se chiudi poco con la 3ª freccetta, potresti perdere qualità dopo i primi errori del turno.',
+        ],
       ),
-      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _X01SummaryHeader(
-            title: 'FASE CHIUSURA',
-            subtitle: 'Turni medi necessari per chiudere e rendimento delle freccette da 170 in giù',
-            onInfo: () => _openInfo(context),
-            onReset: () {},
-          ),
           DecoratedBox(
             decoration: BoxDecoration(
               color: t.surfaceHigh,
@@ -2081,15 +2009,19 @@ class _CheckoutVisitDartAverageTable extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    _MetricCell(label: 'Visit avg', value: metrics.visitAverageText, t: t),
-                    _MetricCell(label: '1ª dart', value: metrics.firstDartAverageText, t: t),
-                    _MetricCell(label: '2ª dart', value: metrics.secondDartAverageText, t: t),
-                    _MetricCell(label: '3ª dart', value: metrics.thirdDartAverageText, t: t),
+                    _MetricCell(label: 'Turni/leg', value: metrics.avgVisitsToCloseText, t: t),
+                    _MetricCell(label: 'Punti/turno', value: metrics.visitAverageText, t: t),
                   ],
                 ),
                 Row(
                   children: [
-                    _MetricCell(label: 'AVG turni close', value: metrics.avgVisitsToCloseText, t: t),
+                    _MetricCell(label: 'Punti 1ª', value: metrics.firstDartAverageText, t: t),
+                    _MetricCell(label: 'Punti 2ª', value: metrics.secondDartAverageText, t: t),
+                    _MetricCell(label: 'Punti 3ª', value: metrics.thirdDartAverageText, t: t),
+                  ],
+                ),
+                Row(
+                  children: [
                     _MetricCell(label: 'Close 1ª', value: metrics.firstDartCheckoutRateText, t: t),
                     _MetricCell(label: 'Close 2ª', value: metrics.secondDartCheckoutRateText, t: t),
                     _MetricCell(label: 'Close 3ª', value: metrics.thirdDartCheckoutRateText, t: t),
@@ -2098,93 +2030,11 @@ class _CheckoutVisitDartAverageTable extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 10),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-            child: Row(
-              children: [
-                Icon(Icons.check_circle_outline_rounded, color: t.textMuted, size: 16),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Sezione standardizzata: misura rendimento e conversione nella zona checkout da 170 in giù.',
-                    style: t.bodySmall(t.textMuted),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
   }
-
-  void _openInfo(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: t.overlay,
-      barrierColor: Colors.black.withOpacity(0.55),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.info_rounded, color: t.accent, size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Come leggere la sezione',
-                        style: TextStyle(
-                          color: t.textPrimary,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Questa sezione misura la fase di chiusura, cioè i turni giocati da 170 in giù. La prima riga mostra il rendimento medio, la seconda mostra quanti turni servono per chiudere e con quale freccetta arrivano le chiusure.',
-                  style: TextStyle(
-                    color: t.textSecondary,
-                    fontSize: 13,
-                    height: 1.35,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text('CONSIGLI', style: t.labelCaps(t.textMuted)),
-                const SizedBox(height: 8),
-                _X01SummaryAdviceRow(
-                  t: t,
-                  text: 'Se AVG turni close è alto, crei opportunità ma non le trasformi abbastanza velocemente.',
-                ),
-                _X01SummaryAdviceRow(
-                  t: t,
-                  text: 'Confronta Close 1ª, 2ª e 3ª per capire con quale freccetta chiudi più spesso.',
-                ),
-                _X01SummaryAdviceRow(
-                  t: t,
-                  text: 'Se Visit avg è basso, la fase checkout non produce abbastanza pressione.',
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
-
 class _CheckoutVisitDartAverageMetrics {
   final double avgVisitsToClose;
   final double visitAverage;
@@ -2314,14 +2164,22 @@ class _CheckoutScoreTowerChart extends StatelessWidget {
 
     return UnifiedStatsTowerChart(
       title: 'PUNTEGGI CHIUSI',
-      subtitle: 'Solo turni checkout. Barre ordinate per quantità: sotto il punteggio chiuso, sopra quante volte',
-      yAxisLabel: 'checkout',
-      infoTitle: 'Come leggere il grafico',
-      infoText: 'Ogni torre rappresenta un punteggio chiuso. Più alta è la torre, più spesso hai chiuso quel punteggio.',
+      subtitle: 'Distribuzione dei checkout completati.',
+      yAxisLabel: 'chiusure',
+      height: 320,
+      showTargetLines: false,
+      footerText:
+      'Osserva quali checkout chiudi maggiormente e con più successo: i punteggi ricorrenti mostrano abitudini, stabilità, sicurezza.',
+      infoTitle: 'Come leggere i punteggi chiusi',
+      infoText:
+      'Ogni torre rappresenta un punteggio chiuso.\n\n'
+          'Più alta è la torre, più spesso hai chiuso con quel punteggio.\n\n'
+          'Il grafico serve a capire quali punteggi chiudi con continuità e con piu efficacia.',
       advice: const [
-        'Le torri più alte indicano i checkout più naturali.',
-        'I punteggi assenti o bassi sono quelli da allenare in modo mirato.',
-        'Usa questo dato per costruire una routine checkout sui numeri più ricorrenti.',
+        'Le torri più alte indicano i checkout che trasformi con maggiore naturalezza.',
+        'I punteggi assenti o bassi mostrano chiusure poco allenate, poco raggiunte o poco convertite.',
+        'Se chiudi sempre gli stessi punteggi, costruisci routine solide.',
+        'Usa questo dato per programmarti in partita un checkout strategico.',
       ],
       groups: orderedBars
           .map(
@@ -2407,14 +2265,23 @@ class _CheckoutSectorTowerChart extends StatelessWidget {
 
     return UnifiedStatsTowerChart(
       title: 'SETTORI DI CHIUSURA',
-      subtitle: 'Solo ultima freccetta checkout. Barre ordinate per quantità: sotto il settore, sopra quante volte',
-      yAxisLabel: 'checkout',
-      infoTitle: 'Come leggere il grafico',
-      infoText: 'Ogni torre rappresenta un settore usato per chiudere. Più alta è la torre, più spesso quel settore è stato il bersaglio vincente.',
+      subtitle: 'Distribuzione dei settori usati per chiudere.',
+      yAxisLabel: 'chiusure',
+      height: 320,
+      showTargetLines: false,
+      footerText:
+      'Osserva quali settori usi davvero per chiudere: le torri più alte mostrano i settori con cui chiudi maggiormente.',
+      infoTitle: 'Come leggere i settori di chiusura',
+      infoText:
+      'Ogni torre rappresenta un settore con cui hai chiuso un leg.\n\n'
+          'Più alta è la torre, più quel settore è stato utilizzato.\n\n'
+          'Il grafico serve a capire quali settori sono più naturali per te e quali invece compaiono poco.',
       advice: const [
-        'Le torri alte mostrano i doppi o settori più affidabili.',
-        'Le torri basse mostrano settori poco usati o poco efficaci.',
-        'Allena prima i settori con più opportunità reali di chiusura.',
+        'Le torri più alte indicano i settori di chiusura più affidabili nel tuo stile di gioco.',
+        'I settori assenti o bassi possono indicare doppi poco raggiunti, poco allenati o poco convertiti.',
+        'Se dipendi sempre dagli stessi doppi, costruisci fiducia, ma rischi di soffrire checkout alternativi.',
+        'Usa questo dato per allenare prima i settori che incontri davvero più spesso in partita.',
+        'Se sono settori piccoli, allenati sui settori strategici di chiusura (D20, S16, D8) per chiudere in meno turni.',
       ],
       groups: orderedBars
           .map(
@@ -2492,15 +2359,52 @@ class _LegTurnsByGameTowerChart extends StatelessWidget {
 
     return UnifiedStatsTowerChart(
       title: 'TURNI PER LEG',
-      subtitle: 'Per ogni gioco: media turni nei leg vinti e media turni nei leg persi',
+      subtitle:
+      'Confronta come costruisci e chiudi i leg vinti e persi.',
       yAxisLabel: 'turni',
-      infoTitle: 'Come leggere il grafico',
-      infoText: 'Ogni gruppo mostra il numero medio di turni nei leg vinti e nei leg persi. Verde = leg vinti, rosso = leg persi.',
-      advice: const [
-        'Se il rosso è molto più alto del verde, perdi efficienza nei leg complicati.',
-        'Se verde e rosso sono vicini, spesso perdi leg combattuti.',
-        'La media sopra la barra aiuta a leggere insieme velocità del leg e qualità del punteggio.',
+      height: 260,
+      showTargetLines: true,
+      customLegend: [
+        ('Vinti', t.green),
+        ('Persi', t.red),
+        ('Scoring', t.textMuted.withOpacity(0.9)),
+        ('Checkout', t.textMuted.withOpacity(0.38)),
       ],
+      footerText:
+      'Confronta i ritmi tra leg vinti e persi, tra scoring e checkout.',
+      infoTitle:
+      'Come leggere i turni per leg',
+      infoText:
+      'Ogni torre rappresenta il ritmo medio di un leg.\n\n'
+
+          'La parte scura mostra i turni di discesa necessari per arrivare in zona checkout.\n\n'
+
+          'La parte chiara mostra invece i turni giocati in checkout prima della chiusura o della sconfitta del leg.\n\n'
+
+          'Le torri verdi rappresentano i leg vinti, le rosse i leg persi.\n\n'
+
+          'Il numero sopra la torre indica i turni medi totali del leg, mentre sotto viene mostrata la media punti.\n\n'
+
+          'Confrontando vinti e persi puoi capire se il leg viene perso soprattutto nella fase di scoring oppure nella conversione finale del checkout.',
+
+      advice: [
+        'Se nei leg persi la parte scura è molto più alta, il problema principale è la discesa: perdi terreno prima ancora di entrare realmente in checkout.',
+
+        'Se le parti scure sono simili tra vinti e persi, ma la parte checkout cresce molto nei persi, il problema è soprattutto nella chiusura finale.',
+
+        'Checkout molto lunghi nei leg persi spesso indicano blocchi sui doppi, setup poco efficienti o difficoltà sotto pressione.',
+
+        'Quando arrivi in checkout con lo stesso ritmo dei leg vinti ma perdi comunque il leg, probabilmente stai lasciando troppi turni extra in chiusura.',
+
+        'Torri basse con AVG alta indicano leg puliti, ritmo forte e buona continuità di scoring.',
+
+        'Torri molto alte sia nei vinti che nei persi indicano partite lente e tanti turni sprecati durante il leg.',
+
+        'Confronta i livelli 15, 18, 21 e 24 dart: aiutano a capire il ritmo reale del tuo gioco sui diversi X01.',
+
+        'Se i leg persi terminano spesso vicino ai tuoi tempi medi vincenti, le partite sono equilibrate e la differenza è nei dettagli finali.',
+      ],
+
       groups: groups
           .map(
             (group) => UnifiedStatsTowerGroup(
@@ -2513,6 +2417,18 @@ class _LegTurnsByGameTowerChart extends StatelessWidget {
                 topLabel: '${group.wonTurnsAverage.toStringAsFixed(1)} T',
                 subTopLabel: '${group.wonScoreAverage.toStringAsFixed(1)} AVG',
                 color: t.green,
+                segments: [
+                  UnifiedStatsTowerSegment(
+                    label: 'discesa',
+                    value: group.wonScoringTurnsAverage,
+                    color: t.green,
+                  ),
+                  UnifiedStatsTowerSegment(
+                    label: 'checkout',
+                    value: group.wonCheckoutTurnsAverage,
+                    color: t.green.withOpacity(0.38),
+                  ),
+                ],
               ),
             if (group.lostLegs > 0)
               UnifiedStatsTowerValue(
@@ -2521,6 +2437,18 @@ class _LegTurnsByGameTowerChart extends StatelessWidget {
                 topLabel: '${group.lostTurnsAverage.toStringAsFixed(1)} T',
                 subTopLabel: '${group.lostScoreAverage.toStringAsFixed(1)} AVG',
                 color: t.red,
+                segments: [
+                  UnifiedStatsTowerSegment(
+                    label: 'discesa',
+                    value: group.lostScoringTurnsAverage,
+                    color: t.red,
+                  ),
+                  UnifiedStatsTowerSegment(
+                    label: 'checkout',
+                    value: group.lostCheckoutTurnsAverage,
+                    color: t.red.withOpacity(0.38),
+                  ),
+                ],
               ),
           ],
         ),
@@ -2530,11 +2458,14 @@ class _LegTurnsByGameTowerChart extends StatelessWidget {
   }
 }
 
-
 class _LegTurnsByGameGroup {
   final int startingScore;
   final double wonTurnsAverage;
   final double lostTurnsAverage;
+  final double wonScoringTurnsAverage;
+  final double wonCheckoutTurnsAverage;
+  final double lostScoringTurnsAverage;
+  final double lostCheckoutTurnsAverage;
   final double wonScoreAverage;
   final double lostScoreAverage;
   final int wonLegs;
@@ -2544,6 +2475,10 @@ class _LegTurnsByGameGroup {
     required this.startingScore,
     required this.wonTurnsAverage,
     required this.lostTurnsAverage,
+    required this.wonScoringTurnsAverage,
+    required this.wonCheckoutTurnsAverage,
+    required this.lostScoringTurnsAverage,
+    required this.lostCheckoutTurnsAverage,
     required this.wonScoreAverage,
     required this.lostScoreAverage,
     required this.wonLegs,
@@ -2572,16 +2507,22 @@ class _LegTurnsByGameGroup {
 
       final turns = leg.turns;
       final turnsCount = turns.length;
+      final scoringTurnsCount = leg.scoringTurns.length;
+      final checkoutTurnsCount = leg.checkoutTurns.length;
       final turnScoreTotal = turns.fold<int>(0, (sum, turn) => sum + turn.total);
 
       if (leg.isWon) {
         bucket.wonLegs++;
         bucket.wonTurnsTotal += turnsCount;
+        bucket.wonScoringTurnsTotal += scoringTurnsCount;
+        bucket.wonCheckoutTurnsTotal += checkoutTurnsCount;
         bucket.wonTurnScoreTotal += turnScoreTotal;
         bucket.wonTurnCount += turnsCount;
       } else if (leg.isLost) {
         bucket.lostLegs++;
         bucket.lostTurnsTotal += turnsCount;
+        bucket.lostScoringTurnsTotal += scoringTurnsCount;
+        bucket.lostCheckoutTurnsTotal += checkoutTurnsCount;
         bucket.lostTurnScoreTotal += turnScoreTotal;
         bucket.lostTurnCount += turnsCount;
       }
@@ -2601,8 +2542,15 @@ class _MutableLegTurnsByGameGroup {
   final int startingScore;
   int wonLegs = 0;
   int lostLegs = 0;
+
   int wonTurnsTotal = 0;
   int lostTurnsTotal = 0;
+
+  int wonScoringTurnsTotal = 0;
+  int wonCheckoutTurnsTotal = 0;
+  int lostScoringTurnsTotal = 0;
+  int lostCheckoutTurnsTotal = 0;
+
   int wonTurnScoreTotal = 0;
   int lostTurnScoreTotal = 0;
   int wonTurnCount = 0;
@@ -2615,6 +2563,10 @@ class _MutableLegTurnsByGameGroup {
       startingScore: startingScore,
       wonTurnsAverage: wonLegs > 0 ? wonTurnsTotal / wonLegs : 0,
       lostTurnsAverage: lostLegs > 0 ? lostTurnsTotal / lostLegs : 0,
+      wonScoringTurnsAverage: wonLegs > 0 ? wonScoringTurnsTotal / wonLegs : 0,
+      wonCheckoutTurnsAverage: wonLegs > 0 ? wonCheckoutTurnsTotal / wonLegs : 0,
+      lostScoringTurnsAverage: lostLegs > 0 ? lostScoringTurnsTotal / lostLegs : 0,
+      lostCheckoutTurnsAverage: lostLegs > 0 ? lostCheckoutTurnsTotal / lostLegs : 0,
       wonScoreAverage: wonTurnCount > 0 ? wonTurnScoreTotal / wonTurnCount : 0,
       lostScoreAverage: lostTurnCount > 0 ? lostTurnScoreTotal / lostTurnCount : 0,
       wonLegs: wonLegs,
@@ -2622,7 +2574,6 @@ class _MutableLegTurnsByGameGroup {
     );
   }
 }
-
 
 class _CheckoutOpportunityBySectorTable extends StatefulWidget {
   final List<_CachedMatchRecord> matches;
@@ -2647,28 +2598,31 @@ class _CheckoutOpportunityBySectorTableState extends State<_CheckoutOpportunityB
 
     if (rows.isEmpty) return const SizedBox.shrink();
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: widget.t.surface,
-        borderRadius: AppTokens.r16,
-        border: Border.all(color: widget.t.border),
+    return UnifiedStatsCard(
+      title: 'OPPORTUNITÀ CHECKOUT',
+      subtitle: 'Checkout reali: target incontrati, percentuale di hit e occasioni mancate',
+      footerIcon: Icons.ads_click_rounded,
+      footerText:
+      'Usa questa tabella per capire quali checkout incontri davvero, quali trasformi e quali ti costano più occasioni reali.',
+      info: const UnifiedStatsInfoData(
+        title: 'Come leggere la tabella',
+        text:
+        'Ogni riga mostra un checkout incontrato durante un leg.\n\n'
+            'Score → punteggio rimasto.\n\n'
+            'Target → settore incontrato per chiudere.\n\n'
+            'Opport. → quante volte hai avuto quella possibilità.\n\n'
+            '% → quante volte l’hai convertita.\n\n'
+            'Mancate → quante occasioni non sono diventate checkout.',
+
+        advice: [
+          'Ordina Opport. per trovare i checkout che incontri più spesso.',
+          'Ordina % per vedere i target che trasformi meglio o peggio.',
+          'Ordina Mancate per capire dove perdi più occasioni reali.',
+        ],
       ),
-      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _X01SummaryHeader(
-            title: 'OPPORTUNITÀ CHECKOUT',
-            subtitle: 'Conta anche le opportunità create durante il turno dopo ogni freccetta',
-            onInfo: () => _openInfo(context),
-            onReset: () {
-              setState(() {
-                _sortColumnIndex = 4;
-                _sortDescending = true;
-              });
-            },
-          ),
           DecoratedBox(
             decoration: BoxDecoration(
               color: widget.t.surfaceHigh,
@@ -2726,10 +2680,8 @@ class _CheckoutOpportunityBySectorTableState extends State<_CheckoutOpportunityB
       case 2:
         return a.opportunities.compareTo(b.opportunities);
       case 3:
-        return a.closed.compareTo(b.closed);
-      case 4:
         return a.closeRate.compareTo(b.closeRate);
-      case 5:
+      case 4:
         return a.missed.compareTo(b.missed);
       default:
         return a.closeRate.compareTo(b.closeRate);
@@ -2776,9 +2728,8 @@ class _CheckoutOpportunityBySectorTableState extends State<_CheckoutOpportunityB
           _buildHeaderCell('Score', 0),
           _buildHeaderCell('Target', 1),
           _buildHeaderCell('Opport.', 2),
-          _buildHeaderCell('Chiuse', 3),
-          _buildHeaderCell('%', 4),
-          _buildHeaderCell('Mancate', 5),
+          _buildHeaderCell('%', 3),
+          _buildHeaderCell('Mancate', 4),
         ],
       ),
     );
@@ -2828,7 +2779,6 @@ class _CheckoutOpportunityBySectorTableState extends State<_CheckoutOpportunityB
         _buildDataCell('${row.remainingScore}'),
         _buildDataCell(row.targetLabel, highlight: true),
         _buildDataCell('${row.opportunities}'),
-        _buildDataCell('${row.closed}'),
         _buildDataCell('${row.closeRate.toStringAsFixed(0)}%', highlight: true),
         _buildDataCell('${row.missed}'),
       ],
@@ -2855,72 +2805,8 @@ class _CheckoutOpportunityBySectorTableState extends State<_CheckoutOpportunityB
       ),
     );
   }
-
-  void _openInfo(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: widget.t.overlay,
-      barrierColor: Colors.black.withOpacity(0.55),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.info_rounded, color: widget.t.accent, size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Come leggere la tabella',
-                        style: TextStyle(
-                          color: widget.t.textPrimary,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Ogni riga rappresenta una combinazione punteggio residuo e target disponibile. Tocca le intestazioni per ordinare Score, Target, opportunità, chiusure, percentuale o mancate.',
-                  style: TextStyle(
-                    color: widget.t.textSecondary,
-                    fontSize: 13,
-                    height: 1.35,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text('CONSIGLI', style: widget.t.labelCaps(widget.t.textMuted)),
-                const SizedBox(height: 8),
-                _X01SummaryAdviceRow(
-                  t: widget.t,
-                  text: 'Ordina Opport. per trovare i checkout che incontri più spesso.',
-                ),
-                _X01SummaryAdviceRow(
-                  t: widget.t,
-                  text: 'Ordina % per vedere i target che trasformi meglio o peggio.',
-                ),
-                _X01SummaryAdviceRow(
-                  t: widget.t,
-                  text: 'Ordina Mancate per capire dove perdi più occasioni reali.',
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
+
 class _CheckoutOpportunityBySectorRow {
   final int remainingScore;
   final String targetLabel;
@@ -3114,25 +3000,65 @@ class X01SummaryTable extends StatelessWidget {
       metricsList.add(_calculateMetrics(score, grouped[score]!));
     }
 
-    final minWidth = (160 + scores.length * 92).clamp(520, 9000).toDouble();
+    final minWidth = (178 + scores.length * 92).clamp(540, 9000).toDouble();
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: t.surface,
-        borderRadius: AppTokens.r16,
-        border: Border.all(color: t.border),
+    return UnifiedStatsCard(
+      title: 'PARTITE X01',
+      subtitle: 'Statistiche generali.',
+      info: const UnifiedStatsInfoData(
+        title: 'Come interpretare la tabella?',
+        text:
+        'AVG partita → media reale dei punti su tutti i turni giocati.\n\n'
+
+            'Avg turni nei leg vinti → quanti turni ti servono mediamente per chiudere un leg vinto.\n\n'
+
+            'Avg turni nei leg persi → quanti turni giochi mediamente prima che l’avversario chiuda il leg.\n\n'
+
+            'Gap vinti/persi → confronta il tuo ritmo medio vincente con i turni disponibili quando perdi.\n\n'
+
+            'Tempo medio leg → durata media dei leg giocati.\n\n'
+
+            'Turni zona checkout vinti → quanti turni di scoring ti servono mediamente per entrare in checkout nei leg vinti.\n\n'
+
+            'Turni zona checkout persi → quanti turni impieghi per arrivare in checkout nei leg persi in cui riesci ad entrarci.\n\n'
+
+            'Turni checkout vinti → quanti turni impieghi mediamente per chiudere una volta entrato in checkout.\n\n'
+
+            'Turni checkout persi → quanti turni resti mediamente in checkout prima di perdere il leg.\n\n'
+
+            'Punti rimasti nei leg persi → punteggio medio rimasto quando perdi il leg.\n\n'
+
+            '% leg persi → percentuale totale dei leg persi.\n\n',
+
+        advice: [
+          'Confronta sempre i dati vinti e persi: la differenza mostra dove il leg viene realmente perso.',
+
+          'Se nei leg persi impieghi molti più turni per arrivare in checkout, il problema principale è nella discesa e nello scoring iniziale.',
+
+          'Se arrivi in checkout con tempi simili sia nei vinti che nei persi, ma perdi molti più turni in checkout, il problema è soprattutto nella chiusura finale.',
+
+          'Checkout persi molto lunghi spesso indicano blocchi sui doppi, setup scomodi o difficoltà a chiudere sotto pressione.',
+
+          'Se sia la discesa che il checkout peggiorano nei leg persi, probabilmente il livello medio degli avversari è superiore oppure il tuo ritmo è ancora troppo instabile.',
+
+          'Gap vinti/persi positivo → gli avversari ti chiudono prima del tuo ritmo medio vincente. Probabilmente stai affrontando giocatori più rapidi o più forti.',
+
+          'Gap vinti/persi vicino allo 0 → i leg sono equilibrati: qui fanno la differenza dettagli come checkout, gestione pressione e settore preferito.',
+
+          'Gap vinti/persi negativo → hai abbastanza turni per vincere il leg, ma non riesci a convertirlo. Il problema è più nella chiusura che nel ritmo.',
+
+          'Confronta il tempo medio dei leg vinti e persi per capire se rendi meglio con ritmo veloce o con costruzione più lenta e controllata.',
+
+          'Quando trovi avversari con un ritmo molto diverso dal tuo, evita di cambiare completamente timing e routine di lancio.',
+
+          'Punti rimasti nei leg persi bassi → stai perdendo leg combattuti su settori piccoli.',
+
+          'Punti rimasti nei leg persi alti → spesso il leg viene perso ancora lontano dal checkout. Controlla la qualità dei turni.',
+        ],
       ),
-      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _X01SummaryHeader(
-            title: 'METRICHE X01',
-            subtitle: 'Tabella riepilogativa per punteggio iniziale',
-            onInfo: () => _openInfo(context, t),
-            onReset: () {},
-          ),
           DecoratedBox(
             decoration: BoxDecoration(
               color: t.surfaceHigh,
@@ -3150,43 +3076,79 @@ class X01SummaryTable extends StatelessWidget {
                   children: [
                     _buildHeaderRow(scores, t),
                     _buildMetricRow(
-                      'Media visit (vinti)',
+                      'Avg partite',
+                      metricsList.map((m) => m.avgMatchAverage.toStringAsFixed(1)).toList(),
+                      t,
+                    ),
+                    _buildMetricRow(
+                      'Avg turni nei leg vinti',
                       metricsList.map((m) => m.avgVisitsWhenWon.toStringAsFixed(1)).toList(),
                       t,
                     ),
                     _buildMetricRow(
-                      'Media visit (persi)',
+                      'Avg turni nei leg persi',
                       metricsList.map((m) => m.avgVisitsWhenLost.toStringAsFixed(1)).toList(),
                       t,
                     ),
                     _buildMetricRow(
-                      'Durata media partita',
-                      metricsList.map((m) => _formatDuration(m.avgLegDurationSeconds.toInt())).toList(),
+                      'Gap vinti/persi',
+                      metricsList
+                          .map(
+                            (m) => (m.avgVisitsWhenLost - m.avgVisitsWhenWon)
+                            .toStringAsFixed(1),
+                      )
+                          .toList(),
+                      t,
+                      highlightIf: (value) {
+                        final gap = double.tryParse(value) ?? 0;
+                        return gap >= 3;
+                      },
+                    ),
+                    _buildMetricRow(
+                      'Tempo medio leg vinti',
+                      metricsList.map((m) => _formatDuration(m.avgWonLegDurationSeconds.toInt())).toList(),
                       t,
                     ),
                     _buildMetricRow(
-                      'Media visit arrivo zona',
-                      metricsList.map((m) => m.avgVisitsToReachClose.toStringAsFixed(1)).toList(),
+                      'Tempo medio leg persi',
+                      metricsList.map((m) => _formatDuration(m.avgLostLegDurationSeconds.toInt())).toList(),
                       t,
                     ),
                     _buildMetricRow(
-                      'Media visit chiusura',
-                      metricsList.map((m) => m.avgVisitsToClose.toStringAsFixed(1)).toList(),
+                      'Turni zona checkout vinti',
+                      metricsList.map((m) => m.avgVisitsToReachCloseWhenWon.toStringAsFixed(1)).toList(),
                       t,
                     ),
                     _buildMetricRow(
-                      '% Leg persi',
+                      'Turni zona checkout persi',
+                      metricsList.map((m) => m.avgVisitsToReachCloseWhenLost.toStringAsFixed(1)).toList(),
+                      t,
+                    ),
+                    _buildMetricRow(
+                      'Turni x checkout',
+                      metricsList.map((m) => m.avgVisitsToCloseWhenWon.toStringAsFixed(1)).toList(),
+                      t,
+                    ),
+                    _buildMetricRow(
+                      'Turni checkout persi',
+                      metricsList.map((m) => m.avgVisitsToCloseWhenLost.toStringAsFixed(1)).toList(),
+                      t,
+                    ),
+
+                    _buildMetricRow(
+                      'Punti rimasti nei leg persi',
+                      metricsList
+                          .map((m) => m.avgRemainingScoreWhenLost.toStringAsFixed(0))
+                          .toList(),                      t,
+                    ),
+                    _buildMetricRow(
+                      '% leg persi',
                       metricsList.map((m) => '${m.percentLost.toStringAsFixed(0)}%').toList(),
                       t,
                       highlightIf: (value) {
                         final percent = double.tryParse(value.replaceAll('%', '')) ?? 0;
                         return percent > 50;
                       },
-                    ),
-                    _buildMetricRow(
-                      'Avg ultimo visit (persi)',
-                      metricsList.map((m) => m.avgLastVisitScore.toStringAsFixed(0)).toList(),
-                      t,
                     ),
                   ],
                 ),
@@ -3202,7 +3164,7 @@ class X01SummaryTable extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Tabella standardizzata: confronta le metriche tra le diverse modalità X01.',
+                    'Analizza come vinci e come perdi: velocità di gioco, arrivo in checkout, gestione finale del leg e qualità delle sconfitte.',
                     style: t.bodySmall(t.textMuted),
                   ),
                 ),
@@ -3211,71 +3173,6 @@ class X01SummaryTable extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  void _openInfo(BuildContext context, AppTokens t) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: t.overlay,
-      barrierColor: Colors.black.withOpacity(0.55),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.info_rounded, color: t.accent, size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Come leggere la tabella',
-                        style: TextStyle(
-                          color: t.textPrimary,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Ogni colonna rappresenta una modalità X01. Ogni riga misura una fase del leg: velocità nei leg vinti, rendimento nei leg persi, ingresso in zona checkout e fase di chiusura.',
-                  style: TextStyle(
-                    color: t.textSecondary,
-                    fontSize: 13,
-                    height: 1.35,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text('CONSIGLI', style: t.labelCaps(t.textMuted)),
-                const SizedBox(height: 8),
-                _X01SummaryAdviceRow(
-                  t: t,
-                  text: 'Confronta vinti e persi per capire se il problema è la discesa o la chiusura.',
-                ),
-                _X01SummaryAdviceRow(
-                  t: t,
-                  text: 'Se la media visit chiusura è alta, devi allenare più checkout reali.',
-                ),
-                _X01SummaryAdviceRow(
-                  t: t,
-                  text: 'Se l’ultimo visit nei leg persi è basso, stai lasciando punti al tavolo nei momenti decisivi.',
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 
@@ -3366,10 +3263,29 @@ class X01SummaryTable extends StatelessWidget {
   }
 
   String _formatDuration(int seconds) {
+    if (seconds <= 0) return '-';
     final minutes = seconds ~/ 60;
     final remainingSeconds = seconds % 60;
     if (minutes > 0) return '${minutes}m ${remainingSeconds}s';
     return '${seconds}s';
+  }
+
+  int _legDurationSeconds(X01LegSlice leg) {
+    if (leg.endTime != null) {
+      final seconds = leg.endTime!.difference(leg.startTime).inSeconds;
+      if (seconds > 0) return seconds;
+    }
+
+    if (leg.turns.length < 2) return 0;
+
+    final sortedTurns = List<X01TurnSlice>.from(leg.turns)
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    final seconds = sortedTurns.last.timestamp
+        .difference(sortedTurns.first.timestamp)
+        .inSeconds;
+
+    return seconds > 0 ? seconds : 0;
   }
 
   _X01Metrics _calculateMetrics(int score, List<_CachedMatchRecord> matches) {
@@ -3377,15 +3293,23 @@ class X01SummaryTable extends StatelessWidget {
 
     if (playerId.isEmpty || matches.isEmpty) {
       return const _X01Metrics(
+        avgMatchAverage: 0,
         avgVisitsWhenWon: 0,
         avgVisitsWhenLost: 0,
-        avgLegDurationSeconds: 0,
-        avgVisitsToReachClose: 0,
-        avgVisitsToClose: 0,
+        avgWonLegDurationSeconds: 0,
+        avgLostLegDurationSeconds: 0,
+        avgVisitsToReachCloseWhenWon: 0,
+        avgVisitsToReachCloseWhenLost: 0,
+        avgVisitsToCloseWhenWon: 0,
+        avgVisitsToCloseWhenLost: 0,
         percentLost: 0,
-        avgLastVisitScore: 0,
+        avgRemainingScoreWhenLost: 0,
       );
     }
+
+    final totalMatchScore = matches.fold<int>(0, (sum, match) => sum + match.totalScore);
+    final totalMatchDarts = matches.fold<int>(0, (sum, match) => sum + match.totalDarts);
+    final avgMatchAverage = totalMatchDarts > 0 ? (totalMatchScore / totalMatchDarts) * 3 : 0.0;
 
     final dataset = const X01DartExtractor().extract(
       records: matches.map((m) => m.originalRecord).toList(),
@@ -3396,13 +3320,17 @@ class X01SummaryTable extends StatelessWidget {
 
     if (legs.isEmpty) {
       return const _X01Metrics(
+        avgMatchAverage: 0,
         avgVisitsWhenWon: 0,
         avgVisitsWhenLost: 0,
-        avgLegDurationSeconds: 0,
-        avgVisitsToReachClose: 0,
-        avgVisitsToClose: 0,
+        avgWonLegDurationSeconds: 0,
+        avgLostLegDurationSeconds: 0,
+        avgVisitsToReachCloseWhenWon: 0,
+        avgVisitsToReachCloseWhenLost: 0,
+        avgVisitsToCloseWhenWon: 0,
+        avgVisitsToCloseWhenLost: 0,
         percentLost: 0,
-        avgLastVisitScore: 0,
+        avgRemainingScoreWhenLost: 0,
       );
     }
 
@@ -3412,169 +3340,121 @@ class X01SummaryTable extends StatelessWidget {
 
     int totalVisitsWhenWon = 0;
     int totalVisitsWhenLost = 0;
-    int totalVisitsToReachClose = 0;
-    int totalVisitsToClose = 0;
-    int totalLastVisitScore = 0;
-    int lastVisitCount = 0;
-    int totalLegDurationSeconds = 0;
-    int legDurationCount = 0;
 
-    for (final leg in finishedLegs) {
-      if (leg.endTime != null) {
-        totalLegDurationSeconds += leg.endTime!.difference(leg.startTime).inSeconds;
-        legDurationCount++;
-      }
-    }
+    int totalVisitsToReachCloseWhenWon = 0;
+    int visitsToReachCloseWhenWonCount = 0;
+
+    int totalVisitsToReachCloseWhenLost = 0;
+    int visitsToReachCloseWhenLostCount = 0;
+
+    int totalVisitsToCloseWhenWon = 0;
+    int visitsToCloseWhenWonCount = 0;
+
+    int totalVisitsToCloseWhenLost = 0;
+    int visitsToCloseWhenLostCount = 0;
+
+    int totalRemainingScoreWhenLost = 0;
+    int remainingScoreCount = 0;
+
+    int totalWonLegDurationSeconds = 0;
+    int wonLegDurationCount = 0;
+
+    int totalLostLegDurationSeconds = 0;
+    int lostLegDurationCount = 0;
 
     for (final leg in wonLegs) {
       totalVisitsWhenWon += leg.turns.length;
-      totalVisitsToReachClose += leg.scoringTurns.length;
-      totalVisitsToClose += leg.checkoutTurns.length;
+
+      totalVisitsToReachCloseWhenWon += leg.scoringTurns.length;
+      visitsToReachCloseWhenWonCount++;
+
+      totalVisitsToCloseWhenWon += leg.checkoutTurns.length;
+      visitsToCloseWhenWonCount++;
+
+      final durationSeconds = _legDurationSeconds(leg);
+      if (durationSeconds > 0) {
+        totalWonLegDurationSeconds += durationSeconds;
+        wonLegDurationCount++;
+      }
     }
 
     for (final leg in lostLegs) {
       totalVisitsWhenLost += leg.turns.length;
 
+      if (leg.checkoutTurns.isNotEmpty) {
+        totalVisitsToReachCloseWhenLost += leg.scoringTurns.length;
+        visitsToReachCloseWhenLostCount++;
+
+        totalVisitsToCloseWhenLost += leg.checkoutTurns.length;
+        visitsToCloseWhenLostCount++;
+      }
+
       if (leg.turns.isNotEmpty) {
-        totalLastVisitScore += leg.turns.last.total;
-        lastVisitCount++;
+        final lastTurn = leg.turns.last;
+        final remainingScore = lastTurn.initialScore - lastTurn.total;
+
+        totalRemainingScoreWhenLost += remainingScore.clamp(0, leg.startingScore).toInt();
+        remainingScoreCount++;
+      }
+
+      final durationSeconds = _legDurationSeconds(leg);
+      if (durationSeconds > 0) {
+        totalLostLegDurationSeconds += durationSeconds;
+        lostLegDurationCount++;
       }
     }
 
     return _X01Metrics(
+      avgMatchAverage: avgMatchAverage,
       avgVisitsWhenWon: wonLegs.isNotEmpty ? totalVisitsWhenWon / wonLegs.length : 0,
       avgVisitsWhenLost: lostLegs.isNotEmpty ? totalVisitsWhenLost / lostLegs.length : 0,
-      avgLegDurationSeconds: legDurationCount > 0 ? totalLegDurationSeconds / legDurationCount : 0,
-      avgVisitsToReachClose: wonLegs.isNotEmpty ? totalVisitsToReachClose / wonLegs.length : 0,
-      avgVisitsToClose: wonLegs.isNotEmpty ? totalVisitsToClose / wonLegs.length : 0,
+      avgWonLegDurationSeconds: wonLegDurationCount > 0 ? totalWonLegDurationSeconds / wonLegDurationCount : 0,
+      avgLostLegDurationSeconds: lostLegDurationCount > 0 ? totalLostLegDurationSeconds / lostLegDurationCount : 0,
+      avgVisitsToReachCloseWhenWon: visitsToReachCloseWhenWonCount > 0
+          ? totalVisitsToReachCloseWhenWon / visitsToReachCloseWhenWonCount
+          : 0,
+      avgVisitsToReachCloseWhenLost: visitsToReachCloseWhenLostCount > 0
+          ? totalVisitsToReachCloseWhenLost / visitsToReachCloseWhenLostCount
+          : 0,
+      avgVisitsToCloseWhenWon:
+      visitsToCloseWhenWonCount > 0
+          ? totalVisitsToCloseWhenWon / visitsToCloseWhenWonCount
+          : 0,
+
+      avgVisitsToCloseWhenLost:
+      visitsToCloseWhenLostCount > 0
+          ? totalVisitsToCloseWhenLost / visitsToCloseWhenLostCount
+          : 0,
       percentLost: finishedLegs.isNotEmpty ? (lostLegs.length / finishedLegs.length) * 100 : 0,
-      avgLastVisitScore: lastVisitCount > 0 ? totalLastVisitScore / lastVisitCount : 0,
+      avgRemainingScoreWhenLost: remainingScoreCount > 0 ? totalRemainingScoreWhenLost / remainingScoreCount : 0,
     );
-  }
-}
-
-class _X01SummaryHeader extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final VoidCallback onInfo;
-  final VoidCallback onReset;
-
-  const _X01SummaryHeader({
-    required this.title,
-    required this.subtitle,
-    required this.onInfo,
-    required this.onReset,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppTokens.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 14, 10, 12),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: t.accent.withOpacity(0.16),
-              borderRadius: AppTokens.r12,
-              border: Border.all(color: t.accent.withOpacity(0.38)),
-            ),
-            child: Icon(Icons.show_chart_rounded, color: t.accent, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: t.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: t.textSecondary,
-                    fontSize: 12,
-                    height: 1.2,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            tooltip: 'Info',
-            onPressed: onInfo,
-            icon: Icon(Icons.info_outline_rounded, color: t.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _X01SummaryAdviceRow extends StatelessWidget {
-  final AppTokens t;
-  final String text;
-
-  const _X01SummaryAdviceRow({
-    required this.t,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.check_circle_rounded, color: t.green, size: 16),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                color: t.textPrimary,
-                fontSize: 12.5,
-                height: 1.3,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+  }}
 
 
 class _X01Metrics {
+  final double avgMatchAverage;
   final double avgVisitsWhenWon;
   final double avgVisitsWhenLost;
-  final double avgLegDurationSeconds;  // ← CAMBIATO NOME
-  final double avgVisitsToReachClose;
-  final double avgVisitsToClose;
+  final double avgWonLegDurationSeconds;
+  final double avgLostLegDurationSeconds;
+  final double avgVisitsToReachCloseWhenWon;
+  final double avgVisitsToReachCloseWhenLost;
+  final double avgVisitsToCloseWhenWon;
+  final double avgVisitsToCloseWhenLost;
   final double percentLost;
-  final double avgLastVisitScore;
+  final double avgRemainingScoreWhenLost;
 
   const _X01Metrics({
+    required this.avgMatchAverage,
     required this.avgVisitsWhenWon,
     required this.avgVisitsWhenLost,
-    required this.avgLegDurationSeconds,
-    required this.avgVisitsToReachClose,
-    required this.avgVisitsToClose,
+    required this.avgWonLegDurationSeconds,
+    required this.avgLostLegDurationSeconds,
+    required this.avgVisitsToReachCloseWhenWon,
+    required this.avgVisitsToReachCloseWhenLost,
+    required this.avgVisitsToCloseWhenWon,
+    required this.avgVisitsToCloseWhenLost,
     required this.percentLost,
-    required this.avgLastVisitScore,
+    required this.avgRemainingScoreWhenLost,
   });
 }

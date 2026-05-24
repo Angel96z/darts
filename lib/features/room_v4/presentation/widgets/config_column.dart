@@ -44,7 +44,7 @@ class ConfigColumn extends ConsumerWidget {
 }
 
 /// ─────────────────────────────────────────────
-/// SEZIONE CON INTESTAZIONE
+/// SEZIONE CON INTESTAZIONE (SENZA CARD ESTERNA)
 /// ─────────────────────────────────────────────
 
 class _ConfigSection extends StatelessWidget {
@@ -73,14 +73,14 @@ class _ConfigSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        child,
+        child, // ← SENZA card esterna, solo il contenuto
       ],
     );
   }
 }
 
 /// ─────────────────────────────────────────────
-/// CAROSELLO MODERNO
+/// CAROSELLO MODERNO CON CONTORNO
 /// <  valore  > con frecce grandi e touch friendly
 /// ─────────────────────────────────────────────
 
@@ -96,7 +96,7 @@ class _Carousel<T> extends StatelessWidget {
     required this.value,
     required this.label,
     required this.onChanged,
-    this.width = 130,
+    this.width = double.infinity,
   });
 
   @override
@@ -110,7 +110,8 @@ class _Carousel<T> extends StatelessWidget {
       width: width,
       decoration: BoxDecoration(
         color: t.surface,
-        borderRadius: AppTokens.r16,
+        borderRadius: AppTokens.r12,
+        border: Border.all(color: t.border),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -125,8 +126,8 @@ class _Carousel<T> extends StatelessWidget {
               label(value),
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
                 color: t.textPrimary,
               ),
             ),
@@ -172,8 +173,8 @@ class _CarouselButtonState extends State<_CarouselButton> {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
-        width: 48,
-        height: 48,
+        width: 44,
+        height: 44,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: _isPressed && widget.isActive
@@ -199,6 +200,7 @@ class _CarouselButtonState extends State<_CarouselButton> {
     );
   }
 }
+
 /// ─────────────────────────────────────────────
 /// TOGGLE MODERNO (checkbox elegante)
 /// Icona check + label
@@ -244,8 +246,8 @@ class _ModernToggleState extends State<_ModernToggle> {
               child: Center(
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
-                  width: 32,
-                  height: 32,
+                  width: 28,
+                  height: 28,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: widget.value ? t.accent : Colors.transparent,
@@ -255,7 +257,7 @@ class _ModernToggleState extends State<_ModernToggle> {
                     ),
                   ),
                   child: widget.value
-                      ? Icon(Icons.check, size: 20, color: t.accentFg)
+                      ? Icon(Icons.check, size: 16, color: t.accentFg)
                       : null,
                 ),
               ),
@@ -277,6 +279,7 @@ class _ModernToggleState extends State<_ModernToggle> {
     );
   }
 }
+
 /// ─────────────────────────────────────────────
 /// LABEL ROW (label + child, usata ovunque)
 /// ─────────────────────────────────────────────
@@ -344,7 +347,6 @@ class _DoubleCarouselInt extends StatelessWidget {
               value: value1,
               label: label1Builder,
               onChanged: onChanged1,
-              width: double.infinity,
             ),
           ),
         ),
@@ -357,7 +359,6 @@ class _DoubleCarouselInt extends StatelessWidget {
               value: value2,
               label: label2Builder,
               onChanged: onChanged2,
-              width: double.infinity,
             ),
           ),
         ),
@@ -408,7 +409,6 @@ class _DoubleCarouselX01 extends StatelessWidget {
               value: value1,
               label: label1Builder,
               onChanged: onChanged1,
-              width: double.infinity,
             ),
           ),
         ),
@@ -421,7 +421,6 @@ class _DoubleCarouselX01 extends StatelessWidget {
               value: value2,
               label: label2Builder,
               onChanged: onChanged2,
-              width: double.infinity,
             ),
           ),
         ),
@@ -468,7 +467,6 @@ class _DoubleCarouselOut extends StatelessWidget {
               value: value1,
               label: label1Builder,
               onChanged: onChanged1,
-              width: double.infinity,
             ),
           ),
         ),
@@ -547,7 +545,6 @@ class _MatchConfigCardState extends State<_MatchConfigCard> {
               setState(() => _mode = v);
               _emit();
             },
-            width: double.infinity,
           ),
         ),
         const SizedBox(height: 16),
@@ -600,27 +597,45 @@ class _GameConfigCardState extends State<_GameConfigCard> {
 
   static const _scoreOptions = [101, 301, 501, 701, 1001];
   static const _typeOptions = [GameType.x01, GameType.cricket];
-  static const _outModeOptions = ['Single', 'Double', 'Triple'];
+  static const _outModeOptions = ['Single Out', 'Master Out', 'Double Out'];
 
   @override
   void initState() {
     super.initState();
-    _type = widget.gameConfig.type;
-    _startingScore = widget.gameConfig.startingScore ?? 501;
-    _outMode = widget.gameConfig.tripleOut == true
-        ? 'Triple'
-        : widget.gameConfig.doubleOut == true
-        ? 'Double'
-        : 'Single';
-    _doubleIn = widget.gameConfig.doubleIn ?? false;
-    _cutThroat = widget.gameConfig.cutThroat ?? false;
+    _syncFromGameConfig(widget.gameConfig);
+  }
+
+  @override
+  void didUpdateWidget(covariant _GameConfigCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.gameConfig != widget.gameConfig) {
+      _syncFromGameConfig(widget.gameConfig);
+    }
+  }
+
+  void _syncFromGameConfig(GameConfig config) {
+    _type = config.type;
+    _startingScore = config.startingScore ?? 501;
+
+    // Mappa le configurazioni ai nuovi testi UI
+    if (config.tripleOut == true) {
+      _outMode = 'Master Out';  // Triple Out → Master Out
+    } else if (config.doubleOut == true) {
+      _outMode = 'Double Out';
+    } else {
+      _outMode = 'Single Out';
+    }
+
+    _doubleIn = config.doubleIn ?? false;
+    _cutThroat = config.cutThroat ?? false;
   }
 
   void _emitX01() => widget.onUpdate(
     GameConfig.x01(
       startingScore: _startingScore,
-      doubleOut: _outMode == 'Double',
-      tripleOut: _outMode == 'Triple',
+      doubleOut: _outMode == 'Double Out',      // ← modificato
+      tripleOut: _outMode == 'Master Out',      // ← modificato
       doubleIn: _doubleIn,
     ),
   );
@@ -681,7 +696,6 @@ class _GameConfigCardState extends State<_GameConfigCard> {
                         }
                       });
                     },
-                    width: double.infinity,
                   ),
                 ),
               ),
@@ -710,7 +724,7 @@ class _GameConfigCardState extends State<_GameConfigCard> {
         // X01: OUT (CAROUSEL) e Double In (TOGGLE) affiancati
         if (_type == GameType.x01)
           _DoubleCarouselOut(
-            label1: 'OUT',
+            label1: 'CHECKOUT',
             options1: _outModeOptions,
             value1: _outMode,
             label1Builder: (v) => v,

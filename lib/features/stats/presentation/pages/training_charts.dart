@@ -11,6 +11,8 @@ import 'package:fl_chart/fl_chart.dart';
 
 import '../widgets/training_sector_hits.dart';
 import '../widgets/unified_stats_chart.dart';
+import 'package:intl/intl.dart';
+
 
 class TrainingCharts {
   /// Funzione: descrive in modo semplice questo blocco di logica.
@@ -214,22 +216,22 @@ class TrainingCharts {
           : 'Trend hit per turno',
       subtitle: singleDart
           ? 'Mostra se la freccia selezionata colpisce il target nel tempo.'
-          : 'Mostra quante hit fai in ogni turno da 3 freccette.',
+          : 'Mostra quante volte hai preso il target nel turno.',
       points: points,
       mode: UnifiedStatsChartMode.lineAndPoints,
       xAxisLabel: singleDart ? 'tiro' : 'turno',
       yAxisLabel: 'hit',
       minYValue: 0,
-      maxYValue: singleDart ? 1 : 3,
+      maxYValue: singleDart ? 1 : 4,
       infoTitle: singleDart
           ? 'Hit nel tempo'
           : 'Trend hit per turno',
       infoText: singleDart
           ? 'Ogni punto vale 0 o 1: 1 significa target colpito, 0 significa target mancato.'
-          : 'Ogni punto rappresenta un turno. Il valore indica quante freccette hanno colpito il target su 3.',
+          : 'Ogni punto rappresenta un turno. Il valore indica quante freccette hanno colpito il target.',
       advice: const [
-        'Linea stabile in alto = buon controllo.',
-        'Cali frequenti = perdita di routine o ritmo.',
+        'Hit frequenti indicano buona qualità del tiro e routine stabile.',
+        'Hit molto distanti o assenti indicano problemi di precisione. Lavora sulla tecnica, calma e concentrazione.',
         'Usa il dettaglio del punto per leggere hit e distanza media.',
       ],
     );
@@ -356,11 +358,7 @@ class TrainingCharts {
           x: i + 1.0,
           y: sessions[i].performance,
           label: 'Sessione ${i + 1}',
-          detail:
-          'Sessione ${i + 1} • Performance ${sessions[i].performance.toStringAsFixed(0)}% • '
-              'Focus ${sessions[i].focus ?? '-'} • Stress ${sessions[i].stress ?? '-'} • '
-              'Energia ${sessions[i].energia ?? '-'} • Fiducia ${sessions[i].fiducia ?? '-'} • '
-              'Distrazioni ${sessions[i].distrazioni ?? '-'}',
+          detail: _buildSessionDetail(sessions[i]),  // ← USA LA NUOVA FUNZIONE
         ),
     ];
 
@@ -490,12 +488,45 @@ class TrainingCharts {
       ],
     );
   }
+
+  static String _buildSessionDetail(SessionPerformancePoint session) {
+    final buffer = StringBuffer();
+
+    // Formatta la data
+    final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+    final formattedDate = dateFormat.format(session.sessionDate);
+
+    buffer.write('📅 $formattedDate\n');
+    buffer.write('📊 Performance: ${session.performance.toStringAsFixed(0)}%');
+
+    final metrics = <String>[];
+    if (session.focus != null) metrics.add('🎯 Focus: ${session.focus}/10');
+    if (session.stress != null) metrics.add('😰 Stress: ${session.stress}/10');
+    if (session.energia != null) metrics.add('⚡ Energia: ${session.energia}/10');
+    if (session.fiducia != null) metrics.add('💪 Fiducia: ${session.fiducia}/10');
+    if (session.distrazioni != null) metrics.add('📱 Distrazioni: ${session.distrazioni}/10');
+
+    if (metrics.isNotEmpty) {
+      buffer.write('\n${metrics.join(' • ')}');
+    }
+
+    // AGGIUNGI IL COMMENTO SE PRESENTE
+    if (session.commento != null && session.commento!.trim().isNotEmpty) {
+      buffer.write('\n\n📝 "${session.commento}"');
+    }
+
+    return buffer.toString();
+  }
+
   /// Funzione: descrive in modo semplice questo blocco di logica.
-  static Widget directionalBias(List<DartThrow> throws) {
+  /// Analisi direzionale relativa al target selezionato, non al bull.
+  static Widget directionalBias(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
 
     final valid = throws.where((t) => !t.isPass).toList();
     if (valid.isEmpty) return _empty();
+
+    final targetCenter = _targetCenterFor(target);
 
     final meanX = valid.map((t) => t.position.dx).reduce((a, b) => a + b) / valid.length;
     final meanY = valid.map((t) => t.position.dy).reduce((a, b) => a + b) / valid.length;
@@ -512,8 +543,9 @@ class TrainingCharts {
     final stdY = sqrt(varY / valid.length);
 
     const boardMm = 451.0;
-    final meanXmm = (meanX - 0.5) * boardMm;
-    final meanYmm = (meanY - 0.5) * boardMm;
+
+    final meanXmm = (meanX - targetCenter.dx) * boardMm;
+    final meanYmm = (meanY - targetCenter.dy) * boardMm;
     final stdXmm = stdX * boardMm;
     final stdYmm = stdY * boardMm;
 
@@ -523,14 +555,15 @@ class TrainingCharts {
     return _UnifiedTrainingMetricCard(
       icon: Icons.open_with_rounded,
       title: 'Bias direzionale',
-      subtitle: 'Deriva media e dispersione del gruppo frecce.',
+      subtitle: 'Deriva media rispetto al target $target e dispersione del gruppo frecce.',
       infoTitle: 'Bias direzionale',
       infoText:
-      'Mostra dove tende a spostarsi il gruppo frecce. Lo spostamento indica la direzione media; la dispersione indica quanto il gruppo è largo.',
+      'Mostra dove tende a spostarsi il gruppo frecce rispetto al target selezionato, non rispetto al bull. '
+          'Lo spostamento indica la direzione media dell’errore; la dispersione indica quanto il gruppo è largo.',
       advice: const [
-        'Errore sempre dallo stesso lato = problema strutturale.',
-        'Dispersione alta = gesto poco ripetibile.',
-        'Correggi setup, mira iniziale e allineamento del corpo.',
+        'Bias alto ma dispersione bassa = gesto ripetibile, ma fuori asse rispetto al target.',
+        'Bias basso ma dispersione alta = mira centrata mediamente, ma gesto poco stabile.',
+        'Correggi in modo leggero nella direzione opposta al bias, senza stravolgere il gesto.',
       ],
       child: _MetricBars(
         rows: [
@@ -548,6 +581,52 @@ class TrainingCharts {
           _MetricBarData('Dispersione Y', stdYmm, '${stdYmm.toStringAsFixed(0)} mm'),
         ],
       ),
+    );
+  }
+
+  static Offset _targetCenterFor(String target) {
+    final normalized = target.trim().toUpperCase();
+
+    if (normalized == 'BULL' || normalized == '25' || normalized.endsWith('25')) {
+      return const Offset(0.5, 0.5);
+    }
+
+    const sectors = [
+      20, 1, 18, 4, 13,
+      6, 10, 15, 2, 17,
+      3, 19, 7, 16, 8,
+      11, 14, 9, 12, 5,
+    ];
+
+    const sectorAngle = 2 * pi / 20;
+    const startOffset = -pi / 2 - sectorAngle / 2;
+
+    final ring = normalized[0];
+    final value = int.tryParse(normalized.substring(1));
+    if (value == null) return const Offset(0.5, 0.5);
+
+    final index = sectors.indexOf(value);
+    if (index == -1) return const Offset(0.5, 0.5);
+
+    final angle = startOffset + index * sectorAngle + sectorAngle / 2;
+
+    const bullOuter = 15.9 / 225.5;
+    const tripleInner = 99 / 225.5;
+    const tripleOuter = 107 / 225.5;
+    const doubleInner = 162 / 225.5;
+    const doubleOuter = 170 / 225.5;
+
+    final radius = switch (ring) {
+      'T' => (tripleInner + tripleOuter) / 2,
+      'D' => (doubleInner + doubleOuter) / 2,
+      _ => (bullOuter + tripleInner) / 2,
+    };
+
+    final normalizedRadius = radius * 0.5;
+
+    return Offset(
+      0.5 + cos(angle) * normalizedRadius,
+      0.5 + sin(angle) * normalizedRadius,
     );
   }
 
@@ -1354,14 +1433,19 @@ class TrainingCharts {
     return _UnifiedTrainingMetricCard(
       icon: Icons.straighten_rounded,
       title: 'Analisi distanza dal target',
-      subtitle: 'Distanza media totale e per freccia verso $target.',
+      subtitle: 'Distanza media totale, e per freccia, verso il $target.',
       infoTitle: 'Analisi distanza dal target',
       infoText:
-      'Mostra la distanza media dal target $target. Valori più bassi sono migliori: meno millimetri significa più precisione.',
+      'Mostra la distanza media dal target $target. Valori più bassi sono migliori: più possibilità di hit.',
       advice: const [
-        'Guarda quale freccia ha più millimetri: è la più debole.',
-        'Una barra lunga indica errore maggiore, non prestazione migliore.',
-        'Inserisci un micro-reset prima della freccia più debole.',
+        'Una distanza media più bassa indica una mira più efficiente e ripetibile nel tempo.',
+        'Una barra più lunga rappresenta maggiore errore dal target, non una prestazione migliore.',
+        'Se la Dart 1 è la più distante, il problema è spesso setup iniziale: stance, allineamento visivo o ingresso nel ritmo.',
+        'Se la Dart 2 peggiora, il rilascio della prima sta alterando equilibrio, timing o posizione del braccio.',
+        'Se la Dart 3 è la meno precisa, il calo è spesso mentale o posturale: perdita di focus, accelerazione o chiusura anticipata del movimento.',
+        'Una differenza minima tra Dart 1, 2 e 3 indica buona stabilità tecnica e controllo del ritmo.',
+        'Inserire un micro-reset respiratorio tra le freccette aiuta a mantenere consistenza nelle serie lunghe.',
+        'Se sulla Dart 3 ti blocchi perché la senti come “ultima freccia”, cambia conteggio mentale: usa 0-1-2 invece di 1-2-3. Riduci il peso psicologico dell’ultimo tiro e mantieni lo stesso ritmo delle prime due.',
       ],
       child: _MetricBars(
         rows: [
@@ -1584,9 +1668,39 @@ class TrainingCharts {
     );
   }
 
-  /// Funzione: descrive in modo semplice questo blocco di logica.
-  static Widget _empty() {
-    return const Center(child: Text('Nessun dato'));
+  static Widget _empty({
+    String title = 'Nessun dato',
+    String subtitle = 'Non ci sono dati per il filtro selezionato.',
+    String infoTitle = 'Nessun dato disponibile',
+    String infoText = 'Questa sezione non può essere calcolata perché il filtro corrente non contiene dati sufficienti.',
+    List<String> advice = const [
+      'Cambia periodo, sessione o target.',
+      'Rimuovi eventuali filtri sulle singole freccette.',
+      'Registra nuovi tiri per popolare questa statistica.',
+    ],
+  }) {
+    return UnifiedStatsCard(
+      title: title,
+      subtitle: subtitle,
+      info: UnifiedStatsInfoData(
+        title: infoTitle,
+        text: infoText,
+        advice: advice,
+      ),
+      child: Builder(
+        builder: (context) {
+          final t = AppTokens.of(context);
+
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+            child: Text(
+              'Nessun dato disponibile.',
+              style: t.bodySmall(t.textMuted),
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -2279,123 +2393,21 @@ class _UnifiedTrainingMetricCard extends StatelessWidget {
     required this.child,
   });
 
-  void _openInfo(BuildContext context) {
-    final t = AppTokens.of(context);
-
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: t.overlay,
-      barrierColor: Colors.black.withOpacity(0.55),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 22),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.info_rounded, color: t.accent, size: 22),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      infoTitle,
-                      style: TextStyle(
-                        color: t.textPrimary,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(infoText, style: t.bodySmall(t.textSecondary)),
-              const SizedBox(height: 16),
-              Text('CONSIGLI', style: t.labelCaps(t.textMuted)),
-              const SizedBox(height: 8),
-              for (final item in advice)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.check_circle_rounded, color: t.green, size: 16),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(item, style: t.bodySmall(t.textPrimary)),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final t = AppTokens.of(context);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: t.surface,
-        borderRadius: AppTokens.r16,
-        border: Border.all(color: t.border),
+    return UnifiedStatsCard(
+      title: title,
+      subtitle: subtitle,
+      info: UnifiedStatsInfoData(
+        title: infoTitle,
+        text: infoText,
+        advice: advice,
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 14, 10, 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: t.accent.withOpacity(0.16),
-                    borderRadius: AppTokens.r12,
-                    border: Border.all(color: t.accent.withOpacity(0.38)),
-                  ),
-                  child: Icon(icon, color: t.accent, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title, style: TextStyle(color: t.textPrimary, fontSize: 16, fontWeight: FontWeight.w900)),
-                      const SizedBox(height: 3),
-                      Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: t.bodySmall(t.textSecondary)),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Info',
-                  onPressed: () => _openInfo(context),
-                  icon: Icon(Icons.info_outline_rounded, color: t.textSecondary),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
-            child: child,
-          ),
-        ],
-      ),
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+      child: child,
     );
   }
 }
-
 class _MetricBarData {
   final String label;
   final double value;

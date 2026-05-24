@@ -37,7 +37,7 @@ class MatchPage extends ConsumerWidget {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => const MatchResultPage(), // o la tua pagina risultato
+              builder: (_) => const MatchResultPage(),
             ),
           );
         }
@@ -75,22 +75,93 @@ class MatchPage extends ConsumerWidget {
     final isTeamMode = teamSize > 1;
     final cards = isTeamMode ? _buildTeamCards(gameState) : _buildPlayerCards(gameState);
     final currentLegKey = builderState?.currentLegNumber ?? 1;
-// Calcola l'altezza per Cricket fuori dal builder
     final cricketStripHeight = gameState.isCricket
         ? (gameState.players.length * 90.0).clamp(180.0, 400.0)
         : null;
-    // 🔥 DIVIDO IN DUE BLOCCHI CON Column + Expanded
-    // 🔥 DIVIDO IN DUE BLOCCHI CON Column + Expanded
+
+    final isDesktop = MediaQuery.of(context).size.width > 900;
+
+    if (isDesktop) {
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 864), // Larghezza massima totale
+          child: Row(
+            children: [
+              // Colonna SINISTRA - con larghezza massima
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400), // Massimo colonna sinistra
+                child: Expanded(
+                  flex: 6,
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 8),
+                      CurrentTurnCard(key: ValueKey(currentLegKey), gameState: gameState),
+                      SizedBox(
+                        height: 20,
+                        child: isWaiting
+                            ? const TurnPassTimer()
+                            : const SizedBox.shrink(),
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: _PlayerStripDesktop(
+                          cards: cards,
+                          t: t,
+                          isTeamMode: isTeamMode,
+                          activeIndex: isTeamMode
+                              ? _activeTeamIndex(gameState)
+                              : gameState.orderedPlayerIds.indexOf(gameState.currentPlayerId),
+                          gameState: gameState,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const MatchConfigBar(),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
+                ),
+              ),
+              // Colonna DESTRA - con larghezza massima
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 500), // Massimo colonna destra
+                child: SizedBox(
+                  width: 380,  // Larghezza base
+                  child: Column(
+                    children: [
+                      if (gameState.isCricket) ...[
+                        const SizedBox(height: 16),
+                        CricketBoard(gameState: gameState),
+                        const SizedBox(height: 16),
+                      ],
+                      Expanded(
+                        child: Center(
+                          child: SizedBox(
+                            width: 340,
+                            height: 440,
+                            child: gameState.isCricket
+                                ? const CricketKeyboard()
+                                : const DartKeyboard(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    // ──────────────────────────────────────────────
+    // LAYOUT MOBILE (originale invariato)
+    // ──────────────────────────────────────────────
     return Column(
       children: [
-        // ──────────────────────────────────────────────
-        // BLOCCO 1 - IN ALTO (altezza fissa)
-        // ──────────────────────────────────────────────
         Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             CurrentTurnCard(key: ValueKey(currentLegKey), gameState: gameState),
-            // 🔥 SPAZIO FISSO DEDICATO AL TIMER (40px) - sempre presente, mai animato
             SizedBox(
               height: 20,
               child: isWaiting
@@ -99,15 +170,10 @@ class MatchPage extends ConsumerWidget {
             ),
           ],
         ),
-
-// ──────────────────────────────────────────────
-// BLOCCO 2 - SPINTO IN BASSO
-// ──────────────────────────────────────────────
         Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              // Player strip con altezza massima controllata
               Flexible(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
@@ -121,12 +187,11 @@ class MatchPage extends ConsumerWidget {
                         ? _activeTeamIndex(gameState)
                         : gameState.orderedPlayerIds.indexOf(gameState.currentPlayerId),
                     gameState: gameState,
-                    cricketStripHeight: cricketStripHeight,  // ← NUOVO PARAMETRO
+                    cricketStripHeight: cricketStripHeight,
                   ),
                 ),
               ),
               const SizedBox(height: 8),
-              // 🔥 SCELTA TASTIERA in base al tipo di gioco
               gameState.isCricket
                   ? const CricketKeyboard()
                   : const DartKeyboard(),
@@ -227,7 +292,7 @@ class _Pill extends StatelessWidget {
   }
 }
 
-// ── Player cards strip ────────────────────────
+// ── Player cards strip (mobile) ────────────────────────
 
 class _PlayerStrip extends StatefulWidget {
   final List<Widget> cards;
@@ -235,7 +300,7 @@ class _PlayerStrip extends StatefulWidget {
   final int activeIndex;
   final bool isTeamMode;
   final GameState gameState;
-  final double? cricketStripHeight;  // ← NUOVO PARAMETRO
+  final double? cricketStripHeight;
 
   const _PlayerStrip({
     required this.cards,
@@ -243,7 +308,7 @@ class _PlayerStrip extends StatefulWidget {
     required this.activeIndex,
     required this.isTeamMode,
     required this.gameState,
-    this.cricketStripHeight,  // ← NUOVO PARAMETRO
+    this.cricketStripHeight,
   });
 
   @override
@@ -254,15 +319,12 @@ class _PlayerStripState extends State<_PlayerStrip> {
   final ScrollController _horizontalController = ScrollController();
   final ScrollController _verticalController = ScrollController();
   int? _lastActiveIndex;
-
-  // 🔥 Lista di chiavi per misurare l'altezza di ogni card
   final List<GlobalKey> _cardKeys = [];
 
   @override
   void initState() {
     super.initState();
     _lastActiveIndex = widget.activeIndex;
-    // Inizializza le chiavi per ogni card
     for (int i = 0; i < widget.cards.length; i++) {
       _cardKeys.add(GlobalKey());
     }
@@ -276,7 +338,6 @@ class _PlayerStripState extends State<_PlayerStrip> {
       _lastActiveIndex = widget.activeIndex;
       _scrollToActive();
     }
-    // Se il numero di card cambia, aggiorna le chiavi
     if (oldWidget.cards.length != widget.cards.length) {
       _cardKeys.clear();
       for (int i = 0; i < widget.cards.length; i++) {
@@ -287,12 +348,11 @@ class _PlayerStripState extends State<_PlayerStrip> {
 
   double _getCardHeight(int index) {
     final renderBox = _cardKeys[index].currentContext?.findRenderObject() as RenderBox?;
-    return renderBox?.size.height ?? 85.0; // fallback a 85 se non disponibile
+    return renderBox?.size.height ?? 85.0;
   }
 
   void _scrollToActive() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // 🔥 CRICKET (sia single che team mode): scroll verticale
       if (widget.gameState.isCricket) {
         if (!_verticalController.hasClients || widget.cards.isEmpty) return;
 
@@ -315,7 +375,6 @@ class _PlayerStripState extends State<_PlayerStrip> {
         return;
       }
 
-      // 🔥 X01: scroll orizzontale
       if (!_horizontalController.hasClients || widget.cards.isEmpty) return;
 
       final viewportWidth = _horizontalController.position.viewportDimension;
@@ -343,17 +402,15 @@ class _PlayerStripState extends State<_PlayerStrip> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // 🔥 CRICKET (sia single che team mode): colonna verticale scrollabile
         if (widget.gameState.isCricket) {
           final screenWidth = MediaQuery.of(context).size.width;
           final cardWidth = (screenWidth * 0.95);
-          // 🔥 USA L'ALTEZZA PASSATA DAL PADRE
           final maxHeight = widget.cricketStripHeight ?? 360.0;
 
           return Center(
             child: SizedBox(
               width: cardWidth,
-              height: maxHeight,  // ← ORA USA L'ALTEZZA CORRETTA
+              height: maxHeight,
               child: SingleChildScrollView(
                 controller: _verticalController,
                 physics: const BouncingScrollPhysics(),
@@ -371,7 +428,6 @@ class _PlayerStripState extends State<_PlayerStrip> {
           );
         }
 
-        // 🔥 X01 (invariato)
         final divisor = widget.isTeamMode ? 2.3 : 2.8;
         final cardWidth = constraints.maxWidth / divisor;
 
@@ -393,10 +449,120 @@ class _PlayerStripState extends State<_PlayerStrip> {
     );
   }
 
-
   @override
   void dispose() {
     _horizontalController.dispose();
+    _verticalController.dispose();
+    super.dispose();
+  }
+}
+
+// ── Player cards strip DESKTOP ────────────────────────
+
+class _PlayerStripDesktop extends StatefulWidget {
+  final List<Widget> cards;
+  final AppTokens t;
+  final int activeIndex;
+  final bool isTeamMode;
+  final GameState gameState;
+
+  const _PlayerStripDesktop({
+    required this.cards,
+    required this.t,
+    required this.activeIndex,
+    required this.isTeamMode,
+    required this.gameState,
+  });
+
+  @override
+  State<_PlayerStripDesktop> createState() => _PlayerStripDesktopState();
+}
+
+class _PlayerStripDesktopState extends State<_PlayerStripDesktop> {
+  final ScrollController _verticalController = ScrollController();
+  int? _lastActiveIndex;
+  final List<GlobalKey> _cardKeys = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _lastActiveIndex = widget.activeIndex;
+    for (int i = 0; i < widget.cards.length; i++) {
+      _cardKeys.add(GlobalKey());
+    }
+    _scrollToActive();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PlayerStripDesktop oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_lastActiveIndex != widget.activeIndex) {
+      _lastActiveIndex = widget.activeIndex;
+      _scrollToActive();
+    }
+    if (oldWidget.cards.length != widget.cards.length) {
+      _cardKeys.clear();
+      for (int i = 0; i < widget.cards.length; i++) {
+        _cardKeys.add(GlobalKey());
+      }
+    }
+  }
+
+  double _getCardHeight(int index) {
+    final renderBox = _cardKeys[index].currentContext?.findRenderObject() as RenderBox?;
+    return renderBox?.size.height ?? 85.0;
+  }
+
+  void _scrollToActive() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_verticalController.hasClients || widget.cards.isEmpty) return;
+
+      final viewportHeight = _verticalController.position.viewportDimension;
+      double offset = 0;
+      for (int i = 0; i < widget.activeIndex; i++) {
+        offset += _getCardHeight(i);
+      }
+      final currentCardHeight = _getCardHeight(widget.activeIndex);
+      final targetOffset = offset - (viewportHeight / 2) + (currentCardHeight / 2);
+      final clampedOffset = targetOffset.clamp(0.0, _verticalController.position.maxScrollExtent);
+
+      _verticalController.animateTo(
+        clampedOffset,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: widget.t.surface.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: SingleChildScrollView(
+        controller: _verticalController,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(widget.cards.length, (index) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: index == widget.cards.length - 1 ? 0 : 8),
+              child: Container(
+                key: _cardKeys[index],
+                child: widget.cards[index],
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
     _verticalController.dispose();
     super.dispose();
   }

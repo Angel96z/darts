@@ -114,6 +114,9 @@ class BotController {
     });
   }
 
+// lib/features/room_v4/bot/bot_controller.dart
+// Modifica il metodo _getStrategy:
+
   BotStrategy _getStrategy(BotLevel level) {
     switch (level) {
       case BotLevel.beginner:
@@ -123,12 +126,13 @@ class BotController {
       case BotLevel.intermediate:
         return HardBotStrategy(level);
       case BotLevel.advanced:
-        return HardBotStrategy(level);
+        return ExpertBotStrategy(level);
       case BotLevel.expert:
         return ExpertBotStrategy(level);
     }
   }
 
+// Modifica il metodo _extractBotLevel per supportare i nuovi nomi
   BotLevel? _extractBotLevel(String playerId) {
     if (!playerId.startsWith('bot_')) return null;
 
@@ -138,7 +142,7 @@ class BotController {
     if (playerId.contains('advanced')) return BotLevel.advanced;
     if (playerId.contains('expert')) return BotLevel.expert;
 
-    return BotLevel.intermediate; // default
+    return BotLevel.intermediate;
   }
 
   void dispose() {

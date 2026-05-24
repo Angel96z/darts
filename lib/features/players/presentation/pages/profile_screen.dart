@@ -513,25 +513,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
-  // 🔥 NUOVO WIDGET: Avatar tile
-  Widget _buildAvatarTile(AppTokens t, UserProfile? profile) {
-    return ListTile(
-      leading: CircleAvatar(
-        radius: 24,
-        backgroundColor: t.surfaceHigh,
-        backgroundImage: profile?.avatarId != null ? AssetImage(profile!.avatarAssetPath) : null,
-        child: profile?.avatarId == null ? Icon(Icons.person, color: t.textMuted) : null,
-      ),
-      title: Text('Avatar', style: TextStyle(color: t.textPrimary)),
-      subtitle: Text('Cambia la tua immagine profilo', style: TextStyle(color: t.textSecondary, fontSize: 12)),
-      trailing: Icon(Icons.chevron_right, color: t.accent),
-      onTap: () {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const AvatarSelectorScreen()));
-      },
-    );
-  }
 
-  @override
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
@@ -653,45 +635,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             const SizedBox(height: 12),
-            // Avatar
-            GestureDetector(
-              onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const AvatarSelectorScreen()));
-              },
-              child: Center(
-                child: CircleAvatar(
-                  radius: 48,
-                  backgroundColor: t.accent.withOpacity(0.1),
-                  backgroundImage: profile?.avatarId != null ? AssetImage(profile!.avatarAssetPath) : null,
-                  child: profile?.avatarId == null
-                      ? Text(profile?.initials ?? '?', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: t.accent))
-                      : null,
+            Center(
+              child: CircleAvatar(
+                radius: 48,
+                backgroundColor: t.accent.withOpacity(0.1),
+                child: Text(
+                  profile?.initials ?? '?',
+                  style: TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    color: t.accent,
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 8),
-            Center(
-              child: TextButton(
-                onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AvatarSelectorScreen()));
-                },
-                child: Text('Cambia avatar', style: TextStyle(color: t.accent, fontSize: 12)),
-              ),
-            ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 12),
             Center(child: Text(profile?.displayName ?? email.split('@').first, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: t.textPrimary))),
             const SizedBox(height: 8),
             Center(child: Text(email, style: TextStyle(fontSize: 14, color: t.textSecondary))),
             const SizedBox(height: 24),
 
-            // Card dati personali
             Card(
               color: t.surface,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
               child: Column(
                 children: [
-                  _buildAvatarTile(t, profile),
-                  Divider(color: t.divider, height: 1, indent: 56),
                   _buildEditableTile(
                     t: t,
                     icon: Icons.person_outline,
@@ -736,7 +704,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             const SizedBox(height: 24),
 
-            // Statistiche carriera
             if (profile?.stats != null)
               Card(
                 color: t.surface,
@@ -781,7 +748,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             const SizedBox(height: 24),
 
-            // Cambio password
             Card(
               color: t.surface,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
@@ -797,7 +763,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             const SizedBox(height: 8),
 
-            // Reset dati giochi
             Card(
               color: t.surface,
               shape: RoundedRectangleBorder(
@@ -815,7 +780,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             const SizedBox(height: 8),
 
-            // Reset password via email
             Card(
               color: t.surface,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
@@ -843,7 +807,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             const SizedBox(height: 24),
 
-            // Elimina account
             Card(
               color: t.surface,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.red.withOpacity(0.3))),
@@ -871,31 +834,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Avatar
         Center(
-          child: Column(
-            children: [
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AvatarSelectorScreen()));
-                },
-                child: CircleAvatar(
-                  radius: 56,
-                  backgroundColor: t.accent.withOpacity(0.1),
-                  backgroundImage: profile?.avatarId != null ? AssetImage(profile!.avatarAssetPath) : null,
-                  child: profile?.avatarId == null
-                      ? Text(profile?.initials ?? '?', style: TextStyle(fontSize: 42, fontWeight: FontWeight.bold, color: t.accent))
-                      : null,
-                ),
+          child: CircleAvatar(
+            radius: 56,
+            backgroundColor: t.accent.withOpacity(0.1),
+            child: Text(
+              profile?.initials ?? '?',
+              style: TextStyle(
+                fontSize: 42,
+                fontWeight: FontWeight.bold,
+                color: t.accent,
               ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AvatarSelectorScreen()));
-                },
-                child: Text('Cambia avatar', style: TextStyle(color: t.accent, fontSize: 13)),
-              ),
-            ],
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -910,14 +860,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
         const SizedBox(height: 24),
 
-        // Card dati personali
         Card(
           color: t.surface,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
           child: Column(
             children: [
-              _buildAvatarTile(t, profile),
-              Divider(color: t.divider, height: 1, indent: 56),
               _buildEditableTile(
                 t: t,
                 icon: Icons.person_outline,
@@ -962,7 +909,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
         const SizedBox(height: 16),
 
-        // Cambio password
         Card(
           color: t.surface,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
@@ -978,7 +924,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
         const SizedBox(height: 8),
 
-        // Reset dati giochi
         Card(
           color: t.surface,
           shape: RoundedRectangleBorder(
@@ -996,7 +941,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
         const SizedBox(height: 8),
 
-        // Reset password via email
         Card(
           color: t.surface,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
@@ -1024,7 +968,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
         const SizedBox(height: 16),
 
-        // Elimina account
         Card(
           color: t.surface,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.red.withOpacity(0.3))),

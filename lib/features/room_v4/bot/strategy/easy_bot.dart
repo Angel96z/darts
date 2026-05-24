@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'bot_strategy.dart';
 import '../../domain/models/game_state.dart';
-import '../../domain/game_types/x01_rules.dart';
 import '../bot_level.dart';
 
 class EasyBotStrategy extends BotStrategy {
@@ -17,66 +16,105 @@ class EasyBotStrategy extends BotStrategy {
   DartSuggestion suggestDart(GameState gameState) {
     final currentScore = gameState.currentTurn.score;
     final doubleOut = gameState.gameConfig.doubleOut ?? true;
-    final tripleOut = gameState.gameConfig.tripleOut ?? false;
 
-    // Se il punteggio è basso, tenta checkout con probabilità realistica
-    if (currentScore <= 100 && doubleOut) {
+    // Punti rimasti per questo turno (3 dardi)
+    final remainingThisTurn = gameState.remainingThrows;
+    final isLastDart = remainingThisTurn == 1;
+
+    // --- CHECKOUT (solo se possibile e realistico) ---
+    if (doubleOut && currentScore <= level.maxCheckout) {
       final checkoutChance = level.getCheckoutChance(currentScore);
-      if (_random.nextDouble() < checkoutChance) {
-        final suggestion = _tryCheckout(currentScore, doubleOut, tripleOut);
+      // Beginner chiude solo il 10-15% delle volte quando ha chance
+      if (_random.nextDouble() < checkoutChance * 0.3) {
+        final suggestion = _tryCheckout(currentScore);
         if (suggestion != null) return suggestion;
       }
     }
 
-    // Scegli un target basato sulla media del livello
-    return _targetForAverage(currentScore);
+    // --- TIRO NORMALE (rispetta la media) ---
+    return _normalDart(currentScore, isLastDart);
   }
 
-  DartSuggestion _targetForAverage(int currentScore) {
-    // Media target ≈ 35-45
-    final targets = [
-      (target: 20, multiplier: 1, value: 20),
-      (target: 19, multiplier: 1, value: 19),
-      (target: 18, multiplier: 1, value: 18),
-      (target: 20, multiplier: 2, value: 40),
-      (target: 16, multiplier: 2, value: 32),
-      (target: 8, multiplier: 2, value: 16),
-    ];
+  DartSuggestion _normalDart(int currentScore, bool isLastDart) {
+    // Beginner: media ~11 punti/dardo
+    // Distribuzione realistica:
+    // - 60% single (media ~15)
+    // - 30% miss/small (media ~5)
+    // - 10% double piccolo (media ~20)
 
-    // Filtra quelli che non superano il punteggio
-    final valid = targets.where((t) => t.value <= currentScore).toList();
-    if (valid.isEmpty) {
-      return const DartSuggestion(target: 1, multiplier: 1, reason: 'Safe');
+    final r = _random.nextDouble();
+
+    // MISS o punteggio molto basso (30%)
+    if (r < 0.30) {
+      final missOptions = [0, 1, 2, 3, 5, 8];
+      final target = missOptions[_random.nextInt(missOptions.length)];
+      return DartSuggestion(
+        target: target,
+        multiplier: 1,
+        reason: 'Tiro impreciso',
+      );
     }
 
-    final selected = valid[_random.nextInt(valid.length)];
+    // Single medio (50%)
+    if (r < 0.80) {
+      // Target comuni per beginner: 20, 19, 18, 16, 14, 12
+      final targets = [20, 19, 18, 16, 14, 12, 10, 8];
+      final target = targets[_random.nextInt(targets.length)];
 
-    // 20% probabilità di miss
-    if (_random.nextDouble() < 0.2) {
-      return const DartSuggestion(target: 0, multiplier: 0, reason: 'MISS');
+      // A volte colpisce il single sbagliato (vicino)
+      if (_random.nextDouble() < 0.2) {
+        final offTarget = [5, 1, 3, 2, 7];
+        return DartSuggestion(
+          target: offTarget[_random.nextInt(offTarget.length)],
+          multiplier: 1,
+          reason: 'Tiro deviato',
+        );
+      }
+
+      return DartSuggestion(
+        target: target,
+        multiplier: 1,
+        reason: 'Single',
+      );
+    }
+
+    // Double piccolo (20% dei tiri non-miss, quindi ~14% totale)
+    // Beginner può colpire qualche double ma raramente
+    final doubles = [16, 8, 10, 12, 14, 18, 20];
+    final target = doubles[_random.nextInt(doubles.length)];
+
+    // 70% di probabilità di mancare il double e fare single
+    if (_random.nextDouble() < 0.7) {
+      return DartSuggestion(
+        target: target,
+        multiplier: 1,
+        reason: 'Double mancato',
+      );
     }
 
     return DartSuggestion(
-      target: selected.target,
-      multiplier: selected.multiplier,
-      reason: 'Punteggio medio',
+      target: target,
+      multiplier: 2,
+      reason: 'Double!',
     );
   }
 
-  DartSuggestion? _tryCheckout(int score, bool doubleOut, bool tripleOut) {
-    final checkoutOptions = _getSimpleCheckout(score, doubleOut, tripleOut);
-    if (checkoutOptions != null && _random.nextDouble() < 0.3) {
-      return checkoutOptions;
+  DartSuggestion? _tryCheckout(int score) {
+    // Solo checkout molto semplici per beginner
+    if (score == 40) {
+      return const DartSuggestion(target: 20, multiplier: 2, reason: 'D20 checkout');
     }
-    return null;
-  }
-
-  DartSuggestion? _getSimpleCheckout(int score, bool doubleOut, bool tripleOut) {
-    if (doubleOut && score <= 40 && score % 2 == 0) {
-      return DartSuggestion(target: score ~/ 2, multiplier: 2, reason: 'Double checkout');
+    if (score == 32) {
+      return const DartSuggestion(target: 16, multiplier: 2, reason: 'D16 checkout');
     }
-    if (score == 50) {
-      return const DartSuggestion(target: 25, multiplier: 2, reason: 'Bullseye');
+    if (score == 24) {
+      return const DartSuggestion(target: 12, multiplier: 2, reason: 'D12 checkout');
+    }
+    if (score == 20) {
+      return const DartSuggestion(target: 10, multiplier: 2, reason: 'D10 checkout');
+    }
+    if (score == 16) {
+      return const DartSuggestion(target: 8, multiplier: 2, reason: 'D8 checkout');
     }
     return null;
   }

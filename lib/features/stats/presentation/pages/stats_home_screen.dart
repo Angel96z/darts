@@ -18,21 +18,29 @@ class StatsHomeScreen extends StatefulWidget {
 
 class _StatsHomeScreenState extends State<StatsHomeScreen> {
   StatsGameMode _selectedMode = StatsGameMode.bull;
-  final PageController _pageController = PageController();
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
+  late final List<Widget> _pages = [
+    const RepaintBoundary(
+      child: TrainingStatsScreen(
+        title: 'Bullseye',
+        mode: TrainingMode.bull,
+        showAppBar: false,
+      ),
+    ),
+    RepaintBoundary(
+      child: X01StatsWidget(
+        title: 'X01',
+        showAppBar: false,
+      ),
+    ),
+    const RepaintBoundary(
+      child: CricketStatsScreen(showAppBar: false),
+    ),
+  ];
 
   void _onModeChanged(StatsGameMode mode) {
+    if (_selectedMode == mode) return;
     setState(() => _selectedMode = mode);
-    _pageController.animateToPage(
-      mode.index,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
   }
 
   @override
@@ -60,24 +68,9 @@ class _StatsHomeScreenState extends State<StatsHomeScreen> {
         elevation: 0,
         backgroundColor: t.bg,
       ),
-      body: PageView(
-        controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(),  // ← DISABILITA SCROLL ORIZZONTALE
-        onPageChanged: (index) {
-          setState(() => _selectedMode = StatsGameMode.values[index]);
-        },
-        children: [
-          const TrainingStatsScreen(
-            title: 'Bullseye',
-            mode: TrainingMode.bull,
-            showAppBar: false,
-          ),
-          X01StatsWidget(
-            title: 'X01',
-            showAppBar: false,
-          ),
-          const CricketStatsScreen(showAppBar: false),
-        ],
+      body: IndexedStack(
+        index: _selectedMode.index,
+        children: _pages,
       ),
     );
   }

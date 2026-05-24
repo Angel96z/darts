@@ -117,6 +117,8 @@ class MatchResultState {
                 'winningScore': leg.winningScore,
                 'startTime': leg.startTime.toIso8601String(),
                 'endTime': leg.endTime?.toIso8601String(),
+                'cricketMarks': leg.cricketMarks.map((k, v) => MapEntry(k, v.map((ik, iv) => MapEntry(ik.toString(), iv)))),
+                'cricketPoints': leg.cricketPoints,
                 'rounds': leg.rounds.map((round) {
                   return {
                     'roundNumber': round.roundNumber,

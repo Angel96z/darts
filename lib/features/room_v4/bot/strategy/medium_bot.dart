@@ -17,90 +17,77 @@ class MediumBotStrategy extends BotStrategy {
   DartSuggestion suggestDart(GameState gameState) {
     final currentScore = gameState.currentTurn.score;
     final doubleOut = gameState.gameConfig.doubleOut ?? true;
-    final tripleOut = gameState.gameConfig.tripleOut ?? false;
 
-    String outMode;
-    if (tripleOut) outMode = 'triple';
-    else if (doubleOut) outMode = 'double';
-    else outMode = 'single';
-
-    // Checkout con probabilità realistica
-    if (currentScore <= 120) {
-      final checkoutChance = level.getCheckoutChance(currentScore) * 1.2;
-      if (_random.nextDouble() < checkoutChance) {
-        final suggestions = CheckoutSuggestion.getSuggestions(
-          score: currentScore,
-          dartsLeft: gameState.remainingThrows,
-          outMode: outMode,
-        );
-        if (suggestions.isNotEmpty && _random.nextDouble() < 0.6) {
-          final (target, multiplier) = _parseDartLabel(suggestions.first);
-          if (target != null && multiplier != null) {
-            // Probabilità di sbagliare il double
-            if (multiplier == 2 && _random.nextDouble() > level.doublesAccuracy) {
-              return DartSuggestion(target: 1, multiplier: 1, reason: 'MISSED DOUBLE');
-            }
-            return DartSuggestion(target: target, multiplier: multiplier, reason: 'Checkout');
-          }
-        }
+    // --- CHECKOUT (casual chiude ~20-30% delle volte) ---
+    if (doubleOut && currentScore <= level.maxCheckout) {
+      final checkoutChance = level.getCheckoutChance(currentScore);
+      if (_random.nextDouble() < checkoutChance * 0.5) {
+        final suggestion = _tryCheckout(currentScore);
+        if (suggestion != null) return suggestion;
       }
     }
 
-    // Cerca di avvicinarsi al checkout
-    return _targetForAverage(currentScore);
+    return _normalDart(currentScore);
   }
 
-  DartSuggestion _targetForAverage(int currentScore) {
-    // Media target ≈ 45-55
-    final targets = [
-      (target: 20, multiplier: 1, value: 20),
-      (target: 19, multiplier: 1, value: 19),
-      (target: 20, multiplier: 2, value: 40),
-      (target: 19, multiplier: 2, value: 38),
-      (target: 18, multiplier: 2, value: 36),
-      (target: 16, multiplier: 2, value: 32),
-      (target: 20, multiplier: 3, value: 60), // raro
-    ];
+  DartSuggestion _normalDart(int currentScore) {
+    // Casual: media ~16 punti/dardo
+    // - 40% single alto (15-20 punti)
+    // - 25% double medio (20-40 punti)
+    // - 20% single basso (5-14 punti)
+    // - 15% miss/small
 
-    final valid = targets.where((t) => t.value <= currentScore).toList();
-    if (valid.isEmpty) {
-      return const DartSuggestion(target: 1, multiplier: 1, reason: 'Safe');
+    final r = _random.nextDouble();
+
+    // MISS (15%)
+    if (r < 0.15) {
+      final missOptions = [0, 1, 2, 5, 8, 10];
+      final target = missOptions[_random.nextInt(missOptions.length)];
+      return DartSuggestion(target: target, multiplier: 1, reason: 'MISS');
     }
 
-    // Scegli in base alla media (più probabili i valori medi)
-    valid.sort((a, b) => (a.value - 45).abs().compareTo((b.value - 45).abs()));
-    final selected = valid.first;
-
-    // 10% miss
-    if (_random.nextDouble() < 0.1) {
-      return const DartSuggestion(target: 0, multiplier: 0, reason: 'MISS');
+    // Single basso (20%)
+    if (r < 0.35) {
+      final targets = [12, 10, 8, 6, 4];
+      final target = targets[_random.nextInt(targets.length)];
+      return DartSuggestion(target: target, multiplier: 1, reason: 'Single basso');
     }
 
-    // Probabilità di colpire single invece di double/triple
-    if (selected.multiplier > 1 && _random.nextDouble() < 0.3) {
-      return DartSuggestion(
-        target: selected.target,
-        multiplier: 1,
-        reason: 'Sbagliato moltiplicatore',
-      );
+    // Single alto (40%)
+    if (r < 0.75) {
+      final targets = [20, 19, 18, 17, 16];
+      final target = targets[_random.nextInt(targets.length)];
+      return DartSuggestion(target: target, multiplier: 1, reason: 'Single alto');
     }
 
-    return DartSuggestion(
-      target: selected.target,
-      multiplier: selected.multiplier,
-      reason: 'Setup',
-    );
+    // Double (25%)
+    final doubles = [20, 16, 10, 8, 12, 14, 18];
+    final target = doubles[_random.nextInt(doubles.length)];
+    final doubleAccuracy = level.getDoubleAccuracyForScore(target * 2);
+
+    if (_random.nextDouble() > doubleAccuracy) {
+      // Mancato il double -> fa single
+      return DartSuggestion(target: target, multiplier: 1, reason: 'Double mancato');
+    }
+
+    return DartSuggestion(target: target, multiplier: 2, reason: 'Double');
   }
 
-  (int?, int?) _parseDartLabel(String label) {
-    if (label == 'MISS') return (0, 0);
-    try {
-      final prefix = label.substring(0, 1);
-      final number = int.parse(label.substring(1));
-      if (prefix == 'S') return (number, 1);
-      if (prefix == 'D') return (number, 2);
-      if (prefix == 'T') return (number, 3);
-    } catch (_) {}
-    return (null, null);
+  DartSuggestion? _tryCheckout(int score) {
+    // Checkout semplici per casual
+    final easyCheckouts = {
+      40: (20, 2), 32: (16, 2), 24: (12, 2), 20: (10, 2),
+      16: (8, 2), 48: (16, 3), 60: (20, 3), 57: (19, 3),
+      54: (18, 3), 51: (17, 3),
+    };
+
+    if (easyCheckouts.containsKey(score)) {
+      final (target, mult) = easyCheckouts[score]!;
+      final accuracy = level.getDoubleAccuracyForScore(target * mult);
+      if (_random.nextDouble() < accuracy) {
+        return DartSuggestion(target: target, multiplier: mult, reason: 'Checkout!');
+      }
+    }
+    return null;
   }
 }

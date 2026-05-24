@@ -28,11 +28,13 @@ import '../widgets/training_sector_hits.dart';
 class TrainingScreen extends StatefulWidget {
   final String title;
   final TrainingMode mode;
+  final String? initialTarget;
 
   const TrainingScreen({
     super.key,
     required this.title,
     required this.mode,
+    this.initialTarget,
   });
 
   @override
@@ -63,7 +65,13 @@ class _TrainingScreenState extends State<TrainingScreen> {
     engine = BullTrainingEngine(scoreController);
     throwController.setEngine(engine);
 
+    final initialTarget = widget.initialTarget;
+    if (initialTarget != null && initialTarget.trim().isNotEmpty) {
+      scoreController.setTarget(initialTarget);
+    }
+
     final user = FirebaseAuth.instance.currentUser;
+
 
     throwController.configureSingles(
       players: [
@@ -108,21 +116,21 @@ class _TrainingScreenState extends State<TrainingScreen> {
           builder: (context) => AlertDialog(
             backgroundColor: t.overlay,
             title: Text(
-              "Leave training?",
+              "Lasciare l\'allenamento?",
               style: TextStyle(color: t.textPrimary),
             ),
             content: Text(
-              "If you leave now, your progress will not be saved.",
+              "Se esci ora, i tuoi progressi non verranno salvati.",
               style: TextStyle(color: t.textSecondary),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: Text("Stay", style: TextStyle(color: t.accent)),
+                child: Text("Continuo ad allenarmi", style: TextStyle(color: t.accent)),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: Text("Leave", style: TextStyle(color: t.red)),
+                child: Text("Esci", style: TextStyle(color: t.red)),
               ),
             ],
           ),
@@ -145,7 +153,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: const Text(
-                        'Target locked: save or undo all throws to change it.',
+                        'Target bloccato: salva o annulla tutti i tiri per cambiarlo.',
                       ),
                       backgroundColor: t.red,
                     ),
@@ -205,7 +213,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => TrainingStatsScreen(
-                          title: 'Training statistics',
+                          title: 'Statistiche allenamento',
                           mode: widget.mode,
                           initialSessionId: feedbackResult.savedSessionId,
                           initialTarget: scoreController.target,
@@ -220,7 +228,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Save error: $e'),
+                      content: Text('Errore salvataggio: $e'),
                       backgroundColor: t.red,
                     ),
                   );
@@ -265,7 +273,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
                         },
                         icon: Icon(Icons.undo, size: 20, color: t.textPrimary),
                         label: Text(
-                          "Undo",
+                          "ANNULLA",
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,

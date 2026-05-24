@@ -55,45 +55,43 @@ class _DartsStartupGateState extends State<_DartsStartupGate> {
 
   Future<void> _bootstrap() async {
     try {
-      _update(0.06, 'PREPARO INTERFACCIA...');
+      await _update(0.06, 'PREPARO INTERFACCIA...');
       await Future<void>.delayed(const Duration(milliseconds: 80));
 
-      _update(0.16, 'CARICO DIPENDENZE...');
+      await _update(0.16, 'CARICO DIPENDENZE...');
       await AppDependencies.initialize();
 
-      _update(0.30, 'CONNETTO FIREBASE...');
+      await _update(0.30, 'CONNETTO FIREBASE...');
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
-      FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: true);
+      FirebaseFirestore.instance.settings =
+      const Settings(persistenceEnabled: true);
 
-      _update(0.42, 'VERIFICO ACCESSO...');
+      await _update(0.42, 'VERIFICO ACCESSO...');
       final user = await FirebaseAuth.instance.authStateChanges().first;
 
-      _update(0.50, 'INIZIALIZZO LINK APP...');
+      await _update(0.50, 'INIZIALIZZO LINK APP...');
       await widget.container.read(appLinkCoordinatorProvider.notifier).init();
 
       if (user != null) {
-        _update(0.60, 'CARICO PROFILO...');
+        await _update(0.60, 'CARICO PROFILO...');
         await widget.container.read(userProvider.notifier).loadProfile();
 
-        _update(0.72, 'SINCRONIZZO MATCH...');
+        await _update(0.64, 'SINCRONIZZO MATCH...');
         await LocalMatchSyncService.instance.syncAll();
 
-        _update(0.84, 'SINCRONIZZO TRAINING...');
+        await _update(0.74, 'SINCRONIZZO TRAINING...');
         await LocalTrainingSyncService.instance.syncAll();
 
-        _update(0.94, 'AGGIORNO STATISTICHE...');
-        StatsRepository.instance.invalidateCache();
-        await StatsAggregatorService.instance
-            .updateUserStats(forceFullRecalc: true);
+        await _update(0.84, 'FINALIZZO...');
         StatsRepository.instance.invalidateCache();
       } else {
-        _update(0.94, 'PREPARO LOGIN...');
+        await _update(0.94, 'PREPARO LOGIN...');
         await Future<void>.delayed(const Duration(milliseconds: 240));
       }
 
-      _update(1.0, 'BULL!');
+      await _update(1.0, '');
       await Future<void>.delayed(const Duration(milliseconds: 2060));
 
       if (!mounted) return;
@@ -109,12 +107,32 @@ class _DartsStartupGateState extends State<_DartsStartupGate> {
     }
   }
 
-  void _update(double progress, String label) {
+  Future<void> _update(double progress, String label) async {
     if (!mounted) return;
-    setState(() {
-      _progress = progress.clamp(0.0, 1.0);
-      _label = label;
-    });
+
+    final target = progress.clamp(0.0, 1.0);
+    final start = _progress;
+
+    if (target <= start) {
+      setState(() => _label = label);
+      return;
+    }
+
+    const stepSize = 0.01;
+    var current = start;
+
+    while (current < target) {
+      if (!mounted) return;
+
+      current = (current + stepSize).clamp(0.0, target);
+
+      setState(() {
+        _progress = current;
+        _label = label;
+      });
+
+      await Future<void>.delayed(const Duration(milliseconds: 28));
+    }
   }
 
   @override
@@ -124,7 +142,7 @@ class _DartsStartupGateState extends State<_DartsStartupGate> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: DartBootSplash(
-        appName: 'Darts Arena',
+        appName: 'My Darts Roser Trainer',
         state: BootState(
           progress: _progress,
           label: _label,

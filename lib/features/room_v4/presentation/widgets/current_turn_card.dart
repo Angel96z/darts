@@ -604,7 +604,7 @@ class HistoryPanelState extends State<HistoryPanel> {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                'No turns yet',
+                'Nessun turno ancora',
                 style: t.bodySmall(t.textMuted),
               ),
             ),

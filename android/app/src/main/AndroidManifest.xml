@@ -14,7 +14,7 @@
     </queries>
 
     <application
-        android:label="darts"
+        android:label="My Darts"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 

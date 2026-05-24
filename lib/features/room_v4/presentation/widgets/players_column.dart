@@ -20,28 +20,42 @@ class PlayersColumn extends ConsumerWidget {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
       children: [
+        // Intestazione come MATCH e GAME
         Row(
           children: [
-            Icon(Icons.people_rounded, size: 18, color: t.accent),
+            Icon(Icons.people_rounded, size: 16, color: t.accent),
             const SizedBox(width: 8),
-            Text('Players', style: t.bodyBold(t.textPrimary)),
+            Text('PLAYERS', style: t.labelCaps(t.accent)),
             const SizedBox(width: 8),
+
             _CountBadge(count: state.players.length),
             const Spacer(),
             TeamSelector(ref: ref),
+
+
           ],
         ),
-        const SizedBox(height: 16),
-        if (state.players.isNotEmpty)
-          PlayerList(
-            players: state.players,
-            isTeamMode: state.teamSize > 1,
-            teamSize: state.teamSize,
-          )
-        else
-          const _EmptyState(),
+        const SizedBox(height: 12),
+
+        // Card contenuto come MATCH e GAME
+        Container(
+          width: double.infinity,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Contenuto principale
+              if (state.players.isNotEmpty)
+                PlayerList(
+                  players: state.players,
+                  isTeamMode: state.teamSize > 1,
+                  teamSize: state.teamSize,
+                )
+              else
+                const _EmptyState(),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -59,7 +73,7 @@ class _CountBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: t.accent.withValues(alpha: 0.12),
+        color: t.accent.withOpacity(0.12),
         borderRadius: AppTokens.r16,
       ),
       child: Text(

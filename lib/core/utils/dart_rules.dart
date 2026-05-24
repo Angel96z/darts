@@ -36,10 +36,6 @@ class DartRules {
     final centerY = boardRadius;
     final scoringOuterRadius = boardRadius * (170 / 225.5);
 
-    if (distance > scoringOuterRadius) {
-      return const DartRuleResult(sector: 'MISS', score: 0, distanceMm: 0);
-    }
-
     final bullInner = boardRadius * (6.35 / 225.5);
     final bullOuter = boardRadius * (15.9 / 225.5);
     final tripleInner = boardRadius * (99 / 225.5);
@@ -54,7 +50,10 @@ class DartRules {
     late final String sector;
     late final int score;
 
-    if (distance <= bullInner) {
+    if (distance > scoringOuterRadius) {
+      sector = 'MISS';
+      score = 0;
+    } else if (distance <= bullInner) {
       sector = 'D25';
       score = 50;
     } else if (distance <= bullOuter) {

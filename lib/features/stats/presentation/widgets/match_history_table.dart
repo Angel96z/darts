@@ -39,7 +39,7 @@ class MatchHistoryTable extends StatelessWidget {
           Center(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Text('No turns yet', style: t.bodySmall(t.textMuted)),
+              child: Text('Nessun turno ancora', style: t.bodySmall(t.textMuted)),
             ),
           )
         else

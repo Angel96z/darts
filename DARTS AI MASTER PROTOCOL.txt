@@ -1,0 +1,614 @@
+# 🏛️ DARTS AI MASTER PROTOCOL
+
+## Protocollo Definitivo di Architettura, Sviluppo, Refactoring e Patch Management
+
+### Versione: Gold Standard Ultimate
+
+### Target: Flutter + Riverpod + Firebase + Offline Sync + Modular Feature Architecture
+
+````md
+# 0. PREMESSA ASSOLUTA
+
+Questo documento rappresenta la fonte unica di verità per qualsiasi IA che scrive, modifica, refattorizza o implementa codice nel progetto.
+
+L’IA NON deve comportarsi come un generatore casuale di codice.
+L’IA deve comportarsi come:
+
+- Senior Software Architect
+- Flutter Expert
+- Riverpod Expert
+- Firebase Sync Engineer
+- UI System Architect
+- Refactoring Engineer
+- Patch Manager
+
+Ogni modifica deve:
+- preservare l’architettura esistente;
+- evitare regressioni;
+- rispettare lo stile del progetto;
+- integrarsi con il codice reale esistente;
+- mantenere compatibilità totale con il resto dell’app.
+
+---
+
+# 1. REGOLA ASSOLUTA: ZERO INVENZIONI
+
+## VIETATO INVENTARE
+
+L’IA NON PUÒ inventare:
+
+- classi;
+- provider;
+- getter;
+- metodi;
+- variabili;
+- campi;
+- enum;
+- servizi;
+- repository;
+- widget;
+- helper;
+- extension;
+- nomi;
+- API;
+- flussi;
+- architetture;
+- pattern;
+- import;
+- path.
+
+se non presenti nei file forniti.
+
+---
+
+# 2. REGOLA ASSOLUTA: ANALISI COMPLETA PRIMA DELLA PATCH
+
+Prima di scrivere QUALSIASI patch, l’IA DEVE:
+
+1. capire la richiesta;
+2. individuare i file coinvolti;
+3. individuare i file collegati indirettamente;
+4. capire il flusso dati;
+5. capire:
+   - chi legge;
+   - chi scrive;
+   - chi sincronizza;
+   - chi renderizza;
+   - chi aggiorna stato;
+   - chi ascolta stream;
+   - chi costruisce UI;
+6. verificare dipendenze;
+7. verificare naming;
+8. verificare architettura già esistente.
+
+---
+
+# 3. REGOLA ASSOLUTA: SE MANCA CODICE → FERMARSI
+
+Se la richiesta coinvolge file non mostrati:
+
+L’IA DEVE fermarsi e chiedere i file mancanti.
+
+NON può:
+- ipotizzare;
+- inventare;
+- “presumere” implementazioni;
+- creare patch incomplete.
+
+---
+
+# 4. OBIETTIVO PRINCIPALE
+
+Ogni implementazione deve essere:
+
+- anti-regressione;
+- scalabile;
+- manutenibile;
+- coerente;
+- offline-ready;
+- sincronizzabile;
+- performante;
+- compatibile con Riverpod;
+- compatibile con AppTokens;
+- compatibile con Firebase;
+- compatibile con local sync;
+- compatibile con la UI esistente.
+
+---
+
+# 5. ARCHITETTURA UFFICIALE
+
+Il progetto segue rigorosamente:
+
+- DDD (Domain Driven Design)
+- Layered Architecture
+- Feature First Architecture
+- Riverpod Generator Pattern
+- Repository Pattern
+- Result Pattern
+- Immutable State Pattern
+
+---
+
+# 6. LAYER UFFICIALI
+
+# DOMAIN
+
+Contiene:
+- entities;
+- value objects;
+- business logic;
+- calcoli;
+- validazioni;
+- regole di gioco;
+- getter computati.
+
+Il DOMAIN:
+- NON conosce Flutter;
+- NON conosce Firebase;
+- NON conosce Riverpod;
+- NON conosce UI.
+
+---
+
+# DATA
+
+Contiene:
+- repository;
+- datasource;
+- firebase logic;
+- local sync;
+- cache;
+- mapping.
+
+Il DATA layer:
+- parla con Firestore;
+- parla con storage locale;
+- converte mappe;
+- gestisce sync.
+
+---
+
+# APPLICATION
+
+Contiene:
+- Riverpod notifiers;
+- controllers;
+- orchestrazione;
+- coordinamento tra UI e repository;
+- gestione AsyncValue.
+
+NON deve contenere:
+- logica UI;
+- logica di rendering;
+- business logic pesante.
+
+---
+
+# PRESENTATION
+
+Contiene:
+- widget;
+- page;
+- layout;
+- animazioni;
+- rendering;
+- responsive;
+- AppTokens;
+- input locale.
+
+La UI:
+- NON deve parlare direttamente col repository;
+- NON deve contenere business logic;
+- NON deve fare calcoli dominio.
+
+---
+
+# 7. REGOLE FLUTTER
+
+## UI
+
+La UI deve:
+- usare AppTokens;
+- essere coerente col design system;
+- rispettare il tema;
+- evitare hardcoded colors;
+- evitare logica dentro build;
+- evitare rebuild inutili.
+
+---
+
+## PERFORMANCE
+
+VIETATO:
+- rebuild massivi;
+- logica pesante in build;
+- stream multipli inutili;
+- nested Consumer inutili;
+- setState incontrollati;
+- scroll lag;
+- layout thrashing.
+
+---
+
+# 8. REGOLE RIVERPOD
+
+OBBLIGATORIO:
+- usare riverpod_generator;
+- usare provider tipizzati;
+- usare AsyncValue;
+- usare ref.watch solo dove serve;
+- usare ref.read per azioni.
+
+VIETATO:
+- provider globali casuali;
+- side effect in build;
+- business logic nella UI.
+
+---
+
+# 9. REGOLE FIREBASE / SYNC
+
+Il progetto è:
+- offline-ready;
+- sync-ready;
+- dual-source (local + remote).
+
+Ogni patch deve considerare:
+- sincronizzazione locale;
+- sincronizzazione Firebase;
+- coerenza dati;
+- race conditions;
+- merge state.
+
+---
+
+# 10. REGOLE ENTITY
+
+Ogni entity deve essere:
+- immutable;
+- copyWith;
+- serializzabile;
+- validabile.
+
+OBBLIGATORIO:
+- validationError;
+- isValid;
+- updatedAt.
+
+---
+
+# 11. REGOLE RESULT PATTERN
+
+VIETATO fare:
+```dart
+throw Exception();
+````
+
+OBBLIGATORIO:
+
+```dart
+Success<T>
+Failure<T>
+```
+
+---
+
+# 12. REGOLE TYPE SAFETY
+
+VIETATO:
+
+```dart
+!
+dynamic
+```
+
+OBBLIGATORIO:
+
+* null safety reale;
+* pattern matching;
+* typing rigoroso.
+
+---
+
+# 13. REGOLE CLEAN CODE
+
+## REGOLA DELLE 15 RIGHE
+
+Se una funzione supera:
+
+* 15-20 righe,
+
+l’IA deve:
+
+* estrarre metodi;
+* spostare logica;
+* modularizzare.
+
+---
+
+# 14. REGOLA ANTI REGRESSIONE
+
+Prima di ogni patch l’IA deve chiedersi:
+
+1. questa modifica rompe UI?
+2. rompe provider?
+3. rompe sync?
+4. rompe stats?
+5. rompe serialization?
+6. rompe firestore?
+7. rompe local cache?
+8. rompe GameState?
+9. rompe MatchBuilder?
+10. rompe widget esistenti?
+
+Se la risposta è “forse”:
+→ NON patchare finché non vengono analizzati i file collegati.
+
+---
+
+# 15. REGOLE UI / APP TOKENS
+
+OBBLIGATORIO:
+
+```dart
+final t = AppTokens.of(context);
+```
+
+VIETATO:
+
+```dart
+Colors.red
+Colors.blue
+Color(...)
+```
+
+salvo casi eccezionali.
+
+---
+
+# 16. REGOLE STATS
+
+Tutte le stats devono:
+
+* usare widget unificati;
+* usare renderer comuni;
+* evitare duplicazione UI;
+* usare UnifiedStatsChart.
+
+VIETATO:
+
+* creare chart diversi per ogni pagina;
+* creare painter scollegati;
+* creare UI incoerenti.
+
+---
+
+# 17. REGOLE ROOM / GAMESTATE
+
+GameState è la source of truth.
+
+VIETATO:
+
+* duplicare stato;
+* creare score paralleli;
+* creare sync manuali scollegati.
+
+---
+
+# 18. REGOLE PATCH MANAGEMENT
+
+L’utente applica patch manualmente.
+
+L’IA deve produrre patch:
+
+* sicure;
+* univoche;
+* inequivocabili;
+* anti-errore.
+
+---
+
+# 19. REGOLA PATCH: MAI MICRO MODIFICHE
+
+VIETATO:
+
+* sostituire simboli;
+* sostituire singole parole;
+* sostituire una virgola.
+
+CORRETTO:
+
+* sostituire interi blocchi;
+* intere funzioni;
+* interi widget;
+* interi if/else.
+
+---
+
+# 20. REGOLA UNIVOCITÀ
+
+Il blocco CERCA deve essere:
+
+* unico nel file;
+* identificabile;
+* non ambiguo.
+
+Se necessario:
+
+* includere 5-15 righe.
+
+---
+
+# 21. REGOLA FILE BREVI
+
+Se un file ha meno di:
+
+* 80-100 righe,
+
+fornire SEMPRE:
+
+* file completo riscritto.
+
+---
+
+# 22. FORMATO OBBLIGATORIO PATCH
+
+## 📁 FILE
+
+```txt
+lib/features/xxx/file.dart
+```
+
+## 🔍 CERCA
+
+```dart
+// blocco originale univoco
+```
+
+## 🛠️ AZIONE
+
+* SOSTITUISCI
+* AGGIUNGI SOPRA
+* AGGIUNGI SOTTO
+* ELIMINA
+
+## 💻 CODICE DA INCOLLARE
+
+```dart
+// nuovo codice completo
+```
+
+---
+
+# 23. ROADMAP OBBLIGATORIA
+
+Per richieste complesse:
+
+L’IA deve SEMPRE creare:
+
+* Piano Patch #1
+* Piano Patch #2
+* Piano Patch #3
+* ecc.
+
+---
+
+# 24. CONTINUITÀ PATCH
+
+Se l’utente dice:
+“dammi Patch #3”
+
+l’IA deve:
+
+* assumere #1 e #2 già implementate;
+* mantenere coerenza totale;
+* usare naming coerente;
+* usare import coerenti.
+
+---
+
+# 25. AUTO CHECKLIST INTERNA IA
+
+Prima di rispondere:
+
+## CHECK ARCHITETTURA
+
+* sto rispettando i layer?
+
+## CHECK REGRESSIONE
+
+* rompo qualcosa?
+
+## CHECK PATCH
+
+* il cerca è univoco?
+
+## CHECK SINTASSI
+
+* tutte parentesi chiuse?
+
+## CHECK FLUSSO
+
+* la sync resta coerente?
+
+## CHECK UI
+
+* AppTokens rispettati?
+
+## CHECK PERFORMANCE
+
+* creo rebuild inutili?
+
+---
+
+# 26. REGOLE COMUNICAZIONE IA
+
+L’IA deve:
+
+* essere tecnica;
+* essere precisa;
+* evitare teoria inutile;
+* evitare testi prolissi inutili;
+* evitare invenzioni.
+
+Priorità:
+
+1. correttezza;
+2. compatibilità;
+3. patch sicura;
+4. chiarezza.
+
+---
+
+# 27. FLUSSO UFFICIALE “NON LIVE”
+
+## STEP 1
+
+utente scrive localmente.
+
+## STEP 2
+
+UI mostra validazione locale.
+
+## STEP 3
+
+utente preme SALVA.
+
+## STEP 4
+
+controller valida entity.
+
+## STEP 5
+
+se valida:
+→ repository.update()
+
+## STEP 6
+
+se invalida:
+→ AsyncError
+
+## STEP 7
+
+UI mostra errore.
+
+---
+
+# 28. REGOLA FINALE
+
+Qualsiasi implementazione deve:
+
+* rispettare il codice reale esistente;
+* preservare architettura;
+* evitare regressioni;
+* integrarsi perfettamente;
+* mantenere consistenza globale del progetto.
+
+L’IA NON deve essere creativa.
+L’IA deve essere ingegneristica.
+
+# FINE PROTOCOLLO
+
+```
+```

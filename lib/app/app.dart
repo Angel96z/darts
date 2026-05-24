@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app_theme.dart';
+import '../core/sync/app_sync_orchestrator.dart';
 import '../features/match_sync/data/services/local_match_sync_service.dart';
 import '../features/stats/data/datasources/local_training_sync_service.dart';
 import '../features/stats/domain/services/stats_aggregator_service.dart';
@@ -19,16 +20,43 @@ class _AppBootstrap extends ConsumerStatefulWidget {
   ConsumerState<_AppBootstrap> createState() => _AppBootstrapState();
 }
 
-class _AppBootstrapState extends ConsumerState<_AppBootstrap> {
+class _AppBootstrapState extends ConsumerState<_AppBootstrap>
+    with WidgetsBindingObserver {
+  bool _bootstrapped = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future.microtask(_bootstrap);
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
   Future<void> _bootstrap() async {
+    if (_bootstrapped) return;
+    _bootstrapped = true;
+
     await ref.read(appLinkCoordinatorProvider.notifier).init();
     await ref.read(userProvider.notifier).loadProfile();
+
+    await AppSyncOrchestrator.instance.syncNow(
+      reason: AppSyncReason.login,
+      force: true,
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+
+    AppSyncOrchestrator.instance.syncNow(
+      reason: AppSyncReason.resume,
+    );
   }
 
   @override
@@ -36,7 +64,6 @@ class _AppBootstrapState extends ConsumerState<_AppBootstrap> {
     return const HomeScreen();
   }
 }
-
 
 class DartsApp extends ConsumerWidget {
   const DartsApp({super.key});
@@ -57,9 +84,14 @@ class DartsApp extends ConsumerWidget {
             stream: FirebaseAuth.instance.authStateChanges(),
             builder: (context, snapshot) {
               final user = snapshot.data ?? FirebaseAuth.instance.currentUser;
-              if (user == null) return const LoginScreen();
+
+              if (user == null) {
+                AppSyncOrchestrator.instance.resetSession();
+                return const LoginScreen();
+              }
+
               return const _AppBootstrap();
-            },
+              },
           ),
         );
       },

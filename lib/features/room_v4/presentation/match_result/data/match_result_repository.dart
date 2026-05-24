@@ -206,9 +206,11 @@ class MatchResultRepository {
         legs.add({
           'legNumber': legData['legNumber'],
           'winnerId': legData['winnerId'],
-          'winningScore': legData['winningScore'],
+          'winningScore': legData['winningScore'] ?? 0,
           'startTime': legData['startTime'],
           'endTime': legData['endTime'],
+          'cricketMarks': legData['cricketMarks'] ?? {},
+          'cricketPoints': legData['cricketPoints'] ?? {},
           'rounds': rounds,
         });
       }

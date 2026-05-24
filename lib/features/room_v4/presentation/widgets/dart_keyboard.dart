@@ -83,42 +83,32 @@ class _Board extends StatelessWidget {
 
   static const _geometry = _BoardGeometry();
 
+// SOSTITUISCI completamente il metodo build di _Board
+
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    // Dimensioni bottoni basate sullo schermo, non sulla board
-    final btnWidth = screenWidth * 0.16;
-    final btnHeight = screenHeight * 0.065;
-    final btnFontSize = btnHeight * 0.7;
-
-    // Margine dai bordi dello schermo
-    final horizontalMargin = screenWidth * 0.02;
-    final topMargin = screenHeight * 0.01;
-    final bottomMargin = screenHeight * 0.01;
+    // DIMENSIONI FISSE - sempre uguali
+    const double btnWidth = 70.0;
+    const double btnHeight = 44.0;
+    const double btnFontSize = 16.0;
+    const double horizontalMargin = 16.0;
+    const double topMargin = 8.0;
+    const double bottomMargin = 8.0;
 
     return Stack(
       children: [
-        // Board centrata
         // Board centrata
         Center(
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTapDown: (details) {
-              // Trova il RenderBox del CustomPaint
               final RenderBox box = context.findRenderObject() as RenderBox;
-              // Ottieni la posizione relativa al CustomPaint
               final Offset localPosition = box.globalToLocal(details.globalPosition);
-
-              // Calcola il centro della board (che è centrata nello Stack)
               final Size boardSize = Size.square(size);
               final Offset boardTopLeft = Offset(
                 (box.size.width - size) / 2,
                 (box.size.height - size) / 2,
               );
-
-              // Sottrai l'offset della board centrata
               final Offset relativeToBoard = localPosition - boardTopLeft;
 
               final hit = _BoardHitTester.hitTest(
@@ -170,7 +160,7 @@ class _Board extends StatelessWidget {
           bottom: bottomMargin,
           left: horizontalMargin,
           child: _CornerBtn(
-            label: 'indietro',
+            label: 'ANNULLA',
             onTap: onUndo,
             icon: Icons.undo,
             t: t,

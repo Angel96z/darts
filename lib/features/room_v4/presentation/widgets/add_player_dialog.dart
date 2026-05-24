@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -104,72 +106,81 @@ Future<bool?> _showCurrentUserDialog(BuildContext context, User user) {
 
   return showDialog<bool>(
     context: context,
-    builder: (ctx) => Dialog(
+    builder: (ctx) => AlertDialog(
       backgroundColor: t.overlay,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: AppTokens.r16),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: t.accent.withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.person_rounded,
-                size: 32,
-                color: t.accent,
-              ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+      title: null, // non usiamo title per controllo completo
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: t.accent.withOpacity(0.12),
+              shape: BoxShape.circle,
             ),
-            const SizedBox(height: 18),
-            Text(
-              'Join with your account?',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: t.textPrimary,
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-              ),
+            child: Icon(
+              Icons.person_rounded,
+              size: 32,
+              color: t.accent,
             ),
-            const SizedBox(height: 8),
-            Text(
-              user.email ?? user.displayName ?? 'User',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: t.accent,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'Gioca come',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: t.textPrimary,
+              fontSize: 18,  // aumentato
+              fontWeight: FontWeight.w900,
             ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('No'),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            user.email ?? user.displayName ?? 'User',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: t.accent,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 28),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: BorderSide(color: t.border),
+                    foregroundColor: t.textSecondary,  // ← AGGIUNGI
                   ),
+                  child: const Text('No', style: TextStyle(fontSize: 15)),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('Sì'),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    backgroundColor: t.accent,  // ← AGGIUNGI
+                    foregroundColor: t.accentFg,  // ← AGGIUNGI
                   ),
+                  child: const Text('Sì', style: TextStyle(fontSize: 15)),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     ),
   );
 }
-
 class _AddPlayerPage extends ConsumerStatefulWidget {
   const _AddPlayerPage();
 
@@ -305,7 +316,7 @@ class _Header extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Add players',
+              'Aggiungi giocatore',
               style: TextStyle(
                 color: t.textPrimary,
                 fontSize: 18,
@@ -334,14 +345,14 @@ class _ModeSelector extends StatelessWidget {
       children: [
         _ModeChip(
           selected: selectedMode == AddPlayerMode.guest,
-          label: 'Guest',
+          label: 'Ospite',
           icon: Icons.person_outline_rounded,
           onTap: () => onModeChanged(AddPlayerMode.guest),
         ),
         const SizedBox(width: 10),
         _ModeChip(
           selected: selectedMode == AddPlayerMode.login,
-          label: 'Login',
+          label: 'Accedi',
           icon: Icons.login_rounded,
           onTap: () => onModeChanged(AddPlayerMode.login),
         ),
@@ -481,7 +492,7 @@ class _GuestFormState extends State<_GuestForm> {
           },
           onSubmitted: (_) => _submit(),
           decoration: InputDecoration(
-            hintText: 'Name',
+            hintText: 'Nome',
             prefixIcon: Icon(
               Icons.badge_rounded,
               color: t.textSecondary,
@@ -497,12 +508,13 @@ class _GuestFormState extends State<_GuestForm> {
             style: FilledButton.styleFrom(
               backgroundColor: t.accent,
               foregroundColor: t.accentFg,
+              disabledForegroundColor: t.accentFg,
               shape: RoundedRectangleBorder(
                 borderRadius: AppTokens.r16,
               ),
             ),
             child: const Text(
-              'Add player',
+              'Aggiungi giocatore',
               style: TextStyle(
                 fontWeight: FontWeight.w900,
                 fontSize: 14,
@@ -555,6 +567,63 @@ class _BotFormState extends State<_BotForm> {
       if (mounted) setState(() => _botAdded = false);
     });
   }
+  Widget _StatChip({
+    required String label,
+    required String value,
+    required AppTokens t,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: t.bg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: t.border.withOpacity(0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _getIconForLabel(label),
+            size: 12,
+            color: t.accent.withOpacity(0.7),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '$label ',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: t.textMuted,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: t.accent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getIconForLabel(String label) {
+    switch (label) {
+      case 'Media':
+        return Icons.show_chart;
+      case 'Checkout':
+        return Icons.check_circle_outline;
+      case 'Max':
+        return Icons.sports_score;
+      case 'Doppi':
+        return Icons.center_focus_strong;
+      default:
+        return Icons.star;
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -564,12 +633,6 @@ class _BotFormState extends State<_BotForm> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: t.surface,
-            borderRadius: AppTokens.r12,
-            border: Border.all(color: t.border),
-          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -582,10 +645,22 @@ class _BotFormState extends State<_BotForm> {
                   letterSpacing: 0.5,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
+
               Wrap(
                 spacing: 8,
-                runSpacing: 8,
+                runSpacing: 6,
+                children: [
+                  _StatChip(label: 'Media', value: '${_selectedLevel.avgMin}-${_selectedLevel.avgMax}', t: t),
+                  _StatChip(label: 'Checkout', value: '${_selectedLevel.checkoutMin}-${_selectedLevel.checkoutMax}%', t: t),
+                  _StatChip(label: 'Max', value: '${_selectedLevel.maxCheckout}', t: t),
+                  _StatChip(label: 'Doppi', value: '${(_selectedLevel.doublesAccuracy * 100).toInt()}%', t: t),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
                 children: BotLevel.values.map((level) {
                   final isSelected = _selectedLevel == level;
                   return GestureDetector(
@@ -628,8 +703,8 @@ class _BotFormState extends State<_BotForm> {
           child: FilledButton.icon(
             onPressed: _botAdded ? null : _addBot,
             icon: _botAdded
-                ? const Icon(Icons.check_rounded, color: Colors.white)
-                : _getBotIcon(_selectedLevel, Colors.white),
+                ? Icon(Icons.check_rounded, color: t.accentFg)
+                : _getBotIcon(_selectedLevel, t.accentFg),
             label: Text(
               _botAdded ? 'Bot aggiunto!' : 'Aggiungi bot ${_selectedLevel.displayName}',
               style: const TextStyle(
@@ -639,8 +714,9 @@ class _BotFormState extends State<_BotForm> {
             ),
             style: FilledButton.styleFrom(
               backgroundColor: _botAdded ? Colors.green : t.accent,
-              foregroundColor: Colors.white,
+              foregroundColor: t.accentFg,  // ← USA LO STESSO DI GUEST
               disabledBackgroundColor: Colors.green,
+              disabledForegroundColor: t.accentFg,
               shape: RoundedRectangleBorder(
                 borderRadius: AppTokens.r16,
               ),
@@ -852,7 +928,7 @@ class _LoginFormState extends State<_LoginForm> {
                   : Icons.login_rounded,
             ),
             label: Text(
-              _loginAdded ? 'Added' : 'Login',
+              _loginAdded ? 'Aggiunto' : 'Aggiungi giocatore',
               style: const TextStyle(
                 fontWeight: FontWeight.w900,
                 fontSize: 14,
@@ -860,11 +936,9 @@ class _LoginFormState extends State<_LoginForm> {
             ),
             style: FilledButton.styleFrom(
               backgroundColor: _loginAdded ? Colors.green : t.accent,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor:
-              _loginAdded ? Colors.green : t.surfaceHigh,
-              disabledForegroundColor:
-              _loginAdded ? Colors.white : t.textMuted,
+              foregroundColor: t.accentFg,  // ← USA LO STESSO DI GUEST
+              disabledBackgroundColor: _loginAdded ? Colors.green : t.surfaceHigh,
+              disabledForegroundColor: t.accentFg,
               shape: RoundedRectangleBorder(
                 borderRadius: AppTokens.r16,
               ),
@@ -875,7 +949,7 @@ class _LoginFormState extends State<_LoginForm> {
     );
   }
 }
-class _AddedPlayersStrip extends StatelessWidget {
+class _AddedPlayersStrip extends StatefulWidget {
   final List<PlayerInfo> players;
   final ValueChanged<String> onRemove;
 
@@ -885,15 +959,57 @@ class _AddedPlayersStrip extends StatelessWidget {
   });
 
   @override
+  State<_AddedPlayersStrip> createState() => _AddedPlayersStripState();
+}
+
+class _AddedPlayersStripState extends State<_AddedPlayersStrip> {
+  final ScrollController _scrollController = ScrollController();
+  int _previousPlayerCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _previousPlayerCount = widget.players.length;
+  }
+
+  @override
+  void didUpdateWidget(covariant _AddedPlayersStrip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Se è stato aggiunto un nuovo giocatore (la lista è cresciuta)
+    if (widget.players.length > _previousPlayerCount) {
+      _scrollToEnd();
+    }
+    _previousPlayerCount = widget.players.length;
+  }
+
+  void _scrollToEnd() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
-    final sorted = List<PlayerInfo>.from(players)
+    final sorted = List<PlayerInfo>.from(widget.players)
       ..sort((a, b) => a.order.compareTo(b.order));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-
         if (sorted.isEmpty)
           Container(
             height: 64,
@@ -915,19 +1031,22 @@ class _AddedPlayersStrip extends StatelessWidget {
         else
           SizedBox(
             height: 68,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              itemCount: sorted.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, index) {
-                final player = sorted[index];
-
-                return _AddedPlayerMiniCard(
-                  player: player,
-                  onRemove: () => onRemove(player.id),
-                );
-              },
+            child: ScrollConfiguration(
+              behavior: _CustomScrollBehavior(),
+              child: ListView.separated(
+                controller: _scrollController,
+                scrollDirection: Axis.horizontal,
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                itemCount: sorted.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, index) {
+                  final player = sorted[index];
+                  return _AddedPlayerMiniCard(
+                    player: player,
+                    onRemove: () => widget.onRemove(player.id),
+                  );
+                },
+              ),
             ),
           ),
       ],
@@ -935,6 +1054,16 @@ class _AddedPlayersStrip extends StatelessWidget {
   }
 }
 
+// 🔥 AGGIUNGI QUESTA CLASSE FUORI DALLO STATO
+class _CustomScrollBehavior extends ScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.stylus,
+  };
+}
 class _AddedPlayerMiniCard extends StatelessWidget {
   final PlayerInfo player;
   final VoidCallback onRemove;

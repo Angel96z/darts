@@ -246,8 +246,9 @@ class ConsigliNotifier extends StateNotifier<ConsigliState> {
     final consigli = state.consigli;
     if (consigli.isEmpty) return;
 
-    _currentIndex = (_currentIndex + 1) % consigli.length;
-    state = state.copyWith(current: consigli[_currentIndex]);
+    // Versione casuale (invece di sequenziale)
+    final randomIndex = _random.nextInt(consigli.length);
+    state = state.copyWith(current: consigli[randomIndex]);
   }
 
   void skipToNext() {

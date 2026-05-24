@@ -4,12 +4,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../room_v4/domain/models/dart_throw.dart';
 import '../../../room_v4/domain/models/player_turn.dart';
+import '../../../stats/domain/services/stats_aggregator_service.dart';
 import '../../domain/entities/local_match_record.dart';
 import '../repositories/match_repository.dart';
 
@@ -50,97 +52,183 @@ class LocalMatchSyncService {
 
   Future<String> _saveLocal(LocalMatchRecord record) async {
     final all = await _getAll();
-    all.add(record);
+
+    final index = all.indexWhere((cached) {
+      final sameRemote = record.remoteId != null &&
+          cached.remoteId != null &&
+          cached.remoteId == record.remoteId;
+
+      final sameLocalAndPlayer = cached.localId == record.localId &&
+          _recordOwnerKey(cached) == _recordOwnerKey(record);
+
+      return sameRemote || sameLocalAndPlayer;
+    });
+
+    if (index == -1) {
+      all.add(record);
+    } else {
+      final current = all[index];
+
+      if (current.syncStatus == LocalMatchSyncStatus.pendingDelete ||
+          current.syncStatus == LocalMatchSyncStatus.failedDelete) {
+        return current.localId;
+      }
+
+      all[index] = record;
+    }
+
     await _saveAll(all);
     return record.localId;
   }
 
   Future<bool> _checkBackendConnection() async {
     try {
+      final connectivity = await Connectivity()
+          .checkConnectivity()
+          .timeout(const Duration(milliseconds: 700));
+
+      if (connectivity.contains(ConnectivityResult.none)) {
+        return false;
+      }
+
       await FirebaseFirestore.instance
           .collection('users')
           .limit(1)
           .get(const GetOptions(source: Source.server))
-          .timeout(const Duration(seconds: 3));
+          .timeout(const Duration(milliseconds: 1200));
+
       return true;
     } catch (_) {
       return false;
     }
   }
+  Future<void> deleteRecords(List<String> ids) async {
+    if (ids.isEmpty) return;
 
-  /// Sincronizza tutti i match pendenti
+    for (final id in ids) {
+      await deleteRecord(id);
+    }
+  }
+  /// Sincronizza i match senza queue separata:
+  /// 1. push dei record locali pendenti
+  /// 2. pull dei record remoti
+  /// 3. aggiornamento stats una sola volta se qualcosa è cambiato
   Future<void> syncAll() async {
     if (_running) return;
     if (!await _checkBackendConnection()) return;
+
     _running = true;
+    try {
+      final pushedSomething = await _pushLocalToRemote();
+      final pulledSomething = await _pullRemoteToLocal();
 
-    await _pushLocalToRemote();
-    await _pullRemoteToLocal();
-
-    _running = false;
+      if (pushedSomething || pulledSomething) {
+        await StatsAggregatorService.instance.updateUserStats();
+      }
+    } finally {
+      _running = false;
+    }
   }
+
+
   final _syncStatusController = StreamController<Map<String, LocalMatchSyncStatus>>.broadcast();
   Stream<Map<String, LocalMatchSyncStatus>> get onSyncStatusChanged => _syncStatusController.stream;
 
-  Future<void> _pushLocalToRemote() async {
+  Future<bool> _pushLocalToRemote() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) return false;
 
     final all = await _getAll();
+    var changed = false;
 
     for (int i = 0; i < all.length; i++) {
       final r = all[i];
 
-      if (r.syncStatus == LocalMatchSyncStatus.synced) continue;
-      // 🔥 NOTIFICA CHE STA PARTENDO LA SINCRONIZZAZIONE
-      if (r.syncStatus != LocalMatchSyncStatus.syncing) {
-        _syncStatusController.add({r.localId: LocalMatchSyncStatus.syncing});
-      }
-      if (r.syncStatus == LocalMatchSyncStatus.failed) {
-        if (r.retryCount >= 3) continue;
-        if (r.lastSyncAttempt != null) {
-          final hoursSinceLastAttempt = DateTime.now().difference(r.lastSyncAttempt!).inHours;
-          if (hoursSinceLastAttempt < 1) continue;
+      if (r.isSynced || r.isSyncing) continue;
+      if (!r.canRetryNow) continue;
+
+      if (r.isPendingDelete) {
+        all[i] = r.copyWith(
+          syncStatus: LocalMatchSyncStatus.failedDelete,
+          retryCount: r.retryCount + 1,
+          lastSyncAttempt: DateTime.now(),
+          deletedAt: r.deletedAt ?? DateTime.now(),
+        );
+        await _saveAll(all);
+
+        try {
+          if (r.hasRemoteId) {
+            await _deleteRemoteMatchByRecord(user.uid, r);
+          }
+
+          all.removeAt(i);
+          i--;
+          changed = true;
+
+          _syncStatusController.add({r.localId: LocalMatchSyncStatus.synced});
+          if (r.remoteId != null) {
+            _syncStatusController.add({r.remoteId!: LocalMatchSyncStatus.synced});
+          }
+
+          await _saveAll(all);
+        } catch (e) {
+          print('❌ Errore delete match remoto: $e');
+          _syncStatusController.add({r.localId: LocalMatchSyncStatus.failedDelete});
+          await _saveAll(all);
         }
+
+        continue;
       }
 
-      // Marca come syncing
-      all[i] = r.copyWith(
+      if (!r.isPendingUpload) continue;
+
+      final syncingRecord = r.copyWith(
         syncStatus: LocalMatchSyncStatus.syncing,
         retryCount: r.retryCount + 1,
         lastSyncAttempt: DateTime.now(),
       );
+
+      all[i] = syncingRecord;
       await _saveAll(all);
       _syncStatusController.add({r.localId: LocalMatchSyncStatus.syncing});
 
       try {
-        final remoteId = await _repository.saveMatch(r);
+        final remoteId = await _repository.saveMatch(syncingRecord);
 
-        all[i] = r.copyWith(
+        all[i] = syncingRecord.copyWith(
           remoteId: remoteId,
           syncStatus: LocalMatchSyncStatus.synced,
           retryCount: 0,
+          updatedAt: DateTime.now(),
         );
-        _syncStatusController.add({r.localId: LocalMatchSyncStatus.synced});
 
+        changed = true;
+        _syncStatusController.add({r.localId: LocalMatchSyncStatus.synced});
       } catch (e) {
         print('❌ Errore push match: $e');
-        all[i] = r.copyWith(syncStatus: LocalMatchSyncStatus.failed);
+
+        all[i] = syncingRecord.copyWith(
+          syncStatus: LocalMatchSyncStatus.failed,
+          lastSyncAttempt: DateTime.now(),
+        );
+
+        _syncStatusController.add({r.localId: LocalMatchSyncStatus.failed});
       }
 
       await _saveAll(all);
     }
+
+    return changed;
   }
 
-  Future<void> _pullRemoteToLocal() async {
+  Future<bool> _pullRemoteToLocal() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) return false;
 
     final db = FirebaseFirestore.instance;
     final local = await _getAll();
-    final existingIds = local.map((e) => e.remoteId).toSet();
+    var changed = false;
 
-    // Carica da entrambe le collezioni
     final x01Snapshot = await db
         .collection('users')
         .doc(user.uid)
@@ -155,24 +243,40 @@ class LocalMatchSyncService {
         .where('status', isEqualTo: 'complete')
         .get();
 
-    // Combina i risultati
     final allDocs = [...x01Snapshot.docs, ...cricketSnapshot.docs];
 
     for (final doc in allDocs) {
-      if (existingIds.contains(doc.id)) continue;
+      final existingDeleteIndex = local.indexWhere((record) {
+        final sameRemote = record.remoteId == doc.id;
+        final sameLocal = record.localId == doc.data()['matchId'];
+        final isDelete = record.syncStatus == LocalMatchSyncStatus.pendingDelete ||
+            record.syncStatus == LocalMatchSyncStatus.failedDelete;
+        return isDelete && (sameRemote || sameLocal);
+      });
+
+      if (existingDeleteIndex != -1) continue;
+
+      final existingPendingIndex = local.indexWhere((record) {
+        final sameRemote = record.remoteId == doc.id;
+        final sameLocal = record.localId == doc.data()['matchId'];
+        return (sameRemote || sameLocal) &&
+            (record.isPendingUpload || record.isPendingDelete || record.isSyncing);
+      });
+
+      if (existingPendingIndex != -1) continue;
 
       final data = doc.data();
-
-      // 🔥 RECUPERA LA GERARCHIA COMPLETA
       final matchSets = await _fetchMatchHierarchy(doc.reference);
 
-      // 🔥 ESTRAI I TURNI DEL GIOCATORE CORRENTE
       final playerId = user.uid;
       final playerTurnsMap = await _extractPlayerTurns(matchSets, playerId);
       final turnsList = playerTurnsMap[playerId] ?? [];
 
       final totalTurns = turnsList.length;
-      final totalDarts = turnsList.fold(0, (sum, t) => sum + t.throws.length);
+      final totalDarts = turnsList.fold<int>(
+        0,
+            (sum, t) => sum + t.throws.length,
+      );
 
       final record = LocalMatchRecord(
         localId: data['matchId'] ?? doc.id,
@@ -187,6 +291,12 @@ class LocalMatchSyncService {
         setsWon: Map<String, int>.from(data['setsWon']),
         startTime: (data['startTime'] as Timestamp).toDate(),
         endTime: (data['endTime'] as Timestamp).toDate(),
+        createdAt: data['createdAt'] is Timestamp
+            ? (data['createdAt'] as Timestamp).toDate()
+            : (data['startTime'] as Timestamp).toDate(),
+        updatedAt: data['updatedAt'] is Timestamp
+            ? (data['updatedAt'] as Timestamp).toDate()
+            : (data['endTime'] as Timestamp).toDate(),
         totalTurns: totalTurns,
         totalDarts: totalDarts,
         gameConfig: Map<String, dynamic>.from(data['gameConfig']),
@@ -200,12 +310,33 @@ class LocalMatchSyncService {
         syncStatus: LocalMatchSyncStatus.synced,
       );
 
-      local.add(record);
+      final existingIndex = local.indexWhere((cached) {
+        final sameRemote = cached.remoteId != null && cached.remoteId == doc.id;
+        final sameLocalAndPlayer = cached.localId == record.localId &&
+            _recordOwnerKey(cached) == _recordOwnerKey(record);
+        return sameRemote || sameLocalAndPlayer;
+      });
+
+      if (existingIndex == -1) {
+        local.add(record);
+        changed = true;
+      } else {
+        final existing = local[existingIndex];
+
+        if (existing.updatedAt.isBefore(record.updatedAt) ||
+            existing.syncStatus != LocalMatchSyncStatus.synced) {
+          local[existingIndex] = record;
+          changed = true;
+        }
+      }
     }
 
-    await _saveAll(local);
-  }
+    if (changed) {
+      await _saveAll(local);
+    }
 
+    return changed;
+  }
   /// 🔥 RECUPERA TUTTI I MATCH X01 DIRETTAMENTE DA FIRESTORE (senza filtro status)
   /// 🔥 RECUPERA TUTTI I MATCH X01 IN PARALLELO (VELOCE)
   Future<List<LocalMatchRecord>> fetchX01MatchesFromFirestore() async {
@@ -560,44 +691,68 @@ class LocalMatchSyncService {
     if (normalizedMode != 'x01' && normalizedMode != 'cricket') return 0;
 
     final all = await _getAll();
-    final localToDelete = all
-        .where((record) => record.mode.trim().toLowerCase() == normalizedMode)
-        .toList();
+    var affectedCount = 0;
 
-    final toKeep = all
-        .where((record) => record.mode.trim().toLowerCase() != normalizedMode)
-        .toList();
+    for (int i = 0; i < all.length; i++) {
+      final record = all[i];
+      if (record.mode.trim().toLowerCase() != normalizedMode) continue;
 
-    var deletedCount = localToDelete.length;
+      affectedCount++;
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final collectionName = normalizedMode == 'x01'
-          ? 'x01_matches'
-          : 'cricket_matches';
+      all[i] = record.copyWith(
+        syncStatus: LocalMatchSyncStatus.pendingDelete,
+        deletedAt: DateTime.now(),
+      );
 
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection(collectionName)
-          .get();
-
-      for (final doc in snapshot.docs) {
-        deletedCount += await _deleteMatchDocumentHierarchy(doc.reference);
-      }
-    }
-
-    await _saveAll(toKeep);
-
-    for (final record in localToDelete) {
-      _syncStatusController.add({record.localId: LocalMatchSyncStatus.synced});
+      _syncStatusController.add({record.localId: LocalMatchSyncStatus.pendingDelete});
       if (record.remoteId != null) {
-        _syncStatusController.add({record.remoteId!: LocalMatchSyncStatus.synced});
+        _syncStatusController.add({record.remoteId!: LocalMatchSyncStatus.pendingDelete});
       }
     }
 
-    return deletedCount;
+    await _saveAll(all);
+    await syncAll();
+
+    return affectedCount;
   }
+
+
+  String _recordOwnerKey(LocalMatchRecord record) {
+    if (record.playerTurns.keys.isNotEmpty) {
+      return record.playerTurns.keys.first;
+    }
+
+    if (record.playerIds.isNotEmpty) {
+      return record.playerIds.first;
+    }
+
+    return '';
+  }
+
+  String _collectionNameForMode(String mode) {
+    return mode.trim().toLowerCase() == 'cricket'
+        ? 'cricket_matches'
+        : 'x01_matches';
+  }
+
+  Future<void> _deleteRemoteMatchByRecord(
+      String uid,
+      LocalMatchRecord record,
+      ) async {
+    final remoteId = record.remoteId;
+    if (remoteId == null || remoteId.isEmpty) return;
+
+    final collectionName = _collectionNameForMode(record.mode);
+
+    final ref = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection(collectionName)
+        .doc(remoteId);
+
+    await _deleteMatchDocumentHierarchy(ref);
+  }
+
 
   Future<int> _deleteMatchDocumentHierarchy(
       DocumentReference<Map<String, dynamic>> matchRef,
@@ -661,14 +816,30 @@ class LocalMatchSyncService {
   Future<void> deleteRecord(String id) async {
     final all = await _getAll();
 
-    all.removeWhere((r) => r.localId == id || r.remoteId == id);
+    final index = all.indexWhere((r) => r.localId == id || r.remoteId == id);
+    if (index == -1) return;
+
+    final record = all[index];
+
+    all[index] = record.copyWith(
+      syncStatus: LocalMatchSyncStatus.pendingDelete,
+      deletedAt: DateTime.now(),
+    );
 
     await _saveAll(all);
-    _syncStatusController.add({id: LocalMatchSyncStatus.synced});
+    _syncStatusController.add({id: LocalMatchSyncStatus.pendingDelete});
+
+    await syncAll();
   }
 
   Future<List<LocalMatchRecord>> getAllRecords() async {
-    return await _getAll();
+    final all = await _getAll();
+
+    return all
+        .where((record) =>
+    record.syncStatus != LocalMatchSyncStatus.pendingDelete &&
+        record.syncStatus != LocalMatchSyncStatus.failedDelete)
+        .toList();
   }
 
   Future<List<LocalMatchRecord>> _getAll() async {

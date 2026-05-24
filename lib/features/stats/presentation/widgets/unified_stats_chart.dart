@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../app_theme.dart';
 
@@ -23,6 +24,147 @@ class UnifiedStatsPoint {
     required this.detail,
   });
 }
+class UnifiedStatsInfoData {
+  final String title;
+  final String text;
+  final List<String> advice;
+  final List<(String, Color)>? customLegend;
+
+  const UnifiedStatsInfoData({
+    required this.title,
+    required this.text,
+    this.advice = const [],
+    this.customLegend,
+  });
+}
+
+class UnifiedStatsCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final UnifiedStatsInfoData info;
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+  final IconData footerIcon;
+  final String? footerText;
+  final bool wrapChildInPanel;
+
+  const UnifiedStatsCard({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.info,
+    required this.child,
+    this.padding,
+    this.footerIcon = Icons.analytics_rounded,
+    this.footerText,
+    this.wrapChildInPanel = false,
+  });
+
+  void _openInfo(BuildContext context) {
+    _UnifiedStatsInfoSheet.show(
+      context: context,
+      title: info.title,
+      text: info.text,
+      advice: info.advice,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: AppTokens.r16,
+        border: Border.all(color: t.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _UnifiedStatsHeader(
+            title: title,
+            subtitle: subtitle,
+            onInfo: () => _openInfo(context),
+          ),
+          _UnifiedStatsCardBody(
+            padding: padding,
+            wrapChildInPanel: wrapChildInPanel,
+            footerIcon: footerIcon,
+            footerText: footerText,
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UnifiedStatsCardBody extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+  final bool wrapChildInPanel;
+  final IconData footerIcon;
+  final String? footerText;
+
+  const _UnifiedStatsCardBody({
+    required this.child,
+    required this.padding,
+    required this.wrapChildInPanel,
+    required this.footerIcon,
+    required this.footerText,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+
+    final content = Padding(
+      padding: padding ?? EdgeInsets.zero,
+      child: child,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (wrapChildInPanel)
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: t.surfaceHigh,
+              border: Border(
+                top: BorderSide(color: t.divider),
+                bottom: BorderSide(color: t.divider),
+              ),
+            ),
+            child: content,
+          )
+        else
+          content,
+        if (footerText != null && footerText!.trim().isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+            child: Row(
+              children: [
+                Icon(footerIcon, color: t.textMuted, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    footerText!,
+                    style: t.bodySmall(t.textMuted),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 
 class UnifiedStatsChart extends StatefulWidget {
   final String title;
@@ -34,10 +176,15 @@ class UnifiedStatsChart extends StatefulWidget {
   final bool invertYAxis;
   final double? minYValue;
   final double? maxYValue;
+  final double? minXValue;
+  final double? maxXValue;
+  final double minXRange;
+  final double minYRange;
   final double height;
   final String infoTitle;
   final String infoText;
   final List<String> advice;
+  final String? footerText;
 
   const UnifiedStatsChart({
     super.key,
@@ -50,10 +197,15 @@ class UnifiedStatsChart extends StatefulWidget {
     this.invertYAxis = false,
     this.minYValue,
     this.maxYValue,
+    this.minXValue,
+    this.maxXValue,
+    this.minXRange = 6.0,
+    this.minYRange = 10.0,
     this.height = 360,
     required this.infoTitle,
     required this.infoText,
     this.advice = const [],
+    this.footerText,
   });
 
   factory UnifiedStatsChart.fakeTrainingPreview({Key? key}) {
@@ -96,6 +248,109 @@ class UnifiedStatsChart extends StatefulWidget {
   State<UnifiedStatsChart> createState() => _UnifiedStatsChartState();
 }
 
+class _TwoPointerScaleData {
+  final Offset focalPoint;
+  final double distanceX;
+  final double distanceY;
+
+  const _TwoPointerScaleData({
+    required this.focalPoint,
+    required this.distanceX,
+    required this.distanceY,
+  });
+}
+
+
+class _TwoPointerScaleGestureRecognizer extends OneSequenceGestureRecognizer {
+  void Function(Offset globalFocalPoint, double distanceX, double distanceY)? onStart;
+  void Function(Offset globalFocalPoint, double distanceX, double distanceY)? onUpdate;
+
+  VoidCallback? onEnd;
+
+  final Map<int, Offset> _pointers = <int, Offset>{};
+  bool _active = false;
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    startTrackingPointer(event.pointer, event.transform);
+    _pointers[event.pointer] = event.position;
+
+    if (_pointers.length == 2 && !_active) {
+      _active = true;
+      resolve(GestureDisposition.accepted);
+      final data = _currentData();
+      onStart?.call(data.focalPoint, data.distanceX, data.distanceY);
+    }
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (event is PointerMoveEvent) {
+      if (!_pointers.containsKey(event.pointer)) return;
+
+      _pointers[event.pointer] = event.position;
+
+      if (_active && _pointers.length >= 2) {
+        final data = _currentData();
+        onUpdate?.call(data.focalPoint, data.distanceX, data.distanceY);
+      }
+
+      return;
+    }
+
+    if (event is PointerUpEvent || event is PointerCancelEvent) {
+      if (_pointers.containsKey(event.pointer)) {
+        stopTrackingPointer(event.pointer);
+        _pointers.remove(event.pointer);
+      }
+
+      if (_active && _pointers.length < 2) {
+        _active = false;
+        onEnd?.call();
+      }
+    }
+  }
+
+  _TwoPointerScaleData _currentData() {
+    final values = _pointers.values.take(2).toList(growable: false);
+
+    if (values.length < 2) {
+      return const _TwoPointerScaleData(
+        focalPoint: Offset.zero,
+        distanceX: 1,
+        distanceY: 1,
+      );
+    }
+
+    final focal = Offset(
+      (values[0].dx + values[1].dx) / 2,
+      (values[0].dy + values[1].dy) / 2,
+    );
+
+    final dx = (values[0].dx - values[1].dx).abs();
+    final dy = (values[0].dy - values[1].dy).abs();
+
+    return _TwoPointerScaleData(
+      focalPoint: focal,
+      distanceX: dx <= 1 ? 1 : dx,
+      distanceY: dy <= 1 ? 1 : dy,
+    );
+  }
+
+  @override
+  void didStopTrackingLastPointer(int pointer) {
+    _pointers.clear();
+
+    if (_active) {
+      _active = false;
+      onEnd?.call();
+    }
+  }
+
+  @override
+  String get debugDescription => 'two pointer chart scale';
+}
+
 class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
   static const double _axisLeftWidth = 64;
   static const double _axisBottomHeight = 36;
@@ -116,16 +371,22 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
     maxY: 1,
   );
 
-  _UnifiedStatsBounds _gestureStartBounds = const _UnifiedStatsBounds(
+  Size _plotSize = Size.zero;
+  UnifiedStatsPoint? _selectedPoint;
+  final GlobalKey _plotKey = GlobalKey();
+
+  _UnifiedStatsBounds _twoPointerStartBounds = const _UnifiedStatsBounds(
     minX: 0,
     maxX: 1,
     minY: 0,
     maxY: 1,
   );
 
-  Offset _gestureStartLocal = Offset.zero;
-  Size _plotSize = Size.zero;
-  UnifiedStatsPoint? _selectedPoint;
+  Offset _twoPointerStartFocal = Offset.zero;
+  double _twoPointerStartDistanceX = 1.0;
+  double _twoPointerStartDistanceY = 1.0;
+  bool _singleFingerPanActive = false;
+  Offset? _singleFingerPanStart;
 
   @override
   void initState() {
@@ -140,7 +401,6 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
     if (oldWidget.points != widget.points) {
       _dataBounds = _calculateDataBounds();
       _visibleBounds = _dataBounds;
-      _gestureStartBounds = _dataBounds;
     }
   }
 
@@ -154,24 +414,46 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
       );
     }
 
-    final minXRaw = widget.points.map((p) => p.x).reduce(math.min);
-    final maxXRaw = widget.points.map((p) => p.x).reduce(math.max);
-    final minYRaw = widget.minYValue ?? widget.points.map((p) => p.y).reduce(math.min);
-    final maxYRaw = widget.maxYValue ?? widget.points.map((p) => p.y).reduce(math.max);
+    final rawMinX = widget.points.map((p) => p.x).reduce(math.min);
+    final rawMaxX = widget.points.map((p) => p.x).reduce(math.max);
+    final rawMinY = widget.points.map((p) => p.y).reduce(math.min);
+    final rawMaxY = widget.points.map((p) => p.y).reduce(math.max);
 
-    final xRange = (maxXRaw - minXRaw).abs();
-    final yRange = (maxYRaw - minYRaw).abs();
+    final minXRaw = widget.minXValue ?? rawMinX;
+    final maxXRaw = widget.maxXValue ?? rawMaxX;
+    final minYRaw = widget.minYValue ?? rawMinY;
+    final maxYRaw = widget.maxYValue ?? rawMaxY;
 
-    final xPadding = xRange == 0 ? 1.0 : (xRange * 0.04).clamp(1.0, 8.0);
-    final yPadding = widget.minYValue != null || widget.maxYValue != null
-        ? 0.0
-        : (yRange == 0 ? 1.0 : (yRange * 0.16).clamp(6.0, 18.0));
+    final xRangeRaw = (maxXRaw - minXRaw).abs();
+    final yRangeRaw = (maxYRaw - minYRaw).abs();
+
+    final effectiveXRange = math.max(xRangeRaw, widget.minXRange);
+    final effectiveYRange = math.max(yRangeRaw, widget.minYRange);
+
+    final xCenter = (minXRaw + maxXRaw) / 2;
+    final yCenter = (minYRaw + maxYRaw) / 2;
+
+    final hasFixedMinX = widget.minXValue != null;
+    final hasFixedMaxX = widget.maxXValue != null;
+    final hasFixedMinY = widget.minYValue != null;
+    final hasFixedMaxY = widget.maxYValue != null;
+
+    final xPadding = hasFixedMinX && hasFixedMaxX ? 0.0 : effectiveXRange * 0.08;
+    final yPadding = hasFixedMinY && hasFixedMaxY ? 0.0 : effectiveYRange * 0.18;
 
     return _UnifiedStatsBounds(
-      minX: minXRaw - xPadding,
-      maxX: maxXRaw + xPadding,
-      minY: minYRaw - yPadding,
-      maxY: maxYRaw + yPadding,
+      minX: hasFixedMinX
+          ? minXRaw
+          : xCenter - effectiveXRange / 2 - xPadding,
+      maxX: hasFixedMaxX
+          ? maxXRaw
+          : xCenter + effectiveXRange / 2 + xPadding,
+      minY: hasFixedMinY
+          ? minYRaw
+          : yCenter - effectiveYRange / 2 - yPadding,
+      maxY: hasFixedMaxY
+          ? maxYRaw
+          : yCenter + effectiveYRange / 2 + yPadding,
     );
   }
 
@@ -179,80 +461,158 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
     setState(() {
       _dataBounds = _calculateDataBounds();
       _visibleBounds = _dataBounds;
-      _gestureStartBounds = _dataBounds;
     });
   }
 
-  void _onScaleStart(ScaleStartDetails details) {
-    _gestureStartBounds = _visibleBounds;
-    _gestureStartLocal = details.localFocalPoint;
+
+  Offset _plotLocalFromGlobal(Offset globalPosition) {
+    final context = _plotKey.currentContext;
+    if (context == null) return Offset.zero;
+
+    final renderObject = context.findRenderObject();
+    if (renderObject is! RenderBox) return Offset.zero;
+
+    return renderObject.globalToLocal(globalPosition);
   }
 
-  void _onScaleUpdate(ScaleUpdateDetails details) {
+  void _onTwoPointerScaleStart(
+      Offset globalFocalPoint,
+      double distanceX,
+      double distanceY,
+      ) {
     if (_plotSize.width <= 0 || _plotSize.height <= 0) return;
 
-    final pointerCount = details.pointerCount;
-    final local = details.localFocalPoint;
+    _twoPointerStartBounds = _visibleBounds;
+    _twoPointerStartFocal = _plotLocalFromGlobal(globalFocalPoint);
+    _twoPointerStartDistanceX = distanceX <= 1 ? 1 : distanceX;
+    _twoPointerStartDistanceY = distanceY <= 1 ? 1 : distanceY;
+  }
 
-    if (pointerCount <= 1) {
-      final dxPx = local.dx - _gestureStartLocal.dx;
-      final dyPx = local.dy - _gestureStartLocal.dy;
+  void _onTwoPointerScaleUpdate(
+      Offset globalFocalPoint,
+      double distanceX,
+      double distanceY,
+      ) {
+    if (_plotSize.width <= 0 || _plotSize.height <= 0) return;
 
-      final dxValue = -dxPx / _plotSize.width * _gestureStartBounds.xRange;
-      final dyValue = widget.invertYAxis
-          ? -dyPx / _plotSize.height * _gestureStartBounds.yRange
-          : dyPx / _plotSize.height * _gestureStartBounds.yRange;
+    final currentFocal = _plotLocalFromGlobal(globalFocalPoint);
+    final currentDistanceX = distanceX <= 1 ? 1 : distanceX;
+    final currentDistanceY = distanceY <= 1 ? 1 : distanceY;
 
-      final moved = _gestureStartBounds.shifted(
-        dx: dxValue,
-        dy: dyValue,
-      );
+    final scaleX =
+    (currentDistanceX / _twoPointerStartDistanceX).clamp(0.25, 8.0);
+    final scaleY =
+    (currentDistanceY / _twoPointerStartDistanceY).clamp(0.25, 8.0);
 
-      setState(() {
-        _visibleBounds = _clampToData(moved);
-      });
-      return;
-    }
+    final startFocalXRatio =
+    (_twoPointerStartFocal.dx / _plotSize.width).clamp(0.0, 1.0);
+    final startFocalYRatio =
+    (_twoPointerStartFocal.dy / _plotSize.height).clamp(0.0, 1.0);
 
-    final horizontalScale = details.horizontalScale <= 0 ? 1.0 : details.horizontalScale;
-    final verticalScale = details.verticalScale <= 0 ? 1.0 : details.verticalScale;
+    final focalX = _twoPointerStartBounds.minX +
+        _twoPointerStartBounds.xRange * startFocalXRatio;
 
-    final focalXRatio = (local.dx / _plotSize.width).clamp(0.0, 1.0);
-    final focalYRatio = (local.dy / _plotSize.height).clamp(0.0, 1.0);
+    final focalY = widget.invertYAxis
+        ? _twoPointerStartBounds.minY +
+        _twoPointerStartBounds.yRange * startFocalYRatio
+        : _twoPointerStartBounds.maxY -
+        _twoPointerStartBounds.yRange * startFocalYRatio;
 
-    final focalX = _gestureStartBounds.minX + _gestureStartBounds.xRange * focalXRatio;
-    final focalY = _gestureStartBounds.maxY - _gestureStartBounds.yRange * focalYRatio;
 
-    final nextXRange = (_gestureStartBounds.xRange / horizontalScale)
+    final nextXRange = (_twoPointerStartBounds.xRange / scaleX)
         .clamp(_dataBounds.xRange / 80, _dataBounds.xRange * 4);
 
-    final nextYRange = (_gestureStartBounds.yRange / verticalScale)
+    final nextYRange = (_twoPointerStartBounds.yRange / scaleY)
         .clamp(_dataBounds.yRange / 80, _dataBounds.yRange * 4);
 
-    final nextMinX = focalX - nextXRange * focalXRatio;
-    final nextMaxX = nextMinX + nextXRange;
+    final focalDelta = currentFocal - _twoPointerStartFocal;
 
-    final nextMaxY = focalY + nextYRange * focalYRatio;
-    final nextMinY = nextMaxY - nextYRange;
+    final panDx = -(focalDelta.dx / _plotSize.width) * nextXRange;
+    final panDy = widget.invertYAxis
+        ? -(focalDelta.dy / _plotSize.height) * nextYRange
+        : (focalDelta.dy / _plotSize.height) * nextYRange;
 
+
+    final minX = focalX - nextXRange * startFocalXRatio + panDx;
+    final maxX = minX + nextXRange;
+
+    final double minY;
+    final double maxY;
+
+    if (widget.invertYAxis) {
+      minY = focalY - nextYRange * startFocalYRatio + panDy;
+      maxY = minY + nextYRange;
+    } else {
+      maxY = focalY + nextYRange * startFocalYRatio + panDy;
+      minY = maxY - nextYRange;
+    }
+    
     setState(() {
       _visibleBounds = _clampToData(
         _UnifiedStatsBounds(
-          minX: nextMinX,
-          maxX: nextMaxX,
-          minY: nextMinY,
-          maxY: nextMaxY,
+          minX: minX,
+          maxX: maxX,
+          minY: minY,
+          maxY: maxY,
         ),
       );
     });
   }
-  void _onTapUp(TapUpDetails details) {
+
+  void _onTwoPointerScaleEnd() {
+    _twoPointerStartDistanceX = 1.0;
+    _twoPointerStartDistanceY = 1.0;
+  }
+
+  void _onSingleFingerPointerDown(PointerDownEvent event) {
+    if (event.kind != PointerDeviceKind.touch) return;
+
+    _singleFingerPanActive = false;
+    _singleFingerPanStart = event.localPosition;
+  }
+
+  void _onSingleFingerPointerMove(PointerMoveEvent event) {
+    if (event.kind != PointerDeviceKind.touch) return;
+    if (_plotSize.width <= 0) return;
+    if (_singleFingerPanStart == null) return;
+
+    final delta = event.localPosition - _singleFingerPanStart!;
+
+    if (!_singleFingerPanActive) {
+      if (delta.dx.abs() < 32) return;
+
+      if (delta.dx.abs() <= delta.dy.abs()) return;
+
+      _singleFingerPanActive = true;
+    }
+
+    final dx = -(event.delta.dx / _plotSize.width) * _visibleBounds.xRange;
+
+    setState(() {
+      _visibleBounds = _clampToData(
+        _UnifiedStatsBounds(
+          minX: _visibleBounds.minX + dx,
+          maxX: _visibleBounds.maxX + dx,
+          minY: _visibleBounds.minY,
+          maxY: _visibleBounds.maxY,
+        ),
+      );
+    });
+  }
+
+  void _onSingleFingerPointerEnd(PointerEvent event) {
+    _singleFingerPanActive = false;
+    _singleFingerPanStart = null;
+  }
+
+
+  void _selectNearestPoint(Offset local) {
     if (_plotSize.width <= 0 || _plotSize.height <= 0 || widget.points.isEmpty) {
       return;
     }
+    final isCompact = MediaQuery.sizeOf(context).width < 600;
+    final hitRadius = isCompact ? 90.0 : 72.0;
 
-    final local = details.localPosition;
-    const hitRadius = 18.0;
 
     UnifiedStatsPoint? nearest;
     double nearestDistance = double.infinity;
@@ -290,21 +650,36 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
   void _onPointerSignal(PointerSignalEvent event) {
     if (event is! PointerScrollEvent) return;
     if (_plotSize.width <= 0 || _plotSize.height <= 0) return;
+    if (!_isCtrlOrMetaPressed()) return;
 
-    final local = event.localPosition;
-    final focalXRatio = (local.dx / _plotSize.width).clamp(0.0, 1.0);
-    final focalYRatio = (local.dy / _plotSize.height).clamp(0.0, 1.0);
+    GestureBinding.instance.pointerSignalResolver.register(event, (_) {
+      final local = event.localPosition;
+      final focalXRatio = (local.dx / _plotSize.width).clamp(0.0, 1.0);
+      final focalYRatio = (local.dy / _plotSize.height).clamp(0.0, 1.0);
+      final factor = _wheelZoomFactor(event);
 
-    final isHorizontalIntent = event.scrollDelta.dx.abs() > event.scrollDelta.dy.abs();
-    final zoomIn = isHorizontalIntent ? event.scrollDelta.dx < 0 : event.scrollDelta.dy < 0;
-    final factor = zoomIn ? 0.86 : 1.16;
-
-    if (isHorizontalIntent) {
       _zoomX(factor, focalXRatio);
-    } else {
       _zoomY(factor, focalYRatio);
-    }
+    });
   }
+
+  bool _isCtrlOrMetaPressed() {
+    final keys = HardwareKeyboard.instance.logicalKeysPressed;
+
+    return keys.contains(LogicalKeyboardKey.controlLeft) ||
+        keys.contains(LogicalKeyboardKey.controlRight) ||
+        keys.contains(LogicalKeyboardKey.metaLeft) ||
+        keys.contains(LogicalKeyboardKey.metaRight);
+  }
+
+  double _wheelZoomFactor(PointerScrollEvent event) {
+    final delta = event.scrollDelta.dy.abs() >= event.scrollDelta.dx.abs()
+        ? event.scrollDelta.dy
+        : event.scrollDelta.dx;
+
+    return delta < 0 ? 0.86 : 1.16;
+  }
+
 
   void _zoomX(double factor, double focalRatio) {
     final focal = _visibleBounds.minX + _visibleBounds.xRange * focalRatio;
@@ -388,83 +763,200 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
     );
   }
 
-  void _openInfo() {
+  @override
+  Widget build(BuildContext context) {
     final t = AppTokens.of(context);
 
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: t.overlay,
-      barrierColor: Colors.black.withOpacity(0.55),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+    return UnifiedStatsCard(
+      title: widget.title,
+      subtitle: widget.subtitle,
+      info: UnifiedStatsInfoData(
+        title: widget.infoTitle,
+        text: widget.infoText,
+        advice: widget.advice,
       ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.info_rounded, color: t.accent, size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        widget.infoTitle,
-                        style: TextStyle(
-                          color: t.textPrimary,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (widget.points.isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+              child: Text(
+                'Nessun dato disponibile.',
+                style: t.bodySmall(t.textMuted),
+              ),
+            )
+          else ...[
+            SizedBox(
+              height: widget.height,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final plotWidth = math.max(
+                    1.0,
+                    constraints.maxWidth - _axisLeftWidth - _axisRightPad,
+                  );
+                  final plotHeight = math.max(
+                    1.0,
+                    constraints.maxHeight - _axisTopPad - _axisBottomHeight,
+                  );
+
+                  _plotSize = Size(plotWidth, plotHeight);
+
+                  return Stack(
+                    children: [
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: t.surfaceHigh,
+                            border: Border(
+                              top: BorderSide(color: t.divider),
+                              bottom: BorderSide(color: t.divider),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  widget.infoText,
-                  style: TextStyle(
-                    color: t.textSecondary,
-                    fontSize: 13,
-                    height: 1.35,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                if (widget.advice.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    'CONSIGLI',
-                    style: t.labelCaps(t.textMuted),
-                  ),
-                  const SizedBox(height: 8),
-                  for (final item in widget.advice)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(Icons.check_circle_rounded, color: t.green, size: 16),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              item,
-                              style: TextStyle(
-                                color: t.textPrimary,
-                                fontSize: 12.5,
-                                height: 1.3,
-                                fontWeight: FontWeight.w600,
+                      Positioned(
+                        left: 0,
+                        top: _axisTopPad,
+                        bottom: _axisBottomHeight,
+                        width: _axisLeftWidth,
+                        child: CustomPaint(
+                          painter: _UnifiedStatsFixedYAxisPainter(
+                            visibleBounds: _visibleBounds,
+                            tokens: t,
+                            axisLabel: widget.yAxisLabel,
+                            invertYAxis: widget.invertYAxis,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: _axisLeftWidth,
+                        right: _axisRightPad,
+                        bottom: 0,
+                        height: _axisBottomHeight,
+                        child: CustomPaint(
+                          painter: _UnifiedStatsFixedXAxisPainter(
+                            visibleBounds: _visibleBounds,
+                            tokens: t,
+                            axisLabel: widget.xAxisLabel,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: _axisLeftWidth,
+                        right: _axisRightPad,
+                        top: _axisTopPad,
+                        bottom: _axisBottomHeight,
+                        child: Listener(
+                          behavior: HitTestBehavior.opaque,
+                          onPointerSignal: _onPointerSignal,
+                          onPointerDown: _onSingleFingerPointerDown,
+                          onPointerMove: _onSingleFingerPointerMove,
+                          onPointerUp: _onSingleFingerPointerEnd,
+                          onPointerCancel: _onSingleFingerPointerEnd,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            excludeFromSemantics: true,
+                            onTapDown: (details) {
+                              if (_singleFingerPanActive) return;
+                              _selectNearestPoint(details.localPosition);
+                            },
+                            onDoubleTap: _resetZoom,
+                            child: RawGestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              gestures: <Type, GestureRecognizerFactory>{
+                                _TwoPointerScaleGestureRecognizer:
+                                GestureRecognizerFactoryWithHandlers<
+                                    _TwoPointerScaleGestureRecognizer>(
+                                      () => _TwoPointerScaleGestureRecognizer(),
+                                      (recognizer) {
+                                    recognizer
+                                      ..onStart = _onTwoPointerScaleStart
+                                      ..onUpdate = _onTwoPointerScaleUpdate
+                                      ..onEnd = _onTwoPointerScaleEnd;
+                                  },
+                                ),
+                              },
+                              child: RepaintBoundary(
+                                key: _plotKey,
+                                child: CustomPaint(
+                                  painter: _UnifiedStatsPlotPainter(
+                                    points: widget.points,
+                                    mode: widget.mode,
+                                    visibleBounds: _visibleBounds,
+                                    tokens: t,
+                                    selectedPoint: _selectedPoint,
+                                    invertYAxis: widget.invertYAxis,
+                                  ),
+                                  size: Size.infinite,
+                                ),
                               ),
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                ],
-              ],
+                    ],
+                  );
+                },
+              ),
             ),
-          ),
+            const SizedBox(height: 10),
+            _UnifiedStatsPointDetails(
+              point: _selectedPoint,
+              xAxisLabel: widget.xAxisLabel,
+              yAxisLabel: widget.yAxisLabel,
+            ),
+          ],
+          if (widget.footerText != null && widget.footerText!.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+              child: Row(
+                children: [
+                  Icon(Icons.analytics_rounded, color: t.textMuted, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.footerText!,
+                      style: t.bodySmall(t.textMuted),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          //_UnifiedStatsFakeTable(points: widget.points),
+        ],
+      ),
+    );
+  }
+}
+class _UnifiedStatsInfoSheet extends StatelessWidget {
+  final String title;
+  final String text;
+  final List<String> advice;
+
+  const _UnifiedStatsInfoSheet({
+    required this.title,
+    required this.text,
+    required this.advice,
+  });
+
+  static void show({
+    required BuildContext context,
+    required String title,
+    required String text,
+    required List<String> advice,
+  }) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withOpacity(0.55),
+      builder: (_) {
+        return _UnifiedStatsInfoSheet(
+          title: title,
+          text: text,
+          advice: advice,
         );
       },
     );
@@ -473,124 +965,124 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
-    _dataBounds = _calculateDataBounds();
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: t.surface,
-        borderRadius: AppTokens.r16,
-        border: Border.all(color: t.border),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _UnifiedStatsHeader(
-            title: widget.title,
-            subtitle: widget.subtitle,
-            onInfo: _openInfo,
-            onReset: _resetZoom,
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.58,
+      minChildSize: 0.34,
+      maxChildSize: 0.92,
+      builder: (context, scrollController) {
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: t.overlay,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border(top: BorderSide(color: t.border)),
           ),
-          SizedBox(
-            height: widget.height,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final plotWidth = math.max(
-                  1.0,
-                  constraints.maxWidth - _axisLeftWidth - _axisRightPad,
-                );
-                final plotHeight = math.max(
-                  1.0,
-                  constraints.maxHeight - _axisTopPad - _axisBottomHeight,
-                );
-
-                _plotSize = Size(plotWidth, plotHeight);
-
-                return Stack(
-                  children: [
-                    Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: t.surfaceHigh,
-                          border: Border(
-                            top: BorderSide(color: t.divider),
-                            bottom: BorderSide(color: t.divider),
-                          ),
-                        ),
+          child: ListView(
+            controller: scrollController,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: t.divider,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: t.accent.withOpacity(0.16),
+                      borderRadius: AppTokens.r12,
+                      border: Border.all(color: t.accent.withOpacity(0.34)),
+                    ),
+                    child: Icon(Icons.info_rounded, color: t.accent, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        color: t.textPrimary,
+                        fontSize: 18,
+                        height: 1.18,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
-                    Positioned(
-                      left: 0,
-                      top: _axisTopPad,
-                      bottom: _axisBottomHeight,
-                      width: _axisLeftWidth,
-                      child: CustomPaint(
-                        painter: _UnifiedStatsFixedYAxisPainter(
-                          visibleBounds: _visibleBounds,
-                          tokens: t,
-                          axisLabel: widget.yAxisLabel,
-                          invertYAxis: widget.invertYAxis,
-                        ),
+                  ),
+                  IconButton(
+                    tooltip: 'Chiudi',
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: Icon(Icons.close_rounded, color: t.textSecondary),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: t.surface,
+                  borderRadius: AppTokens.r16,
+                  border: Border.all(color: t.border),
+                ),
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    color: t.textSecondary,
+                    fontSize: 14,
+                    height: 1.48,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              if (advice.isNotEmpty) ...[
+                const SizedBox(height: 22),
+                Text('CONSIGLI', style: t.labelCaps(t.textMuted)),
+                const SizedBox(height: 10),
+                for (final item in advice)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: t.surface,
+                        borderRadius: AppTokens.r12,
+                        border: Border.all(color: t.border),
                       ),
-                    ),
-                    Positioned(
-                      left: _axisLeftWidth,
-                      right: _axisRightPad,
-                      bottom: 0,
-                      height: _axisBottomHeight,
-                      child: CustomPaint(
-                        painter: _UnifiedStatsFixedXAxisPainter(
-                          visibleBounds: _visibleBounds,
-                          tokens: t,
-                          axisLabel: widget.xAxisLabel,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      left: _axisLeftWidth,
-                      right: _axisRightPad,
-                      top: _axisTopPad,
-                      bottom: _axisBottomHeight,
-                      child: Listener(
-                        behavior: HitTestBehavior.opaque,
-                        onPointerSignal: _onPointerSignal,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTapDown: (_) {},
-                          onTapUp: _onTapUp,
-                          onDoubleTap: _resetZoom,
-                          onScaleStart: _onScaleStart,
-                          onScaleUpdate: _onScaleUpdate,
-                          child: CustomPaint(
-                            painter: _UnifiedStatsPlotPainter(
-                              points: widget.points,
-                              mode: widget.mode,
-                              visibleBounds: _visibleBounds,
-                              tokens: t,
-                              selectedPoint: _selectedPoint,
-                              invertYAxis: widget.invertYAxis,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.check_circle_rounded, color: t.green, size: 18),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              item,
+                              style: TextStyle(
+                                color: t.textPrimary,
+                                fontSize: 13,
+                                height: 1.38,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                            size: Size.infinite,
                           ),
-                        ),
+                        ],
                       ),
                     ),
-                  ],
-                );
-              },
-            ),
+                  ),
+              ],
+            ],
           ),
-          const SizedBox(height: 10),
-          _UnifiedStatsPointDetails(
-            point: _selectedPoint,
-            xAxisLabel: widget.xAxisLabel,
-            yAxisLabel: widget.yAxisLabel,
-          ),
-
-          //_UnifiedStatsFakeTable(points: widget.points),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -628,13 +1120,11 @@ class _UnifiedStatsHeader extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onInfo;
-  final VoidCallback onReset;
 
   const _UnifiedStatsHeader({
     required this.title,
     required this.subtitle,
     required this.onInfo,
-    required this.onReset,
   });
 
   @override
@@ -687,11 +1177,6 @@ class _UnifiedStatsHeader extends StatelessWidget {
             tooltip: 'Info',
             onPressed: onInfo,
             icon: Icon(Icons.info_outline_rounded, color: t.textSecondary),
-          ),
-          IconButton(
-            tooltip: 'Reset zoom',
-            onPressed: onReset,
-            icon: Icon(Icons.center_focus_strong_rounded, color: t.accent),
           ),
         ],
       ),
@@ -1145,6 +1630,8 @@ class _UnifiedStatsPlotPainter extends CustomPainter {
         oldDelegate.invertYAxis != invertYAxis;
   }
 }
+
+
 class _UnifiedStatsPointDetails extends StatelessWidget {
   final UnifiedStatsPoint? point;
   final String xAxisLabel;
@@ -1246,85 +1733,6 @@ class _UnifiedStatsPointChip extends StatelessWidget {
   }
 }
 
-class _UnifiedStatsFakeTable extends StatelessWidget {
-  final List<UnifiedStatsPoint> points;
-
-  const _UnifiedStatsFakeTable({
-    required this.points,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppTokens.of(context);
-    final rows = points.take(18).toList();
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: t.surface,
-      ),
-      child: SingleChildScrollView(
-
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          headingRowHeight: 36,
-          dataRowMinHeight: 34,
-          dataRowMaxHeight: 42,
-          columnSpacing: 22,
-          headingTextStyle: TextStyle(
-            color: t.textMuted,
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.4,
-          ),
-          dataTextStyle: TextStyle(
-            color: t.textPrimary,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
-          columns: const [
-            DataColumn(label: Text('IDX')),
-            DataColumn(label: Text('LABEL')),
-            DataColumn(label: Text('X')),
-            DataColumn(label: Text('Y')),
-            DataColumn(label: Text('DELTA')),
-            DataColumn(label: Text('TREND')),
-            DataColumn(label: Text('LETTURA')),
-          ],
-          rows: [
-            for (int i = 0; i < rows.length; i++)
-              DataRow(
-                cells: [
-                  DataCell(Text('${i + 1}')),
-                  DataCell(Text(rows[i].label)),
-                  DataCell(Text(rows[i].x.toStringAsFixed(0))),
-                  DataCell(Text(rows[i].y.toStringAsFixed(1))),
-                  DataCell(Text(_deltaLabel(rows, i))),
-                  DataCell(Text(_trendLabel(rows, i))),
-                  DataCell(Text(rows[i].detail)),
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _deltaLabel(List<UnifiedStatsPoint> rows, int index) {
-    if (index == 0) return '—';
-    final delta = rows[index].y - rows[index - 1].y;
-    final sign = delta >= 0 ? '+' : '';
-    return '$sign${delta.toStringAsFixed(1)}';
-  }
-
-  String _trendLabel(List<UnifiedStatsPoint> rows, int index) {
-    if (index == 0) return 'START';
-    final delta = rows[index].y - rows[index - 1].y;
-    if (delta > 3) return 'UP';
-    if (delta < -3) return 'DOWN';
-    return 'STABLE';
-  }
-}
-
 
 class UnifiedStatsDistanceBucket {
   final String label;
@@ -1358,58 +1766,6 @@ class UnifiedStatsHorizontalBars extends StatelessWidget {
     this.advice = const [],
   });
 
-  void _openInfo(BuildContext context) {
-    final t = AppTokens.of(context);
-
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: t.overlay,
-      barrierColor: Colors.black.withOpacity(0.55),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 22),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.info_rounded, color: t.accent, size: 22),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(infoTitle, style: t.bodyBold(t.textPrimary)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(infoText, style: t.bodySmall(t.textSecondary)),
-              if (advice.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Text('CONSIGLI', style: t.labelCaps(t.textMuted)),
-                const SizedBox(height: 8),
-                for (final item in advice)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.check_circle_rounded, color: t.green, size: 16),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(item, style: t.bodySmall(t.textPrimary))),
-                      ],
-                    ),
-                  ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
@@ -1417,23 +1773,17 @@ class UnifiedStatsHorizontalBars extends StatelessWidget {
         ? 1
         : buckets.map((e) => e.count).reduce(math.max).clamp(1, 999999);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: t.surface,
-        borderRadius: AppTokens.r16,
-        border: Border.all(color: t.border),
+    return UnifiedStatsCard(
+      title: title,
+      subtitle: subtitle,
+      info: UnifiedStatsInfoData(
+        title: infoTitle,
+        text: infoText,
+        advice: advice,
       ),
-      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _UnifiedStatsHeader(
-            title: title,
-            subtitle: subtitle,
-            onInfo: () => _openInfo(context),
-            onReset: () {},
-          ),
           if (buckets.isEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
@@ -1460,12 +1810,25 @@ class UnifiedStatsHorizontalBars extends StatelessWidget {
     );
   }
 }
+class UnifiedStatsTowerSegment {
+  final String label;
+  final double value;
+  final Color color;
+
+  const UnifiedStatsTowerSegment({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+}
+
 class UnifiedStatsTowerValue {
   final String label;
   final double value;
   final String topLabel;
   final String? subTopLabel;
   final Color? color;
+  final List<UnifiedStatsTowerSegment> segments;
 
   const UnifiedStatsTowerValue({
     required this.label,
@@ -1473,6 +1836,7 @@ class UnifiedStatsTowerValue {
     required this.topLabel,
     this.subTopLabel,
     this.color,
+    this.segments = const [],
   });
 }
 
@@ -1495,6 +1859,9 @@ class UnifiedStatsTowerChart extends StatefulWidget {
   final String infoTitle;
   final String infoText;
   final List<String> advice;
+  final List<(String, Color)>? customLegend;
+  final String? footerText;
+  final bool showTargetLines;
 
   const UnifiedStatsTowerChart({
     super.key,
@@ -1506,6 +1873,9 @@ class UnifiedStatsTowerChart extends StatefulWidget {
     this.infoTitle = 'Come leggere il grafico',
     this.infoText = 'Il grafico a torre mostra categorie sull’asse orizzontale e quantità o medie sull’asse verticale.',
     this.advice = const [],
+    this.customLegend,
+    this.footerText,
+    this.showTargetLines = false,
   });
 
   @override
@@ -1513,88 +1883,6 @@ class UnifiedStatsTowerChart extends StatefulWidget {
 }
 
 class _UnifiedStatsTowerChartState extends State<UnifiedStatsTowerChart> {
-  void _openInfo() {
-    final t = AppTokens.of(context);
-
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: t.overlay,
-      barrierColor: Colors.black.withOpacity(0.55),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.info_rounded, color: t.accent, size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        widget.infoTitle,
-                        style: TextStyle(
-                          color: t.textPrimary,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  widget.infoText,
-                  style: TextStyle(
-                    color: t.textSecondary,
-                    fontSize: 13,
-                    height: 1.35,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                if (widget.advice.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Text('CONSIGLI', style: t.labelCaps(t.textMuted)),
-                  const SizedBox(height: 8),
-                  for (final item in widget.advice)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(Icons.check_circle_rounded, color: t.green, size: 16),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              item,
-                              style: TextStyle(
-                                color: t.textPrimary,
-                                fontSize: 12.5,
-                                height: 1.3,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _resetView() {
-    setState(() {});
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1610,23 +1898,17 @@ class _UnifiedStatsTowerChartState extends State<UnifiedStatsTowerChart> {
     final minWidth = (widget.groups.length * (maxBarsInGroup <= 1 ? 46.0 : 92.0))
         .clamp(520.0, 9000.0);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: t.surface,
-        borderRadius: AppTokens.r16,
-        border: Border.all(color: t.border),
+    return UnifiedStatsCard(
+      title: widget.title,
+      subtitle: widget.subtitle,
+      info: UnifiedStatsInfoData(
+        title: widget.infoTitle,
+        text: widget.infoText,
+        advice: widget.advice,
       ),
-      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _UnifiedStatsHeader(
-            title: widget.title,
-            subtitle: widget.subtitle,
-            onInfo: _openInfo,
-            onReset: _resetView,
-          ),
           SizedBox(
             height: widget.height,
             child: DecoratedBox(
@@ -1647,6 +1929,8 @@ class _UnifiedStatsTowerChartState extends State<UnifiedStatsTowerChart> {
                       groups: widget.groups,
                       tokens: t,
                       yAxisLabel: widget.yAxisLabel,
+                      customLegend: widget.customLegend,
+                      showTargetLines: widget.showTargetLines,
                     ),
                     child: const SizedBox.expand(),
                   ),
@@ -1663,7 +1947,8 @@ class _UnifiedStatsTowerChartState extends State<UnifiedStatsTowerChart> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Grafico a torre standardizzato: confronta le barre per categoria e usa Info per leggere il significato del dato.',
+                    widget.footerText ??
+                        'Confronta le barre per categoria e usa Info per leggere il significato del dato.',
                     style: t.bodySmall(t.textMuted),
                   ),
                 ),
@@ -1680,19 +1965,23 @@ class _UnifiedStatsTowerPainter extends CustomPainter {
   final List<UnifiedStatsTowerGroup> groups;
   final AppTokens tokens;
   final String yAxisLabel;
+  final List<(String, Color)>? customLegend;
+  final bool showTargetLines;
 
   const _UnifiedStatsTowerPainter({
     required this.groups,
     required this.tokens,
     required this.yAxisLabel,
+    this.customLegend,
+    required this.showTargetLines,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     const left = 42.0;
     const right = 18.0;
-    const top = 18.0;
-    const bottom = 50.0;
+    const top = 28.0;
+    const bottom = 62.0;
 
     final chart = Rect.fromLTWH(
       left,
@@ -1728,27 +2017,65 @@ class _UnifiedStatsTowerPainter extends CustomPainter {
       _drawText(canvas, label, Offset(4, y - 7), tokens.textMuted, 10);
     }
 
-    final groupWidth = chart.width / groups.length;
+    if (showTargetLines) {
+      final targetLines = [
+        (15.0, '15'),
+        (18.0, '18'),
+        (21.0, '21'),
+        (24.0, '24'),
+      ];
+
+      for (final (target, label) in targetLines) {
+        if (target > yMax) continue;
+
+        final y = chart.bottom - ((target / yMax) * chart.height);
+
+        canvas.drawLine(
+          Offset(chart.left, y),
+          Offset(chart.right, y),
+          Paint()
+            ..color = tokens.textMuted.withOpacity(0.18)
+            ..strokeWidth = 1,
+        );
+
+        _drawText(
+          canvas,
+          '${label}d',
+          Offset(chart.right - 28, y - 8),
+          tokens.textMuted.withOpacity(0.6),
+          9,
+        );
+      }
+    }
+
+
+    final compactGroupWidth = 84.0;
+    final totalWidth = groups.length * compactGroupWidth;
+    final horizontalOffset =
+    totalWidth < chart.width ? (chart.width - totalWidth) / 6 : 0;
+
+    final groupWidth = compactGroupWidth;
 
     for (int i = 0; i < groups.length; i++) {
       final group = groups[i];
       final visibleValues = group.values.where((value) => value.value > 0).toList();
       if (visibleValues.isEmpty) continue;
 
-      final centerX = chart.left + groupWidth * i + groupWidth / 2;
+      final centerX =
+          chart.left + horizontalOffset + groupWidth * i + groupWidth / 2;
+
       final barCount = visibleValues.length;
       final barWidth = barCount <= 1
-          ? (groupWidth * 0.44).clamp(12.0, 30.0)
-          : (groupWidth * 0.24).clamp(12.0, 30.0);
-      final gap = (groupWidth * 0.08).clamp(4.0, 8.0);
-      final totalBarsWidth = barWidth * barCount + gap * (barCount - 1);
+          ? math.min(groupWidth * 0.42, 34.0)
+          : math.min((groupWidth - 18) / barCount, 28.0);
+
+      final totalBarsWidth = barWidth * barCount + 6 * (barCount - 1);
       final startX = centerX - totalBarsWidth / 2;
 
-      for (int valueIndex = 0; valueIndex < visibleValues.length; valueIndex++) {
-        final value = visibleValues[valueIndex];
+      for (int j = 0; j < visibleValues.length; j++) {
+        final value = visibleValues[j];
+        final x = startX + j * (barWidth + 6);
         final barHeight = (value.value / yMax) * chart.height;
-        final x = startX + valueIndex * (barWidth + gap);
-
         final rect = Rect.fromLTWH(
           x,
           chart.bottom - barHeight,
@@ -1756,20 +2083,62 @@ class _UnifiedStatsTowerPainter extends CustomPainter {
           barHeight,
         );
 
-        final color = value.color ?? tokens.accent;
+        if (value.segments.isEmpty) {
+          final color = value.color ?? tokens.accent;
 
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(rect, const Radius.circular(4)),
-          Paint()
-            ..color = color
-            ..style = PaintingStyle.fill,
-        );
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(rect, const Radius.circular(4)),
+            Paint()
+              ..color = color
+              ..style = PaintingStyle.fill,
+          );
+        } else {
+          double segmentBottom = chart.bottom;
+
+          for (final segment in value.segments.where((s) => s.value > 0)) {
+            final segmentHeight = (segment.value / yMax) * chart.height;
+
+            final segmentRect = Rect.fromLTWH(
+              x,
+              segmentBottom - segmentHeight,
+              barWidth,
+              segmentHeight,
+            );
+
+            canvas.drawRRect(
+              RRect.fromRectAndRadius(
+                segmentRect,
+                const Radius.circular(4),
+              ),
+              Paint()
+                ..color = segment.color
+                ..style = PaintingStyle.fill,
+            );
+
+            if (segmentHeight > 22) {
+              _drawCenteredText(
+                canvas,
+                segment.value.toStringAsFixed(1),
+                Offset(
+                  segmentRect.center.dx,
+                  segmentRect.center.dy - 6,
+                ),
+                Colors.white.withOpacity(0.92),
+                9,
+              );
+            }
+
+            segmentBottom -= segmentHeight;
+          }
+        }
+
+        final labelColor = value.color ?? tokens.accent;
 
         _drawCenteredText(
           canvas,
           value.topLabel,
           Offset(rect.center.dx, rect.top - 28),
-          color,
+          labelColor,
           10,
         );
 
@@ -1779,7 +2148,7 @@ class _UnifiedStatsTowerPainter extends CustomPainter {
             canvas,
             subTopLabel,
             Offset(rect.center.dx, rect.top - 15),
-            color,
+            labelColor,
             9,
           );
         }
@@ -1802,32 +2171,32 @@ class _UnifiedStatsTowerPainter extends CustomPainter {
   }
 
   void _drawLegend(Canvas canvas, Rect chart) {
-    final ordered = <String, Color>{};
-
-    for (final group in groups) {
-      for (final value in group.values) {
-        ordered.putIfAbsent(value.label, () => value.color ?? tokens.accent);
-      }
-    }
-
-    if (ordered.length <= 1) return;
+    final items = customLegend;
+    if (items == null || items.isEmpty) return;
 
     double x = chart.left;
-    final y = chart.bottom + 30;
+    double y = chart.bottom + 42;
 
-    for (final entry in ordered.entries) {
+    for (final (label, color) in items) {
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromLTWH(x, y, 10, 10),
-          const Radius.circular(2),
+          Rect.fromLTWH(x, y, 12, 12),
+          const Radius.circular(3),
         ),
         Paint()
-          ..color = entry.value
+          ..color = color
           ..style = PaintingStyle.fill,
       );
 
-      _drawText(canvas, entry.key, Offset(x + 14, y - 2), tokens.textMuted, 10);
-      x += 64;
+      _drawText(
+        canvas,
+        label,
+        Offset(x + 18, y - 1),
+        tokens.textMuted,
+        10,
+      );
+
+      x += 62;
     }
   }
 
@@ -1881,9 +2250,12 @@ class _UnifiedStatsTowerPainter extends CustomPainter {
   bool shouldRepaint(covariant _UnifiedStatsTowerPainter oldDelegate) {
     return oldDelegate.groups != groups ||
         oldDelegate.tokens != tokens ||
-        oldDelegate.yAxisLabel != yAxisLabel;
+        oldDelegate.yAxisLabel != yAxisLabel ||
+        oldDelegate.customLegend != customLegend ||
+        oldDelegate.showTargetLines != showTargetLines;
   }
 }
+
 
 class _UnifiedDistanceBarRow extends StatelessWidget {
   final UnifiedStatsDistanceBucket bucket;

@@ -27,15 +27,6 @@ class TurnPassTimer extends ConsumerWidget {
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         child: Row(
           children: [
-            Text(
-              '${remaining}s',
-              style: const TextStyle(
-                fontSize: 11,
-                color: Colors.orange,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(width: 8),
             Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(2),

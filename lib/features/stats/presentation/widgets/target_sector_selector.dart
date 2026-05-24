@@ -54,30 +54,27 @@ class TargetSectorSelector extends StatelessWidget {
     final parsed = _TargetParts.from(currentTarget);
 
     if (!enabled) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              parsed.type,
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.w900,
-                color: t.accent,
-                height: 1,
+      return GestureDetector(
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Target bloccato: salva o annulla tutti i tiri per cambiarlo.',
               ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 2),
             ),
-            Text(
-              '${parsed.number}',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.w900,
-                color: t.textPrimary,
-                height: 1,
-              ),
-            ),
-          ],
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(parsed.type, style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: t.accent, height: 1)),
+              Text('${parsed.number}', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: t.textPrimary, height: 1)),
+            ],
+          ),
         ),
       );
     }
@@ -254,7 +251,7 @@ class _SectorOverlayState extends State<_SectorOverlay> {
                     children: [
                       Expanded(
                         child: Text(
-                          'Select the target',
+                          'Seleziona target',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
@@ -422,7 +419,7 @@ class _SectorOverlayState extends State<_SectorOverlay> {
                             elevation: 0,
                           ),
                           child: const Text(
-                            'Confirm',
+                            'Conferma',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w800,

@@ -41,15 +41,17 @@ class StatsAggregatorService {
         // Profilo non esiste, lo creeremo
       }
 
-      final lastStatsUpdate = currentProfile?.stats.lastMatchDate;
+      final currentStats = currentProfile?.stats;
+      final hasNoStatsHistory =
+          currentStats?.lastMatchDate == null &&
+              currentStats?.lastTrainingDate == null;
 
-      // Determina se fare ricalcolo completo o incrementale
-      final needFullRecalc = forceFullRecalc || lastStatsUpdate == null;
+      final needFullRecalc = forceFullRecalc || currentStats == null || hasNoStatsHistory;
 
       if (needFullRecalc) {
         await _fullRecalc(user.uid);
       } else {
-        await _incrementalUpdate(user.uid, lastStatsUpdate!);
+        await _incrementalUpdate(user.uid, currentStats);
       }
     } catch (e) {
       print('Errore aggregazione stats: $e');
@@ -68,23 +70,29 @@ class StatsAggregatorService {
     await _saveStats(uid, stats);
   }
 
-  /// Aggiornamento incrementale (SOLO nuovi dati dall'ultimo update)
-  Future<void> _incrementalUpdate(String uid, DateTime lastUpdate) async {
+  /// Aggiornamento incrementale:
+  /// - match confrontati con lastMatchDate
+  /// - training confrontati con lastTrainingDate
+  /// Non usare una sola data globale: match e training avanzano separatamente.
+  Future<void> _incrementalUpdate(String uid, UserAggregatedStats currentStats) async {
     final allMatches = await LocalMatchSyncService.instance.getAllRecords();
     final allTrainings = await LocalTrainingSyncService.instance.getAllRecords();
 
-    // Filtra solo i nuovi dati (dopo lastUpdate)
-    final newMatches = allMatches.where((m) => m.endTime.isAfter(lastUpdate)).toList();
-    final newTrainings = allTrainings.where((t) => t.endTime.isAfter(lastUpdate)).toList();
+    final lastMatchUpdate = currentStats.lastMatchDate ?? DateTime(2000);
+    final lastTrainingUpdate = currentStats.lastTrainingDate ?? DateTime(2000);
+
+    final newMatches = allMatches
+        .where((m) => m.isVisible && m.endTime.isAfter(lastMatchUpdate))
+        .toList();
+
+    final newTrainings = allTrainings
+        .where((t) => t.isVisible && t.endTime.isAfter(lastTrainingUpdate))
+        .toList();
 
     if (newMatches.isEmpty && newTrainings.isEmpty) return;
 
-    // Recupera stats attuali
-    final currentProfile = await _userRepo.fetchProfile(uid);
-    final currentStats = currentProfile.stats;
-
-    // Calcola delta dai nuovi dati
     final delta = _calculateStats(newMatches, newTrainings, uid);
+
 
     // Combina con stats esistenti
     final updatedStats = UserAggregatedStats(
@@ -136,8 +144,11 @@ class StatsAggregatorService {
     DateTime? lastMatchDate;
     DateTime? lastTrainingDate;
 
+    final visibleMatches = matches.where((m) => m.isVisible).toList();
+    final visibleTrainings = trainings.where((t) => t.isVisible).toList();
+
     // Analizza match X01
-    final x01Matches = matches.where((m) => m.mode == 'x01').toList();
+    final x01Matches = visibleMatches.where((m) => m.mode == 'x01').toList();
     for (final match in x01Matches) {
       final playerTurns = match.playerTurns[uid] ?? [];
       if (playerTurns.isEmpty) continue;
@@ -191,7 +202,8 @@ class StatsAggregatorService {
     }
 
     // Analizza match Cricket
-    final cricketMatches = matches.where((m) => m.mode == 'cricket').toList();
+    final cricketMatches = visibleMatches.where((m) => m.mode == 'cricket').toList();
+
     for (final match in cricketMatches) {
       totalMatches++;
       if (match.winnerId == uid) totalMatchesWon++;
@@ -214,8 +226,7 @@ class StatsAggregatorService {
     }
 
     // Analizza training
-    for (final training in trainings) {
-      if (training.syncStatus == LocalTrainingSyncStatus.failed) continue;
+    for (final training in visibleTrainings) {
 
       totalTrainingSessions++;
       totalTrainingThrows += training.throwsList.length;
