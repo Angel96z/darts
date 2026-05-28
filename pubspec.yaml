@@ -48,6 +48,11 @@ dependencies:
   equatable: ^2.0.7
   intl: ^0.20.2
   google_generative_ai: ^0.4.0
+  in_app_update: ^4.2.3
+  # Drift (SQLite) for local persistence
+  drift: ^2.4.0
+  sqlite3_flutter_libs: ^0.5.7
+  path_provider: ^2.0.15
 
 dev_dependencies:
   flutter_test:
@@ -58,6 +63,7 @@ dev_dependencies:
   riverpod_generator: ^2.4.0
   custom_lint: ^0.6.4
   riverpod_lint: ^2.3.10
+  drift_dev: ^2.4.0
 
 flutter_launcher_icons:
   android: true

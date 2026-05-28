@@ -18,6 +18,7 @@ import '../../../domain/models/match.dart' as domain;
 import '../../../domain/models/player_info.dart';
 import '../../../domain/models/player_turn.dart';
 import '../../../domain/models/set.dart' as domain_set;
+import '../../../domain/models/game_config.dart';
 import '../application/match_result_notifier.dart';
 import '../domain/match_result_state.dart';
 
@@ -40,27 +41,27 @@ class _MatchResultPageState extends ConsumerState<MatchResultPage> {
     final match = roomState.completedMatch;
     if (match == null) return;
 
-    ref.read(matchResultProvider.notifier).loadMatchResult(
-      match: match,
-      players: roomState.players,
-      isTeamMode: roomState.teamSize > 1,
-      playerToTeam: roomState.builderState?.playerToTeam ?? {},
-    );
+    ref
+        .read(matchResultProvider.notifier)
+        .loadMatchResult(
+          match: match,
+          players: roomState.players,
+          isTeamMode: roomState.teamSize > 1,
+          isCricket: roomState.gameConfig.type == GameType.cricket,
+          playerToTeam: roomState.builderState?.playerToTeam ?? {},
+        );
   }
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     final completedMatch = ref.watch(
       roomNotifierProvider.select((s) => s.completedMatch),
     );
-    final players = ref.watch(
-      roomNotifierProvider.select((s) => s.players),
-    );
-    final teamSize = ref.watch(
-      roomNotifierProvider.select((s) => s.teamSize),
-    );
+    final players = ref.watch(roomNotifierProvider.select((s) => s.players));
+    final teamSize = ref.watch(roomNotifierProvider.select((s) => s.teamSize));
     final playerToTeam = ref.watch(
       roomNotifierProvider.select((s) => s.builderState?.playerToTeam ?? {}),
     );
@@ -73,10 +74,7 @@ class _MatchResultPageState extends ConsumerState<MatchResultPage> {
           child: Center(
             child: Text(
               'Nessun match completato disponibile',
-              style: TextStyle(
-                color: t.textSecondary,
-                fontWeight: FontWeight.w700,
-              ),
+              style: tt.bodySmall?.copyWith(color: t.textSecondary),
             ),
           ),
         ),
@@ -162,23 +160,19 @@ class _MatchResultPageState extends ConsumerState<MatchResultPage> {
     if (playerId == null) return 'Sconosciuto';
 
     final player = players.firstWhere(
-          (p) => p.id == playerId,
-      orElse: () => PlayerInfo(
-        id: playerId,
-        name: playerId,
-        isGuest: false,
-        order: 0,
-      ),
+      (p) => p.id == playerId,
+      orElse: () =>
+          PlayerInfo(id: playerId, name: playerId, isGuest: false, order: 0),
     );
 
     return player.name;
   }
 
   String _getTeamName(
-      String? winnerId,
-      List<PlayerInfo> players,
-      Map<String, String> playerToTeam,
-      ) {
+    String? winnerId,
+    List<PlayerInfo> players,
+    Map<String, String> playerToTeam,
+  ) {
     if (winnerId == null) return 'Sconosciuto';
     if (winnerId.startsWith('T')) return winnerId;
 
@@ -186,8 +180,9 @@ class _MatchResultPageState extends ConsumerState<MatchResultPage> {
   }
 
   String _buildLocalStructure(String playerId) {
-    final localStructure =
-    ref.read(matchResultProvider).buildLocalStructure(playerId);
+    final localStructure = ref
+        .read(matchResultProvider)
+        .buildLocalStructure(playerId);
     return _formatJson(localStructure);
   }
 
@@ -196,11 +191,11 @@ class _MatchResultPageState extends ConsumerState<MatchResultPage> {
   }
 
   void _showDatabaseStructure(
-      BuildContext context,
-      domain.Match match,
-      String playerId,
-      AppTokens t,
-      ) {
+    BuildContext context,
+    domain.Match match,
+    String playerId,
+    AppTokens t,
+  ) {
     bool useDbSource = false;
     String? dbMatchId;
     Map<String, dynamic>? dbStructure;
@@ -233,10 +228,8 @@ class _MatchResultPageState extends ConsumerState<MatchResultPage> {
                       if (value && dbMatchId == null) {
                         setDialogState(() => dbStructure = null);
 
-                        final record =
-                        await LocalMatchSyncService.instance.getById(
-                          match.id,
-                        );
+                        final record = await LocalMatchSyncService.instance
+                            .getById(match.id);
 
                         if (record != null && record.remoteId != null) {
                           dbMatchId = record.remoteId;
@@ -254,15 +247,15 @@ class _MatchResultPageState extends ConsumerState<MatchResultPage> {
                       padding: const EdgeInsets.all(14),
                       child: useDbSource
                           ? dbStructure == null
-                          ? _LoadingJson(t: t)
+                                ? _LoadingJson(t: t)
+                                : _JsonText(
+                                    text: _formatJson(dbStructure),
+                                    t: t,
+                                  )
                           : _JsonText(
-                        text: _formatJson(dbStructure),
-                        t: t,
-                      )
-                          : _JsonText(
-                        text: _buildLocalStructure(playerId),
-                        t: t,
-                      ),
+                              text: _buildLocalStructure(playerId),
+                              t: t,
+                            ),
                     ),
                   ),
                 ],
@@ -283,14 +276,12 @@ class _Header extends StatelessWidget {
   final String winnerName;
   final VoidCallback onClose;
 
-  const _Header({
-    required this.winnerName,
-    required this.onClose,
-  });
+  const _Header({required this.winnerName, required this.onClose});
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
@@ -309,12 +300,7 @@ class _Header extends StatelessWidget {
               children: [
                 Text(
                   'Match completato',
-                  style: TextStyle(
-                    fontSize: 13,
-                    height: 1,
-                    fontWeight: FontWeight.w900,
-                    color: t.textPrimary,
-                  ),
+                  style: tt.titleSmall?.copyWith(color: t.textPrimary),
                 ),
               ],
             ),
@@ -333,14 +319,12 @@ class _WinnerPanel extends StatelessWidget {
   final String name;
   final bool isTeamMode;
 
-  const _WinnerPanel({
-    required this.name,
-    required this.isTeamMode,
-  });
+  const _WinnerPanel({required this.name, required this.isTeamMode});
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return _Panel(
       child: Row(
@@ -355,22 +339,12 @@ class _WinnerPanel extends StatelessWidget {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 22,
-                    height: 1,
-                    fontWeight: FontWeight.w900,
-                    color: t.textPrimary,
-                  ),
+                  style: tt.titleMedium?.copyWith(color: t.textPrimary),
                 ),
                 const SizedBox(height: 5),
                 Text(
                   isTeamMode ? 'Team vincitore' : 'Vincitore del match',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: t.textSecondary,
-                    letterSpacing: 0.7,
-                  ),
+                  style: tt.labelSmall?.copyWith(color: t.textSecondary),
                 ),
               ],
             ),
@@ -407,6 +381,7 @@ class _StatsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     if (state.isLoading && state.playerStats.isEmpty) {
       return _Panel(
@@ -420,7 +395,7 @@ class _StatsPanel extends StatelessWidget {
       return _Panel(
         child: Text(
           state.failure?.message ?? 'Errore nel caricamento statistiche',
-          style: TextStyle(color: t.red, fontWeight: FontWeight.w700),
+          style: tt.bodySmall?.copyWith(color: t.red),
         ),
       );
     }
@@ -434,19 +409,17 @@ class _StatsPanel extends StatelessWidget {
             title: 'Statistiche giocatori',
           ),
           const SizedBox(height: 10),
-          ...state.sortedStats.map(
-                (entry) {
-              return _PlayerStatCard(
-                playerId: entry.key,
-                stats: entry.value,
-                players: players,
-                match: match,
-                teamId: isTeamMode ? playerToTeam[entry.key] : null,
-                getPlayerName: getPlayerName,
-                onShowStructure: onShowStructure,
-              );
-            },
-          ),
+          ...state.sortedStats.map((entry) {
+            return _PlayerStatCard(
+              playerId: entry.key,
+              stats: entry.value,
+              players: players,
+              match: match,
+              teamId: isTeamMode ? playerToTeam[entry.key] : null,
+              getPlayerName: getPlayerName,
+              onShowStructure: onShowStructure,
+            );
+          }),
         ],
       ),
     );
@@ -475,16 +448,13 @@ class _PlayerStatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final playerName = getPlayerName(playerId, players);
 
     final player = players.firstWhere(
-          (p) => p.id == playerId,
-      orElse: () => PlayerInfo(
-        id: playerId,
-        name: playerName,
-        isGuest: true,
-        order: 0,
-      ),
+      (p) => p.id == playerId,
+      orElse: () =>
+          PlayerInfo(id: playerId, name: playerName, isGuest: true, order: 0),
     );
 
     return Container(
@@ -511,22 +481,13 @@ class _PlayerStatCard extends StatelessWidget {
                       playerName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 1,
-                        fontWeight: FontWeight.w900,
-                        color: t.textPrimary,
-                      ),
+                      style: tt.titleSmall?.copyWith(color: t.textPrimary),
                     ),
                     if (teamId != null) ...[
                       const SizedBox(height: 3),
                       Text(
                         teamId!,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: t.textSecondary,
-                        ),
+                        style: tt.bodySmall?.copyWith(color: t.textSecondary),
                       ),
                     ],
                   ],
@@ -608,6 +569,7 @@ class _MatchDetailsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return _Panel(
       child: Column(
@@ -621,14 +583,11 @@ class _MatchDetailsPanel extends StatelessWidget {
           if (match.sets.isEmpty)
             Text(
               'Nessun dettaglio disponibile',
-              style: TextStyle(
-                color: t.textMuted,
-                fontWeight: FontWeight.w600,
-              ),
+              style: tt.bodySmall?.copyWith(color: t.textMuted),
             )
           else
             ...match.sets.asMap().entries.map(
-                  (entry) => _SetTile(
+              (entry) => _SetTile(
                 index: entry.key,
                 set: entry.value,
                 players: players,
@@ -667,6 +626,7 @@ class _SetTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     final winnerName = isTeamMode
         ? getTeamName(set.winnerId, players, playerToTeam)
@@ -684,28 +644,22 @@ class _SetTile extends StatelessWidget {
               'Vincitore: $winnerName',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: t.textPrimary,
-              ),
+              style: tt.titleSmall?.copyWith(color: t.textPrimary),
             ),
           ),
         ],
       ),
-      children: set.legs.asMap().entries.map(
-            (entry) {
-          return _LegTile(
-            index: entry.key,
-            leg: entry.value,
-            players: players,
-            isTeamMode: isTeamMode,
-            playerToTeam: playerToTeam,
-            getPlayerName: getPlayerName,
-            getTeamName: getTeamName,
-          );
-        },
-      ).toList(),
+      children: set.legs.asMap().entries.map((entry) {
+        return _LegTile(
+          index: entry.key,
+          leg: entry.value,
+          players: players,
+          isTeamMode: isTeamMode,
+          playerToTeam: playerToTeam,
+          getPlayerName: getPlayerName,
+          getTeamName: getTeamName,
+        );
+      }).toList(),
     );
   }
 }
@@ -733,6 +687,7 @@ class _LegTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     final winnerName = isTeamMode
         ? getTeamName(leg.winnerId, players, playerToTeam)
@@ -766,37 +721,20 @@ class _LegTile extends StatelessWidget {
               'Vincitore: $winnerName',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: t.textPrimary,
-              ),
+              style: tt.titleSmall?.copyWith(color: t.textPrimary),
             ),
           ),
           Text(
             '${leg.winningScore} pts',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              color: t.green,
-            ),
+            style: AppTokens.scoreSmallStyle.copyWith(color: t.green),
           ),
         ],
       ),
       subtitle: Text(
         '${leg.rounds.length} round · ${rows.length} turni',
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: t.textMuted,
-        ),
+        style: tt.bodySmall?.copyWith(color: t.textMuted),
       ),
-      children: [
-        _HistoryTable(
-          startScore: startScore,
-          rows: rows,
-        ),
-      ],
+      children: [_HistoryTable(startScore: startScore, rows: rows)],
     );
   }
 }
@@ -849,14 +787,12 @@ class _HistoryTable extends StatelessWidget {
   final int startScore;
   final List<_HistoryRowVm> rows;
 
-  const _HistoryTable({
-    required this.startScore,
-    required this.rows,
-  });
+  const _HistoryTable({required this.startScore, required this.rows});
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final wantedHeight = 35.0 + (rows.length * 38.0);
     final height = wantedHeight.clamp(92.0, 260.0);
 
@@ -876,21 +812,25 @@ class _HistoryTable extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: 76,
-                    child: Text('PLAYER', style: t.labelCaps(t.textMuted)),
+                    child: Text(
+                      'PLAYER',
+                      style: tt.labelSmall?.copyWith(color: t.textMuted),
+                    ),
                   ),
                   Expanded(
-                    child: Text('SCORE', style: t.labelCaps(t.textMuted)),
+                    child: Text(
+                      'SCORE',
+                      style: tt.labelSmall?.copyWith(color: t.textMuted),
+                    ),
                   ),
                   Text(
                     '$startScore',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
+                    style: AppTokens.scoreSmallStyle.copyWith(
                       color: t.textSecondary,
                     ),
                   ),
                   const SizedBox(width: 24),
-                  Text('R', style: t.labelCaps(t.textMuted)),
+                  Text('R', style: tt.labelSmall?.copyWith(color: t.textMuted)),
                 ],
               ),
             ),
@@ -898,15 +838,15 @@ class _HistoryTable extends StatelessWidget {
             Expanded(
               child: rows.isEmpty
                   ? Center(
-                child: Text(
-                  'Nessun turno',
-                  style: t.bodySmall(t.textMuted),
-                ),
-              )
+                      child: Text(
+                        'Nessun turno',
+                        style: tt.bodySmall?.copyWith(color: t.textMuted),
+                      ),
+                    )
                   : ListView.builder(
-                itemCount: rows.length,
-                itemBuilder: (_, i) => _HistoryRow(vm: rows[i]),
-              ),
+                      itemCount: rows.length,
+                      itemBuilder: (_, i) => _HistoryRow(vm: rows[i]),
+                    ),
             ),
           ],
         ),
@@ -923,6 +863,7 @@ class _HistoryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     final scoreColor = vm.isCheckout
         ? t.green
@@ -944,11 +885,7 @@ class _HistoryRow extends StatelessWidget {
               vm.playerName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-                color: t.textSecondary,
-              ),
+              style: tt.labelSmall?.copyWith(color: t.textSecondary),
             ),
           ),
           Expanded(
@@ -956,11 +893,7 @@ class _HistoryRow extends StatelessWidget {
               children: [
                 Text(
                   vm.turnTotal,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: scoreColor,
-                  ),
+                  style: AppTokens.scoreSmallStyle.copyWith(color: scoreColor),
                 ),
                 const SizedBox(width: 6),
                 Flexible(
@@ -968,11 +901,7 @@ class _HistoryRow extends StatelessWidget {
                     vm.dartsLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600,
-                      color: t.textMuted,
-                    ),
+                    style: tt.labelSmall?.copyWith(color: t.textMuted),
                   ),
                 ),
               ],
@@ -983,9 +912,7 @@ class _HistoryRow extends StatelessWidget {
             child: Text(
               vm.scoreAfterTurn,
               textAlign: TextAlign.right,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
+              style: AppTokens.scoreSmallStyle.copyWith(
                 color: vm.isCheckout ? t.green : t.textSecondary,
               ),
             ),
@@ -995,11 +922,7 @@ class _HistoryRow extends StatelessWidget {
             child: Text(
               vm.roundNumber,
               textAlign: TextAlign.right,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: t.textMuted,
-              ),
+              style: tt.labelSmall?.copyWith(color: t.textMuted),
             ),
           ),
         ],
@@ -1026,6 +949,7 @@ class _JsonDialogHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
@@ -1043,11 +967,7 @@ class _JsonDialogHeader extends StatelessWidget {
               Expanded(
                 child: Text(
                   'Struttura dati salvata',
-                  style: TextStyle(
-                    color: t.textPrimary,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 15,
-                  ),
+                  style: tt.titleMedium?.copyWith(color: t.textPrimary),
                 ),
               ),
               IconButton(
@@ -1057,10 +977,7 @@ class _JsonDialogHeader extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          _SourceSwitch(
-            useDbSource: useDbSource,
-            onChanged: onChanged,
-          ),
+          _SourceSwitch(useDbSource: useDbSource, onChanged: onChanged),
         ],
       ),
     );
@@ -1074,6 +991,7 @@ class _LoadingJson extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
@@ -1083,7 +1001,7 @@ class _LoadingJson extends StatelessWidget {
             const SizedBox(height: 14),
             Text(
               'Caricamento dati...',
-              style: TextStyle(color: t.textSecondary),
+              style: tt.bodySmall?.copyWith(color: t.textSecondary),
             ),
           ],
         ),
@@ -1096,21 +1014,14 @@ class _JsonText extends StatelessWidget {
   final String text;
   final AppTokens t;
 
-  const _JsonText({
-    required this.text,
-    required this.t,
-  });
+  const _JsonText({required this.text, required this.t});
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     return SelectableText(
       text,
-      style: TextStyle(
-        fontFamily: 'monospace',
-        fontSize: 11,
-        height: 1.35,
-        color: t.textSecondary,
-      ),
+      style: tt.bodySmall?.copyWith(color: t.textSecondary),
     );
   }
 }
@@ -1142,15 +1053,35 @@ class _SyncStatusWidgetState extends State<_SyncStatusWidget> {
   void initState() {
     super.initState();
     _currentStatus = widget.initialStatus;
+    _refreshStatusFromLocalCache();
 
-    _syncSubscription =
-        LocalMatchSyncService.instance.onSyncStatusChanged.listen(
-              (statusMap) {
-            if (mounted && statusMap.containsKey(widget.matchId)) {
-              setState(() => _currentStatus = statusMap[widget.matchId]);
-            }
-          },
-        );
+    _syncSubscription = LocalMatchSyncService.instance.onSyncStatusChanged
+        .listen((statusMap) {
+          if (!mounted) return;
+
+          final nextStatus = statusMap[widget.matchId];
+          if (nextStatus == null) return;
+
+          setState(() => _currentStatus = nextStatus);
+        });
+  }
+
+  @override
+  void didUpdateWidget(covariant _SyncStatusWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.matchId != widget.matchId ||
+        oldWidget.initialStatus != widget.initialStatus) {
+      _currentStatus = widget.initialStatus;
+      _refreshStatusFromLocalCache();
+    }
+  }
+
+  Future<void> _refreshStatusFromLocalCache() async {
+    final record = await LocalMatchSyncService.instance.getById(widget.matchId);
+    if (!mounted || record == null) return;
+
+    setState(() => _currentStatus = record.syncStatus);
   }
 
   @override
@@ -1165,24 +1096,24 @@ class _SyncStatusWidgetState extends State<_SyncStatusWidget> {
 
     final data = switch (_currentStatus) {
       LocalMatchSyncStatus.synced => (
-      icon: Icons.cloud_done_outlined,
-      color: t.green,
-      tooltip: 'Match sincronizzato',
+        icon: Icons.cloud_done_outlined,
+        color: t.green,
+        tooltip: 'Match sincronizzato',
       ),
       LocalMatchSyncStatus.syncing => (
-      icon: Icons.sync,
-      color: t.orange,
-      tooltip: 'Sincronizzazione in corso',
+        icon: Icons.sync,
+        color: t.orange,
+        tooltip: 'Sincronizzazione in corso',
       ),
       LocalMatchSyncStatus.failed => (
-      icon: Icons.cloud_off_outlined,
-      color: t.red,
-      tooltip: 'Sincronizzazione fallita. Tocca per dettagli',
+        icon: Icons.cloud_off_outlined,
+        color: t.red,
+        tooltip: 'Sincronizzazione fallita. Tocca per dettagli',
       ),
       _ => (
-      icon: Icons.cloud_upload_outlined,
-      color: t.grey,
-      tooltip: 'Match in attesa di sincronizzazione',
+        icon: Icons.cloud_upload_outlined,
+        color: t.grey,
+        tooltip: 'Match in attesa di sincronizzazione',
       ),
     };
 
@@ -1328,28 +1259,18 @@ class _SectionTitle extends StatelessWidget {
   final IconData icon;
   final String title;
 
-  const _SectionTitle({
-    required this.icon,
-    required this.title,
-  });
+  const _SectionTitle({required this.icon, required this.title});
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Row(
       children: [
         Icon(icon, size: 17, color: t.accent),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 14,
-            height: 1,
-            fontWeight: FontWeight.w900,
-            color: t.textPrimary,
-          ),
-        ),
+        Text(title, style: tt.titleMedium?.copyWith(color: t.textPrimary)),
       ],
     );
   }
@@ -1359,13 +1280,11 @@ class _TinyBadge extends StatelessWidget {
   final String label;
   final Color color;
 
-  const _TinyBadge({
-    required this.label,
-    required this.color,
-  });
+  const _TinyBadge({required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     return Container(
       height: 21,
       padding: const EdgeInsets.symmetric(horizontal: 7),
@@ -1375,15 +1294,7 @@ class _TinyBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: color.withOpacity(0.35)),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 9,
-          height: 1,
-          fontWeight: FontWeight.w900,
-          color: color,
-        ),
-      ),
+      child: Text(label, style: tt.labelSmall?.copyWith(color: color)),
     );
   }
 }
@@ -1398,6 +1309,7 @@ class _StatChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -1411,22 +1323,8 @@ class _StatChip extends StatelessWidget {
         children: [
           Icon(icon, size: 13, color: t.textSecondary),
           const SizedBox(width: 5),
-          Text(
-            '$label ',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: t.textMuted,
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              color: t.textPrimary,
-            ),
-          ),
+          Text('$label ', style: tt.labelSmall?.copyWith(color: t.textMuted)),
+          Text(value, style: tt.titleSmall?.copyWith(color: t.textPrimary)),
         ],
       ),
     );
@@ -1437,24 +1335,21 @@ class _Avatar extends StatelessWidget {
   final String name;
   final bool isWinner;
 
-  const _Avatar({
-    required this.name,
-    required this.isWinner,
-  });
+  const _Avatar({required this.name, required this.isWinner});
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return CircleAvatar(
       radius: 15,
-      backgroundColor:
-      isWinner ? t.accent.withOpacity(0.16) : t.border.withOpacity(0.55),
+      backgroundColor: isWinner
+          ? t.accent.withOpacity(0.16)
+          : t.border.withOpacity(0.55),
       child: Text(
         name.isNotEmpty ? name[0].toUpperCase() : '?',
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w900,
+        style: tt.titleSmall?.copyWith(
           color: isWinner ? t.accent : t.textPrimary,
         ),
       ),
@@ -1466,10 +1361,7 @@ class _IconBox extends StatelessWidget {
   final IconData icon;
   final Color color;
 
-  const _IconBox({
-    required this.icon,
-    required this.color,
-  });
+  const _IconBox({required this.icon, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -1490,14 +1382,12 @@ class _SourceSwitch extends StatelessWidget {
   final bool useDbSource;
   final ValueChanged<bool> onChanged;
 
-  const _SourceSwitch({
-    required this.useDbSource,
-    required this.onChanged,
-  });
+  const _SourceSwitch({required this.useDbSource, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Container(
       height: 38,
@@ -1517,9 +1407,7 @@ class _SourceSwitch extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             'Locale',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+            style: tt.titleSmall?.copyWith(
               color: useDbSource ? t.textMuted : t.accent,
             ),
           ),
@@ -1532,9 +1420,7 @@ class _SourceSwitch extends StatelessWidget {
           const Spacer(),
           Text(
             'Database',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+            style: tt.titleSmall?.copyWith(
               color: useDbSource ? t.accent : t.textMuted,
             ),
           ),

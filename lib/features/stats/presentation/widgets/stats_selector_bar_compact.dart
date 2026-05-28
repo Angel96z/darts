@@ -24,6 +24,7 @@ class StatsSelectorBarCompact extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Row(
       children: [
@@ -40,7 +41,10 @@ class StatsSelectorBarCompact extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(modeLabel, style: t.bodyBold(t.textPrimary)),
+                Text(
+                  modeLabel,
+                  style: tt.titleSmall?.copyWith(color: t.textPrimary),
+                ),
                 const SizedBox(width: 4),
                 Icon(Icons.arrow_drop_down, color: t.textSecondary, size: 18),
               ],
@@ -65,7 +69,7 @@ class StatsSelectorBarCompact extends StatelessWidget {
                   Expanded(
                     child: Text(
                       rightLabel,
-                      style: t.bodyBold(t.textPrimary),
+                      style: tt.titleSmall?.copyWith(color: t.textPrimary),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),

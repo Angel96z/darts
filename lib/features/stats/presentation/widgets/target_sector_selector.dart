@@ -16,8 +16,27 @@ class TargetSectorSelector extends StatelessWidget {
   });
 
   static const List<int> _numbers = [
-    25, 20, 19, 18, 17, 16, 15, 14, 13, 12,
-    11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
+    25,
+    20,
+    19,
+    18,
+    17,
+    16,
+    15,
+    14,
+    13,
+    12,
+    11,
+    10,
+    9,
+    8,
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+    1,
   ];
 
   Future<void> _openSelector(BuildContext context) async {
@@ -37,10 +56,8 @@ class TargetSectorSelector extends StatelessWidget {
           ),
         );
       },
-      pageBuilder: (ctx, _, __) => _SectorOverlay(
-        currentTarget: currentTarget,
-        numbers: _numbers,
-      ),
+      pageBuilder: (ctx, _, __) =>
+          _SectorOverlay(currentTarget: currentTarget, numbers: _numbers),
     );
 
     if (result != null && result != currentTarget) {
@@ -51,6 +68,7 @@ class TargetSectorSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final parsed = _TargetParts.from(currentTarget);
 
     if (!enabled) {
@@ -71,8 +89,36 @@ class TargetSectorSelector extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(parsed.type, style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: t.accent, height: 1)),
-              Text('${parsed.number}', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: t.textPrimary, height: 1)),
+              SizedBox(
+                height: 32,
+                child: FittedBox(
+                  fit: BoxFit.fitHeight,
+                  child: MediaQuery(
+                    data: AppTokens.clampScore(context),
+                    child: Text(
+                      parsed.type,
+                      style: AppTokens.scoreSmallStyle.copyWith(
+                        color: t.accent,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 32,
+                child: FittedBox(
+                  fit: BoxFit.fitHeight,
+                  child: MediaQuery(
+                    data: AppTokens.clampScore(context),
+                    child: Text(
+                      '${parsed.number}',
+                      style: AppTokens.scoreSmallStyle.copyWith(
+                        color: t.textPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -92,31 +138,12 @@ class TargetSectorSelector extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'TARGET',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.1,
-                color: t.accent,
-              ),
-            ),
+            Text('TARGET', style: tt.labelSmall?.copyWith(color: t.accent)),
             const SizedBox(width: 9),
-            Text(
-              parsed.type,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-                color: t.accent,
-              ),
-            ),
+            Text(parsed.type, style: tt.titleMedium?.copyWith(color: t.accent)),
             Text(
               '${parsed.number}',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: t.textPrimary,
-              ),
+              style: tt.titleMedium?.copyWith(color: t.textPrimary),
             ),
             const SizedBox(width: 4),
             Icon(Icons.keyboard_arrow_down, size: 18, color: t.textSecondary),
@@ -131,20 +158,26 @@ class _TargetParts {
   final String type;
   final int number;
 
-  const _TargetParts({
-    required this.type,
-    required this.number,
-  });
+  const _TargetParts({required this.type, required this.number});
 
   factory _TargetParts.from(String value) {
     if (value.startsWith('S')) {
-      return _TargetParts(type: 'S', number: int.tryParse(value.substring(1)) ?? 25);
+      return _TargetParts(
+        type: 'S',
+        number: int.tryParse(value.substring(1)) ?? 25,
+      );
     }
     if (value.startsWith('D')) {
-      return _TargetParts(type: 'D', number: int.tryParse(value.substring(1)) ?? 25);
+      return _TargetParts(
+        type: 'D',
+        number: int.tryParse(value.substring(1)) ?? 25,
+      );
     }
     if (value.startsWith('T')) {
-      return _TargetParts(type: 'T', number: int.tryParse(value.substring(1)) ?? 20);
+      return _TargetParts(
+        type: 'T',
+        number: int.tryParse(value.substring(1)) ?? 20,
+      );
     }
     return _TargetParts(type: 'S', number: int.tryParse(value) ?? 25);
   }
@@ -156,10 +189,7 @@ class _SectorOverlay extends StatefulWidget {
   final String currentTarget;
   final List<int> numbers;
 
-  const _SectorOverlay({
-    required this.currentTarget,
-    required this.numbers,
-  });
+  const _SectorOverlay({required this.currentTarget, required this.numbers});
 
   @override
   State<_SectorOverlay> createState() => _SectorOverlayState();
@@ -183,13 +213,17 @@ class _SectorOverlayState extends State<_SectorOverlay> {
 
     final parsed = _TargetParts.from(widget.currentTarget);
     _selectedType = parsed.type;
-    _selectedNumber = widget.numbers.contains(parsed.number) ? parsed.number : widget.numbers.first;
+    _selectedNumber = widget.numbers.contains(parsed.number)
+        ? parsed.number
+        : widget.numbers.first;
 
     if (_selectedNumber == 25 && _selectedType == 'T') {
       _selectedType = 'D';
     }
 
-    _numberController = FixedExtentScrollController(initialItem: _selectedIndex);
+    _numberController = FixedExtentScrollController(
+      initialItem: _selectedIndex,
+    );
   }
 
   @override
@@ -217,6 +251,7 @@ class _SectorOverlayState extends State<_SectorOverlay> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final mq = MediaQuery.of(context);
     final maxWidth = mq.size.width >= 600 ? 430.0 : mq.size.width * 0.92;
 
@@ -252,12 +287,7 @@ class _SectorOverlayState extends State<_SectorOverlay> {
                       Expanded(
                         child: Text(
                           'Seleziona target',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: t.textPrimary,
-                            letterSpacing: -0.2,
-                          ),
+                          style: tt.titleMedium?.copyWith(color: t.textPrimary),
                         ),
                       ),
                       GestureDetector(
@@ -333,7 +363,9 @@ class _SectorOverlayState extends State<_SectorOverlay> {
                             children: [
                               Container(
                                 height: 74,
-                                margin: const EdgeInsets.symmetric(horizontal: 14),
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                ),
                                 decoration: BoxDecoration(
                                   color: t.accent.withOpacity(0.10),
                                   borderRadius: BorderRadius.circular(16),
@@ -357,16 +389,23 @@ class _SectorOverlayState extends State<_SectorOverlay> {
                                     final selected = n == _selectedNumber;
 
                                     return Center(
-                                      child: AnimatedDefaultTextStyle(
-                                        duration: const Duration(milliseconds: 130),
-                                        style: TextStyle(
-                                          fontSize: selected ? 54 : 34,
-                                          fontWeight: FontWeight.w900,
-                                          height: 1,
-                                          color: selected ? t.accent : t.textMuted,
-                                          letterSpacing: -1,
+                                      child: MediaQuery(
+                                        data: AppTokens.clampScore(context),
+                                        child: AnimatedScale(
+                                          duration: const Duration(
+                                            milliseconds: 130,
+                                          ),
+                                          scale: selected ? 0.75 : 0.47,
+                                          child: Text(
+                                            '$n',
+                                            style: AppTokens.scoreStyle
+                                                .copyWith(
+                                                  color: selected
+                                                      ? t.accent
+                                                      : t.textMuted,
+                                                ),
+                                          ),
                                         ),
-                                        child: Text('$n'),
                                       ),
                                     );
                                   },
@@ -397,18 +436,14 @@ class _SectorOverlayState extends State<_SectorOverlay> {
                         alignment: Alignment.center,
                         child: Text(
                           _selectedLabel,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            color: t.accent,
-                            letterSpacing: -0.2,
-                          ),
+                          style: tt.titleMedium?.copyWith(color: t.accent),
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: FilledButton(
-                          onPressed: () => Navigator.pop(context, _selectedLabel),
+                          onPressed: () =>
+                              Navigator.pop(context, _selectedLabel),
                           style: FilledButton.styleFrom(
                             backgroundColor: t.accent,
                             foregroundColor: t.accentFg,
@@ -418,13 +453,7 @@ class _SectorOverlayState extends State<_SectorOverlay> {
                             ),
                             elevation: 0,
                           ),
-                          child: const Text(
-                            'Conferma',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
+                          child: Text('Conferma', style: tt.titleSmall),
                         ),
                       ),
                     ],
@@ -456,6 +485,8 @@ class _MultiplierButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+
     return Opacity(
       opacity: enabled ? 1 : 0.35,
       child: GestureDetector(
@@ -473,22 +504,28 @@ class _MultiplierButton extends StatelessWidget {
             ),
             boxShadow: selected
                 ? [
-              BoxShadow(
-                color: t.accent.withOpacity(0.22),
-                blurRadius: 14,
-                offset: const Offset(0, 6),
-              ),
-            ]
+                    BoxShadow(
+                      color: t.accent.withOpacity(0.22),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ]
                 : null,
           ),
           alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-              height: 1,
-              color: selected ? t.accentFg : t.textPrimary,
+          child: SizedBox(
+            height: 24,
+            child: FittedBox(
+              fit: BoxFit.fitHeight,
+              child: MediaQuery(
+                data: AppTokens.clampScore(context),
+                child: Text(
+                  label,
+                  style: (tt.titleMedium ?? AppTokens.scoreSmallStyle).copyWith(
+                    color: selected ? t.accentFg : t.textPrimary,
+                  ),
+                ),
+              ),
             ),
           ),
         ),

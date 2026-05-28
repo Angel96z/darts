@@ -22,6 +22,7 @@ class MatchPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     final status       = ref.watch(roomNotifierProvider.select((s) => s.status));
     final errorMessage = ref.watch(roomNotifierProvider.select((s) => s.errorMessage));
@@ -47,7 +48,18 @@ class MatchPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: t.bg,
       appBar: _AppBar(builderState: builderState, t: t),
-      body: _buildBody(context, status, errorMessage, players, gameState, isWaiting, teamSize, builderState, t),
+      body: _buildBody(
+        context,
+        status,
+        errorMessage,
+        players,
+        gameState,
+        isWaiting,
+        teamSize,
+        builderState,
+        t,
+        tt,
+      ),
     );
   }
 
@@ -61,15 +73,26 @@ class MatchPage extends ConsumerWidget {
       int teamSize,
       MatchBuilderState? builderState,
       AppTokens t,
+      TextTheme tt,
       ) {
     if (status == AppStatus.loading) {
       return Center(child: CircularProgressIndicator(color: t.accent, strokeWidth: 2));
     }
     if (status == AppStatus.error) {
-      return Center(child: Text(errorMessage ?? 'Errore', style: TextStyle(color: t.textSecondary, fontSize: 14)));
+      return Center(
+        child: Text(
+          errorMessage ?? 'Errore',
+          style: tt.bodySmall?.copyWith(color: t.textSecondary),
+        ),
+      );
     }
     if (gameState == null || players.isEmpty) {
-      return Center(child: Text('Nessun giocatore', style: TextStyle(color: t.textMuted, fontSize: 14)));
+      return Center(
+        child: Text(
+          'Nessun giocatore',
+          style: tt.bodySmall?.copyWith(color: t.textMuted),
+        ),
+      );
     }
 
     final isTeamMode = teamSize > 1;
@@ -249,6 +272,7 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     final setNum = builderState?.currentSetNumber ?? 1;
     final legNum = builderState?.currentLegNumber ?? 1;
 
@@ -258,7 +282,7 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
       elevation: 0,
       titleSpacing: 16,
       title: Text('🎯  Game On',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: t.textPrimary)),
+          style: tt.titleMedium?.copyWith(color: t.textPrimary)),
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
         child: Container(height: 1, color: t.divider),
@@ -280,13 +304,14 @@ class _Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(color: t.surface, borderRadius: AppTokens.r6),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: t.textMuted, letterSpacing: 0.5)),
+        Text(label, style: tt.labelSmall?.copyWith(color: t.textMuted)),
         const SizedBox(width: 4),
-        Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: t.textPrimary)),
+        Text(value, style: tt.titleSmall?.copyWith(color: t.textPrimary)),
       ]),
     );
   }

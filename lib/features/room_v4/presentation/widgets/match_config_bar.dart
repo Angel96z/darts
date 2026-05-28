@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../app_theme.dart';
 import '../../application/room_notifier.dart';
 import '../../domain/models/game_config.dart';
 
@@ -13,6 +14,8 @@ class MatchConfigBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final gameConfig = ref.watch(roomNotifierProvider.select((s) => s.gameConfig));
     final matchConfig = ref.watch(roomNotifierProvider.select((s) => s.matchConfig));
     final teamSize = ref.watch(roomNotifierProvider.select((s) => s.teamSize));
@@ -45,10 +48,10 @@ class MatchConfigBar extends ConsumerWidget {
     // Modalità match (set e leg)
     if (matchConfig.mode == MatchMode.firstTo) {
       configLines.add('First to ${matchConfig.setsToWin} set');
-      configLines.add('- ${matchConfig.legsToWin} leg');
+      configLines.add('${matchConfig.legsToWin} leg');
     } else {
       configLines.add('Best of ${matchConfig.setCount} set');
-      configLines.add('- ${matchConfig.legCount} leg');
+      configLines.add('${matchConfig.legCount} leg');
     }
 
     // Cut Throat (Cricket)
@@ -70,11 +73,7 @@ class MatchConfigBar extends ConsumerWidget {
       child: Center(
         child: Text(
           configLines.join(' · '),
-          style: TextStyle(
-            fontSize: 12,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-            letterSpacing: 0.3,
-          ),
+          style: tt.bodySmall?.copyWith(color: t.textSecondary),
           textAlign: TextAlign.center,
         ),
       ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../app_theme.dart';
 import '../application/string_notifier.dart';
 
 class StringTestPage extends ConsumerWidget {
@@ -7,6 +8,8 @@ class StringTestPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final state = ref.watch(stringControllerProvider);
     final controller = ref.read(stringControllerProvider.notifier);
 
@@ -24,7 +27,10 @@ class StringTestPage extends ConsumerWidget {
 // ... all'interno del metodo build, nel widget Card ...
               Card(
                 child: ListTile(
-                  title: Text(entity.value, style: const TextStyle(fontSize: 20)),
+                  title: Text(
+                    entity.value,
+                    style: tt.titleMedium?.copyWith(color: t.textPrimary),
+                  ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -39,14 +45,19 @@ class StringTestPage extends ConsumerWidget {
                         ],
                       ),
                       if (entity.containsNumbers)
-                        const Text("⚠️ Contiene numeri",
-                            style: TextStyle(color: Colors.orange, fontSize: 12)),
+                        Text(
+                          "⚠️ Contiene numeri",
+                          style: tt.bodySmall?.copyWith(color: t.orange),
+                        ),
                     ],
                   ),
                 ),
               ),
               loading: () => const CircularProgressIndicator(),
-              error: (e, _) => Text("Errore: $e", style: const TextStyle(color: Colors.red)),
+              error: (e, _) => Text(
+                "Errore: $e",
+                style: tt.bodySmall?.copyWith(color: t.red),
+              ),
             ),
             const Spacer(),
             if (state.value == null)
@@ -65,7 +76,10 @@ class StringTestPage extends ConsumerWidget {
               ),
               TextButton(
                 onPressed: () => controller.delete(),
-                child: const Text("ELIMINA", style: TextStyle(color: Colors.red)),
+                child: Text(
+                  "ELIMINA",
+                  style: tt.titleSmall?.copyWith(color: t.red),
+                ),
               ),
             ]
           ],

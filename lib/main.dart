@@ -14,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/app.dart';
 import 'app/di/app_dependencies.dart';
 import 'app/link/app_link_state.dart';
+import 'core/services/app_update_service.dart';
 import 'features/bootstrap/presentation/dart_boot_splash.dart';
 import 'features/match_sync/data/services/local_match_sync_service.dart';
 import 'features/players/application/user_notifier.dart';
@@ -50,7 +51,14 @@ class _DartsStartupGateState extends State<_DartsStartupGate> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Avvia il controllo aggiornamenti in modo "fire-and-forget".
+      // Non attendiamo il risultato per non bloccare il bootstrap/splash.
+      AppUpdateService.checkForUpdate();
+
+      // Continua con il normale bootstrap dell'app.
+      _bootstrap();
+    });
   }
 
   Future<void> _bootstrap() async {
@@ -75,16 +83,34 @@ class _DartsStartupGateState extends State<_DartsStartupGate> {
       await widget.container.read(appLinkCoordinatorProvider.notifier).init();
 
       if (user != null) {
-        await _update(0.60, 'CARICO PROFILO...');
-        await widget.container.read(userProvider.notifier).loadProfile();
+        await _update(0.52, 'CARICO PROFILO...');
 
-        await _update(0.64, 'SINCRONIZZO MATCH...');
-        await LocalMatchSyncService.instance.syncAll();
+        try {
+          await widget.container.read(userProvider.notifier).loadProfile();
+        } catch (e, st) {
+          debugPrint('PROFILE BOOT ERROR: $e');
+          debugPrintStack(stackTrace: st);
+        }
 
-        await _update(0.74, 'SINCRONIZZO TRAINING...');
-        await LocalTrainingSyncService.instance.syncAll();
+        await _update(0.58, 'PREPARO DATI LOCALI...');
 
-        await _update(0.84, 'FINALIZZO...');
+        try {
+          await _update(0.64, 'SINCRONIZZO MATCH...');
+          await LocalMatchSyncService.instance.syncAll();
+        } catch (e, st) {
+          debugPrint('MATCH SYNC BOOT ERROR: $e');
+          debugPrintStack(stackTrace: st);
+        }
+
+        try {
+          await _update(0.72, 'SINCRONIZZO TRAINING...');
+          await LocalTrainingSyncService.instance.syncAll();
+        } catch (e, st) {
+          debugPrint('TRAINING SYNC BOOT ERROR: $e');
+          debugPrintStack(stackTrace: st);
+        }
+
+        await _update(0.90, 'FINALIZZO...');
         StatsRepository.instance.invalidateCache();
       } else {
         await _update(0.94, 'PREPARO LOGIN...');
@@ -92,7 +118,7 @@ class _DartsStartupGateState extends State<_DartsStartupGate> {
       }
 
       await _update(1.0, '');
-      await Future<void>.delayed(const Duration(milliseconds: 2060));
+      await Future<void>.delayed(const Duration(milliseconds: 1060));
 
       if (!mounted) return;
       setState(() => _ready = true);
@@ -102,7 +128,7 @@ class _DartsStartupGateState extends State<_DartsStartupGate> {
       if (!mounted) return;
       setState(() {
         _error = e;
-        _label = 'ERRORE AVVIO';
+        _label = 'ERRORE AVVIO: $e';
       });
     }
   }
@@ -142,7 +168,7 @@ class _DartsStartupGateState extends State<_DartsStartupGate> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: DartBootSplash(
-        appName: 'My Darts Roser Trainer',
+        appName: 'My Darts Roses Trainer',
         state: BootState(
           progress: _progress,
           label: _label,

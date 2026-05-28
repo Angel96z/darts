@@ -17,6 +17,7 @@ class AiCoachCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final state = ref.watch(aiCoachControllerProvider(input.fingerprint));
     final controller = ref.read(aiCoachControllerProvider(input.fingerprint).notifier);
 
@@ -42,12 +43,12 @@ class AiCoachCard extends ConsumerWidget {
             if (!hasFreshAdvice && state.status != AiCoachStatus.error)
               Text(
                 'Premi il bottone per generare un consiglio tecnico sui dati attuali.',
-                style: t.bodySmall(t.textMuted),
+                style: tt.bodySmall?.copyWith(color: t.textMuted),
               ),
             if (state.status == AiCoachStatus.error) ...[
               Text(
                 state.errorMessage ?? 'Errore sconosciuto',
-                style: t.bodySmall(t.red),
+                style: tt.bodySmall?.copyWith(color: t.red),
               ),
               const SizedBox(height: 10),
             ],
@@ -87,6 +88,8 @@ class _AdviceBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+
     return DecoratedBox(
       decoration: BoxDecoration(
         color: t.surfaceHigh,
@@ -98,18 +101,18 @@ class _AdviceBlock extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(advice.summary, style: t.bodyBold(t.textPrimary)),
+            Text(advice.summary, style: tt.titleMedium?.copyWith(color: t.textPrimary)),
             const SizedBox(height: 8),
-            Text(advice.mainIssue, style: t.bodySmall(t.textSecondary)),
+            Text(advice.mainIssue, style: tt.bodySmall?.copyWith(color: t.textSecondary)),
             const SizedBox(height: 10),
             for (final item in advice.technicalAdvice) ...[
-              Text('• $item', style: t.bodySmall(t.textPrimary)),
+              Text('• $item', style: tt.bodySmall?.copyWith(color: t.textPrimary)),
               const SizedBox(height: 6),
             ],
             const SizedBox(height: 6),
             Text(
               advice.nextDrill,
-              style: t.bodyBold(t.accent),
+              style: tt.titleMedium?.copyWith(color: t.accent),
             ),
           ],
         ),

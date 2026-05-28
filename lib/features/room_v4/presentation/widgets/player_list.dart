@@ -81,7 +81,6 @@ class _TeamListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = AppTokens.of(context);
     final teams = _teams;
 
     return Column(
@@ -118,6 +117,7 @@ class TeamBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -134,7 +134,7 @@ class TeamBlock extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
             child: Text(
               'TEAM ${teamIndex + 1}',
-              style: t.labelCaps(t.accent),
+              style: tt.labelSmall?.copyWith(color: t.accent),
             ),
           ),
           const Divider(height: 1),
@@ -195,6 +195,7 @@ class _PlayerRowState extends State<_PlayerRow> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -218,16 +219,12 @@ class _PlayerRowState extends State<_PlayerRow> {
                 Text(
                   widget.player.name,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: t.textPrimary,
-                  ),
+                  style: tt.bodyMedium?.copyWith(color: t.textPrimary),
                 ),
                 if (widget.player.isGuest)
                   Text(
                     'guest',
-                    style: t.bodySmall(t.textMuted).copyWith(fontSize: 10),
+                    style: tt.bodySmall?.copyWith(color: t.textMuted),
                   ),
               ],
             ),

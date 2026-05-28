@@ -23,6 +23,7 @@ class StatsFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Padding(
       padding: const EdgeInsets.all(12),
@@ -44,7 +45,10 @@ class StatsFilterBar extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(state.modeLabel, style: t.bodyBold(t.textPrimary)),
+                  Text(
+                    state.modeLabel,
+                    style: tt.titleSmall?.copyWith(color: t.textPrimary),
+                  ),
                   const SizedBox(width: 4),
                   Icon(Icons.arrow_drop_down, color: t.textSecondary, size: 18),
                 ],
@@ -67,7 +71,7 @@ class StatsFilterBar extends StatelessWidget {
                     Expanded(
                       child: Text(
                         state.displayLabel,
-                        style: t.bodyBold(t.textPrimary),
+                        style: tt.titleSmall?.copyWith(color: t.textPrimary),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -86,26 +90,42 @@ class StatsFilterBar extends StatelessWidget {
 
 Future<StatsFilterMode?> showStatsModeDialog(BuildContext context) async {
   final t = AppTokens.of(context);
+  final tt = Theme.of(context).textTheme;
 
   return showDialog<StatsFilterMode>(
     context: context,
     builder: (ctx) => AlertDialog(
       backgroundColor: t.surface,
-      title: Text('Seleziona modalità', style: t.bodyBold(t.textPrimary)),
+      title: Text(
+        'Seleziona modalità',
+        style: tt.titleMedium?.copyWith(color: t.textPrimary),
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           ListTile(
             leading: Icon(Icons.calendar_today, color: t.accent),
-            title: Text('Periodo', style: t.bodyBold(t.textPrimary)),
-            subtitle: Text('Seleziona un intervallo di date', style: t.bodySmall(t.textSecondary)),
+            title: Text(
+              'Periodo',
+              style: tt.titleMedium?.copyWith(color: t.textPrimary),
+            ),
+            subtitle: Text(
+              'Seleziona un intervallo di date',
+              style: tt.bodySmall?.copyWith(color: t.textSecondary),
+            ),
             onTap: () => Navigator.pop(ctx, StatsFilterMode.period),
           ),
           Divider(color: t.divider),
           ListTile(
             leading: Icon(Icons.sports_score, color: t.accent),
-            title: Text('Sessione', style: t.bodyBold(t.textPrimary)),
-            subtitle: Text('Seleziona una singola sessione', style: t.bodySmall(t.textSecondary)),
+            title: Text(
+              'Sessione',
+              style: tt.titleMedium?.copyWith(color: t.textPrimary),
+            ),
+            subtitle: Text(
+              'Seleziona una singola sessione',
+              style: tt.bodySmall?.copyWith(color: t.textSecondary),
+            ),
             onTap: () => Navigator.pop(ctx, StatsFilterMode.session),
           ),
         ],

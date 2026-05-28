@@ -240,7 +240,10 @@ class _CricketStatsScreenState extends State<CricketStatsScreen>
       backgroundColor: t.bg,
       appBar: widget.showAppBar
           ? AppBar(
-        title: Text('Cricket', style: TextStyle(color: t.textPrimary)),
+        title: Text(
+          'Cricket',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(color: t.textPrimary),
+        ),
         backgroundColor: t.surface,
         elevation: 0,
       )
@@ -494,6 +497,8 @@ class _CricketImpactSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+
     return UnifiedStatsCard(
       title: 'WIN VS LOSE',
       subtitle: 'Confronto tra leg vinti e leg persi su marker e round medi',
@@ -550,7 +555,7 @@ class _CricketImpactSummaryCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Sezione standardizzata: confronta il rendimento Cricket tra leg vinti e persi.',
-                    style: t.bodySmall(t.textMuted),
+                    style: tt.bodySmall?.copyWith(color: t.textMuted),
                   ),
                 ),
               ],
@@ -577,6 +582,8 @@ class _CricketMetricCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
@@ -592,18 +599,14 @@ class _CricketMetricCell extends StatelessWidget {
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: color,
-              ),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: color),
             ),
             const SizedBox(height: 4),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: t.bodySmall(t.textMuted),
+              style: tt.bodySmall?.copyWith(color: t.textMuted),
             ),
           ],
         ),
@@ -923,6 +926,7 @@ class _SectorCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     return Expanded(
       flex: flex,
       child: Text(
@@ -930,10 +934,8 @@ class _SectorCell extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         textAlign: TextAlign.center,
-        style: TextStyle(
+        style: (isHeader ? tt.labelSmall : tt.bodySmall)?.copyWith(
           color: color ?? (isHeader ? t.textSecondary : t.textPrimary),
-          fontSize: isHeader ? 9 : 11,
-          fontWeight: isHeader || isStrong ? FontWeight.w900 : FontWeight.w700,
         ),
       ),
     );
@@ -1025,6 +1027,8 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+
     return UnifiedStatsCard(
       title: title.toUpperCase(),
       subtitle: 'Tabella rendimento settori Cricket',
@@ -1060,7 +1064,7 @@ class _SectionCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Tabella standardizzata: confronta marker, chiusura settore e distribuzione S/D/T.',
-                    style: t.bodySmall(t.textMuted),
+                    style: tt.bodySmall?.copyWith(color: t.textMuted),
                   ),
                 ),
               ],
@@ -1086,6 +1090,7 @@ class _TinyChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     return Container(
       constraints: const BoxConstraints(minWidth: 48),
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
@@ -1095,9 +1100,9 @@ class _TinyChip extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text(value, style: TextStyle(fontSize: 12, color: t.textPrimary, fontWeight: FontWeight.w900)),
+          Text(value, style: tt.titleSmall?.copyWith(color: t.textPrimary)),
           const SizedBox(height: 1),
-          Text(label, style: TextStyle(fontSize: 8, color: t.textMuted, fontWeight: FontWeight.w700)),
+          Text(label, style: tt.labelSmall?.copyWith(color: t.textMuted)),
         ],
       ),
     );
@@ -1123,6 +1128,7 @@ class _StateMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
@@ -1131,9 +1137,17 @@ class _StateMessage extends StatelessWidget {
           children: [
             Icon(icon, color: color, size: 48),
             const SizedBox(height: 14),
-            Text(title, textAlign: TextAlign.center, style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.w800, fontSize: 15)),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: tt.titleMedium?.copyWith(color: t.textPrimary),
+            ),
             const SizedBox(height: 6),
-            Text(subtitle, textAlign: TextAlign.center, style: TextStyle(color: t.textMuted, fontSize: 12)),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: tt.bodySmall?.copyWith(color: t.textMuted),
+            ),
             if (action != null) ...[
               const SizedBox(height: 16),
               action!,
@@ -1143,23 +1157,6 @@ class _StateMessage extends StatelessWidget {
       ),
     );
   }
-}
-
-
-TextStyle _bodyBoldStyle(AppTokens t) {
-  return TextStyle(
-    color: t.textPrimary,
-    fontSize: 13,
-    fontWeight: FontWeight.w800,
-  );
-}
-
-TextStyle _smallStyle(Color color) {
-  return TextStyle(
-    color: color,
-    fontSize: 10,
-    fontWeight: FontWeight.w600,
-  );
 }
 
 String _num(double value) {

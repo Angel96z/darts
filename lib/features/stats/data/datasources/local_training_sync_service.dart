@@ -264,11 +264,23 @@ class LocalTrainingSyncService {
 
   bool _running = false;
 
+  bool get isSyncing => _running;
+
   final _syncStatusController =
   StreamController<Map<String, LocalTrainingSyncStatus>>.broadcast();
 
+  final _syncRunningController = StreamController<bool>.broadcast();
+
   Stream<Map<String, LocalTrainingSyncStatus>> get onSyncStatusChanged =>
       _syncStatusController.stream;
+
+  Stream<bool> get onSyncRunningChanged => _syncRunningController.stream;
+
+  void _setRunning(bool value) {
+    if (_running == value) return;
+    _running = value;
+    _syncRunningController.add(value);
+  }
 
   static Future<void> initialize(TrainingRepository repo) async {
     instance = LocalTrainingSyncService._internal(repo);
@@ -313,7 +325,7 @@ class LocalTrainingSyncService {
       );
     }
 
-    await syncAll();
+    await syncAll(skipConnectionCheck: true);
     final updated = await getById(localId);
 
     return LocalTrainingSaveResult(
@@ -367,9 +379,12 @@ class LocalTrainingSyncService {
     await syncAll();
   }
 
-  Future<void> syncAll() async {
+  Future<void> syncAll({bool skipConnectionCheck = false}) async {
     if (_running) return;
-    if (!await _checkBackendConnection()) return;
+
+    if (!skipConnectionCheck && !await _checkBackendConnection()) {
+      return;
+    }
 
     _running = true;
     try {
@@ -396,6 +411,10 @@ class LocalTrainingSyncService {
     final all = await _getAll();
 
     return all.where((record) => record.isVisible).toList();
+  }
+
+  Future<List<LocalTrainingRecord>> getAllRecordsForPicker() async {
+    return _getAll();
   }
 
   Future<void> deleteRecord(String id) async {
@@ -533,37 +552,25 @@ class LocalTrainingSyncService {
 
   Future<bool> _checkBackendConnection() async {
     try {
+      final connectivity = await Connectivity()
+          .checkConnectivity()
+          .timeout(const Duration(milliseconds: 700));
+
+      if (connectivity.contains(ConnectivityResult.none)) {
+        return false;
+      }
+
       await FirebaseFirestore.instance
           .collection('users')
           .limit(1)
           .get(const GetOptions(source: Source.server))
-          .timeout(const Duration(seconds: 3));  Future<bool> _checkBackendConnection() async {
-        try {
-          final connectivity = await Connectivity()
-              .checkConnectivity()
-              .timeout(const Duration(milliseconds: 700));
+          .timeout(const Duration(milliseconds: 1200));
 
-          if (connectivity.contains(ConnectivityResult.none)) {
-            return false;
-          }
-
-          await FirebaseFirestore.instance
-              .collection('users')
-              .limit(1)
-              .get(const GetOptions(source: Source.server))
-              .timeout(const Duration(milliseconds: 1200));
-
-          return true;
-        } catch (_) {
-          return false;
-        }
-      }
       return true;
     } catch (_) {
       return false;
     }
   }
-
   Future<bool> _pushLocalToRemote() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return false;

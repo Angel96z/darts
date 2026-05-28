@@ -40,13 +40,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Scaffold(
       backgroundColor: t.bg,
       appBar: AppBar(
         title: Text(
           "Impostazioni",
-          style: TextStyle(color: t.textPrimary),
+          style: tt.titleMedium?.copyWith(color: t.textPrimary),
         ),
         backgroundColor: t.surface,
         elevation: 0,
@@ -60,19 +61,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(
               "Aspetto",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-                color: t.textSecondary,
-                letterSpacing: 0.5,
-              ),
+              style: tt.labelSmall?.copyWith(color: t.textSecondary),
             ),
           ),
 
           RadioListTile<ThemeMode>(
             title: Text(
               "Sistema",
-              style: TextStyle(color: t.textPrimary),
+              style: tt.bodyMedium?.copyWith(color: t.textPrimary),
             ),
             value: ThemeMode.system,
             groupValue: _themeMode,
@@ -83,7 +79,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           RadioListTile<ThemeMode>(
             title: Text(
               "Chiaro",
-              style: TextStyle(color: t.textPrimary),
+              style: tt.bodyMedium?.copyWith(color: t.textPrimary),
             ),
             value: ThemeMode.light,
             groupValue: _themeMode,
@@ -94,7 +90,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           RadioListTile<ThemeMode>(
             title: Text(
               "Scuro",
-              style: TextStyle(color: t.textPrimary),
+              style: tt.bodyMedium?.copyWith(color: t.textPrimary),
             ),
             value: ThemeMode.dark,
             groupValue: _themeMode,
@@ -109,12 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(
               "App",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-                color: t.textSecondary,
-                letterSpacing: 0.5,
-              ),
+              style: tt.labelSmall?.copyWith(color: t.textSecondary),
             ),
           ),
 
@@ -122,11 +113,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: Icon(Icons.info_outline, color: t.textSecondary),
             title: Text(
               "Versione app",
-              style: TextStyle(color: t.textPrimary),
+              style: tt.bodyMedium?.copyWith(color: t.textPrimary),
             ),
             subtitle: Text(
               "1.0.0",
-              style: TextStyle(color: t.textMuted),
+              style: tt.bodySmall?.copyWith(color: t.textMuted),
             ),
           ),
         ],

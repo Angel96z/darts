@@ -23,7 +23,7 @@ class DartboardManager extends StatefulWidget {
     this.controller,
     this.target,
     this.minScale = 1,
-    this.maxScale = 8,
+    this.maxScale = 20,
     this.onScore,
     this.overlays = const {DartboardOverlayType.throws},
   });

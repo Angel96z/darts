@@ -158,6 +158,7 @@ class _ConsigliAdminScreenState extends ConsumerState<ConsigliAdminScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final isAdminAsync = ref.watch(isAdminProvider);
 
     return Scaffold(
@@ -184,12 +185,12 @@ class _ConsigliAdminScreenState extends ConsumerState<ConsigliAdminScreen> {
                   const SizedBox(height: 16),
                   Text(
                     'Accesso non autorizzato',
-                    style: TextStyle(color: t.textSecondary, fontSize: 16),
+                    style: tt.titleMedium?.copyWith(color: t.textSecondary),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Solo l\'amministratore può gestire le frasi',
-                    style: TextStyle(color: t.textMuted, fontSize: 12),
+                    style: tt.bodySmall?.copyWith(color: t.textMuted),
                   ),
                 ],
               ),
@@ -212,7 +213,7 @@ class _ConsigliAdminScreenState extends ConsumerState<ConsigliAdminScreen> {
         error: (_, __) => Center(
           child: Text(
             'Errore di autenticazione',
-            style: TextStyle(color: t.red),
+            style: tt.bodySmall?.copyWith(color: t.red),
           ),
         ),
       ),
@@ -220,6 +221,7 @@ class _ConsigliAdminScreenState extends ConsumerState<ConsigliAdminScreen> {
   }
 
   Widget _buildForm(AppTokens t) {
+    final tt = Theme.of(context).textTheme;
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
@@ -240,7 +242,7 @@ class _ConsigliAdminScreenState extends ConsumerState<ConsigliAdminScreen> {
               ),
               child: Text(
                 '✏️ MODIFICA IN CORSO',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: t.accent),
+                style: tt.labelSmall?.copyWith(color: t.accent),
               ),
             ),
           const SizedBox(height: 12),
@@ -332,7 +334,12 @@ class _ConsigliAdminScreenState extends ConsumerState<ConsigliAdminScreen> {
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(child: Text('Errore: ${snapshot.error}', style: TextStyle(color: t.red)));
+          return Center(
+            child: Text(
+              'Errore: ${snapshot.error}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.red),
+            ),
+          );
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -349,12 +356,12 @@ class _ConsigliAdminScreenState extends ConsumerState<ConsigliAdminScreen> {
                 const SizedBox(height: 12),
                 Text(
                   'Nessuna frase nel database',
-                  style: TextStyle(color: t.textSecondary),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: t.textSecondary),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Usa il form qui sopra per aggiungerne una!',
-                  style: TextStyle(color: t.textMuted, fontSize: 12),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.textMuted),
                 ),
               ],
             ),
@@ -397,7 +404,7 @@ class _ConsigliAdminScreenState extends ConsumerState<ConsigliAdminScreen> {
                           ),
                           child: Text(
                             _categoriaLabel(categoria),
-                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: t.accent),
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(color: t.accent),
                           ),
                         ),
                         const Spacer(),
@@ -410,7 +417,7 @@ class _ConsigliAdminScreenState extends ConsumerState<ConsigliAdminScreen> {
                             ),
                             child: Text(
                               'DISATTIVO',
-                              style: TextStyle(fontSize: 8, fontWeight: FontWeight.w600, color: t.grey),
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: t.grey),
                             ),
                           ),
                         IconButton(
@@ -426,9 +433,7 @@ class _ConsigliAdminScreenState extends ConsumerState<ConsigliAdminScreen> {
                     const SizedBox(height: 8),
                     Text(
                       text,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: attivo ? FontWeight.w500 : FontWeight.normal,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: attivo ? t.textPrimary : t.textSecondary,
                       ),
                     ),
@@ -437,7 +442,7 @@ class _ConsigliAdminScreenState extends ConsumerState<ConsigliAdminScreen> {
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
                           '— $autore',
-                          style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: t.textMuted),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.textMuted),
                         ),
                       ),
                   ],

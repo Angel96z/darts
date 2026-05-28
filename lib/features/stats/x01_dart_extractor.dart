@@ -399,7 +399,14 @@ class X01TurnSlice {
   int get startingScore => first.startingScore;
   int get initialScore => first.turnInitialScore;
   int get scoreAfter => first.turnScoreAfter;
-  int get total => first.turnTotal;
+  int get total {
+    if (isBust) return 0;
+
+    final scored = initialScore - scoreAfter;
+    return scored > 0 ? scored : 0;
+  }
+
+  int get rawTotal => first.turnTotal;
   int get dartsThrown => darts.length;
 
   bool get isBust => first.turnIsBust;
@@ -409,8 +416,14 @@ class X01TurnSlice {
 
   double get average {
     if (darts.isEmpty) return 0;
-    final totalScore = darts.fold<int>(0, (sum, dart) => sum + dart.dartScore);
-    return (totalScore / darts.length) * 3;
+
+    // Usa la stessa logica del game state
+    if (first.turnIsBust) return 0;
+
+    final actualScore = first.turnInitialScore - first.turnScoreAfter;
+    if (actualScore <= 0) return 0;
+
+    return (actualScore / darts.length) * 3;
   }
 }
 

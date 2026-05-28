@@ -9,15 +9,16 @@ import '../../../../app_theme.dart';
 import '../../../game/domain/entities/dart_models.dart';
 import 'package:fl_chart/fl_chart.dart';
 
+import '../widgets/training_quadrant_distance.dart';
 import '../widgets/training_sector_hits.dart';
 import '../widgets/unified_stats_chart.dart';
 import 'package:intl/intl.dart';
-
 
 class TrainingCharts {
   /// Funzione: descrive in modo semplice questo blocco di logica.
   static List<DartThrow> _sortThrowsChronologically(List<DartThrow> throws) {
     final ordered = [...throws];
+
     /// Funzione: descrive in modo semplice questo blocco di logica.
     ordered.sort((a, b) {
       final byTime = a.timestamp.compareTo(b.timestamp);
@@ -33,8 +34,8 @@ class TrainingCharts {
 
   /// Funzione: descrive in modo semplice questo blocco di logica.
   static List<SessionPerformancePoint> _sortSessionsChronologically(
-      List<SessionPerformancePoint> sessions,
-      ) {
+    List<SessionPerformancePoint> sessions,
+  ) {
     final ordered = [...sessions];
     ordered.sort((a, b) => a.sessionDate.compareTo(b.sessionDate));
     return ordered;
@@ -49,11 +50,7 @@ class TrainingCharts {
 
     final orderedThrows = _sortThrowsChronologically(throws);
 
-    final dartMap = <int, List<DartThrow>>{
-      1: [],
-      2: [],
-      3: [],
-    };
+    final dartMap = <int, List<DartThrow>>{1: [], 2: [], 3: []};
 
     for (final t in orderedThrows) {
       if (dartMap.containsKey(t.dartInTurn)) {
@@ -82,23 +79,16 @@ class TrainingCharts {
       return '${percent.toStringAsFixed(0)}% · 1 su $oneEvery';
     }
 
-    final turns = _buildTurns(orderedThrows)
-        .where((turn) {
+    final turns = _buildTurns(orderedThrows).where((turn) {
       if (turn.length != 3) return false;
 
       final dartIndexes = turn.map((t) => t.dartInTurn).toSet();
       return dartIndexes.contains(1) &&
           dartIndexes.contains(2) &&
           dartIndexes.contains(3);
-    })
-        .toList();
+    }).toList();
 
-    final exactHitsCount = <int, int>{
-      0: 0,
-      1: 0,
-      2: 0,
-      3: 0,
-    };
+    final exactHitsCount = <int, int>{0: 0, 1: 0, 2: 0, 3: 0};
 
     for (final turnThrows in turns) {
       final hitsOnTarget = turnThrows.where((t) => t.sector == target).length;
@@ -133,7 +123,7 @@ class TrainingCharts {
           subtitle: 'Percentuale di hit separata per Dart 1, Dart 2 e Dart 3.',
           infoTitle: 'Hit per freccia del turno',
           infoText:
-          'Mostra quanto spesso ogni freccia del turno colpisce il target $target. Serve a capire se perdi qualità tra prima, seconda e terza freccia.',
+              'Mostra quanto spesso ogni freccia del turno colpisce il target $target. Serve a capire se perdi qualità tra prima, seconda e terza freccia.',
           advice: const [
             'Se Dart 3 cala rispetto a Dart 1, probabilmente perdi stabilità nel finale.',
             'Se Dart 1 è debole, lavora su setup iniziale e primo rilascio.',
@@ -141,9 +131,21 @@ class TrainingCharts {
           ],
           child: _MetricBars(
             rows: [
-              _MetricBarData('Dart 1', hitPercent(dartMap[1]!), hitText(dartMap[1]!)),
-              _MetricBarData('Dart 2', hitPercent(dartMap[2]!), hitText(dartMap[2]!)),
-              _MetricBarData('Dart 3', hitPercent(dartMap[3]!), hitText(dartMap[3]!)),
+              _MetricBarData(
+                'Dart 1',
+                hitPercent(dartMap[1]!),
+                hitText(dartMap[1]!),
+              ),
+              _MetricBarData(
+                'Dart 2',
+                hitPercent(dartMap[2]!),
+                hitText(dartMap[2]!),
+              ),
+              _MetricBarData(
+                'Dart 3',
+                hitPercent(dartMap[3]!),
+                hitText(dartMap[3]!),
+              ),
             ],
           ),
         ),
@@ -153,7 +155,7 @@ class TrainingCharts {
           subtitle: 'Quanti turni completi finiscono con 0, 1, 2 o 3 hit.',
           infoTitle: 'Hit esatte per turno',
           infoText:
-          'Conta solo i turni completi da 3 freccette reali e mostra quante volte chiudi il turno con 0, 1, 2 o 3 hit sul target $target.',
+              'Conta solo i turni completi da 3 freccette reali e mostra quante volte chiudi il turno con 0, 1, 2 o 3 hit sul target $target.',
           advice: const [
             'Aumentare i turni da 2 hit è spesso più importante che cercare subito il 3/3.',
             'Molti turni da 0 hit indicano perdita di riferimento o routine instabile.',
@@ -171,6 +173,7 @@ class TrainingCharts {
       ],
     );
   }
+
   /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget hitTrend(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
@@ -222,10 +225,8 @@ class TrainingCharts {
       xAxisLabel: singleDart ? 'tiro' : 'turno',
       yAxisLabel: 'hit',
       minYValue: 0,
-      maxYValue: singleDart ? 1 : 4,
-      infoTitle: singleDart
-          ? 'Hit nel tempo'
-          : 'Trend hit per turno',
+      maxYValue: singleDart ? 2 : 4,
+      infoTitle: singleDart ? 'Hit nel tempo' : 'Trend hit per turno',
       infoText: singleDart
           ? 'Ogni punto vale 0 o 1: 1 significa target colpito, 0 significa target mancato.'
           : 'Ogni punto rappresenta un turno. Il valore indica quante freccette hanno colpito il target.',
@@ -236,6 +237,7 @@ class TrainingCharts {
       ],
     );
   }
+
   /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget mmTrend(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
@@ -247,13 +249,18 @@ class TrainingCharts {
 
     // Calcola distanza media per turno
     final mmPerTurn = turns.map((turn) {
-      return turn.map((e) => e.distanceMm).reduce((a, b) => a + b) / turn.length;
+      return turn.map((e) => e.distanceMm).reduce((a, b) => a + b) /
+          turn.length;
     }).toList();
 
     // Trova max per normalizzazione
-// Trova max per normalizzazione - CORRETTO
-    final maxMm = mmPerTurn.isEmpty ? 100.0 : mmPerTurn.cast<double>().reduce((a, b) => a > b ? a : b);
-    final minMm = mmPerTurn.isEmpty ? 0.0 : mmPerTurn.cast<double>().reduce((a, b) => a < b ? a : b);
+    // Trova max per normalizzazione - CORRETTO
+    final maxMm = mmPerTurn.isEmpty
+        ? 100.0
+        : mmPerTurn.cast<double>().reduce((a, b) => a > b ? a : b);
+    final minMm = mmPerTurn.isEmpty
+        ? 0.0
+        : mmPerTurn.cast<double>().reduce((a, b) => a < b ? a : b);
 
     // INVERTE: distanza piccola = valore alto nel grafico
     // formula: valore_invertito = maxMm - distanza_reale
@@ -278,11 +285,13 @@ class TrainingCharts {
       title: 'Precisione nel tempo',
       series: [series],
       description: 'Distanza media dal target in ogni turno.',
-      insight: '📈 Linea che sale = migliori (distanza ridotta)\n📉 Linea che scende = peggiori (distanza aumentata)',
-      tip: 'Riduci forza e cerca un rilascio più morbido per far salire la linea.',
+      insight:
+          '📈 Linea che sale = migliori (distanza ridotta)\n📉 Linea che scende = peggiori (distanza aumentata)',
+      tip:
+          'Riduci forza e cerca un rilascio più morbido per far salire la linea.',
       config: ChartConfig(
         minY: 0,
-        maxY: maxMm,  // Mostra scala 0-maxMm
+        maxY: maxMm, // Mostra scala 0-maxMm
         yInterval: (maxMm / 4).clamp(5, 50).toDouble(),
         xInterval: 1,
         // Custom label builder per mostrare la distanza reale
@@ -298,7 +307,8 @@ class TrainingCharts {
             'Hit: ${hitByTurn[index]}\n'
             'Distanza: ${mmPerTurn[index].toStringAsFixed(1)} mm';
       },
-      legendText: '⬆️ PUNTO PIÙ ALTO = migliore precisione (meno mm) | ⬇️ PUNTO PIÙ BASSO = peggiore precisione (più mm)',
+      legendText:
+          '⬆️ PUNTO PIÙ ALTO = migliore precisione (meno mm) | ⬇️ PUNTO PIÙ BASSO = peggiore precisione (più mm)',
       rendererBuilder: (ctx) => LineChartRenderer(ctx: ctx, showDots: false),
     );
   }
@@ -358,7 +368,7 @@ class TrainingCharts {
           x: i + 1.0,
           y: sessions[i].performance,
           label: 'Sessione ${i + 1}',
-          detail: _buildSessionDetail(sessions[i]),  // ← USA LA NUOVA FUNZIONE
+          detail: _buildSessionDetail(sessions[i]), // ← USA LA NUOVA FUNZIONE
         ),
     ];
 
@@ -375,7 +385,7 @@ class TrainingCharts {
 
     final avgPerformance =
         sessions.map((e) => e.performance).reduce((a, b) => a + b) /
-            sessions.length;
+        sessions.length;
 
     final avgFocus = avgOf((s) => s.focus);
     final avgStress = avgOf((s) => s.stress);
@@ -411,10 +421,10 @@ class TrainingCharts {
           xAxisLabel: 'sessione',
           yAxisLabel: 'performance %',
           minYValue: 0,
-          maxYValue: 100,
+          maxYValue: 105,
           infoTitle: title,
           infoText:
-          'Ogni punto rappresenta una sessione selezionata. Il grafico serve a confrontare il rendimento con gli stati d’animo registrati.',
+              'Ogni punto rappresenta una sessione selezionata. Il grafico serve a confrontare il rendimento con gli stati d’animo registrati.',
           advice: const [
             'Confronta TOP e WORST per capire quali stati mentali ricorrono.',
             'Focus alto e distrazioni basse spesso indicano sessioni più solide.',
@@ -425,10 +435,11 @@ class TrainingCharts {
         _UnifiedTrainingMetricCard(
           icon: icon,
           title: moodTitle,
-          subtitle: 'Media performance e stati d’animo delle sessioni selezionate.',
+          subtitle:
+              'Media performance e stati d’animo delle sessioni selezionate.',
           infoTitle: moodTitle,
           infoText:
-          'Mostra la media degli stati d’animo associati a questo gruppo di sessioni. Serve per capire in quale condizione mentale/fisica giochi meglio o peggio.',
+              'Mostra la media degli stati d’animo associati a questo gruppo di sessioni. Serve per capire in quale condizione mentale/fisica giochi meglio o peggio.',
           advice: const [
             'Confronta questi valori con l’altro gruppo TOP/WORST.',
             'Non guardare un solo dato: cerca pattern ricorrenti.',
@@ -478,9 +489,14 @@ class TrainingCharts {
                 ],
               ),
               const SizedBox(height: 10),
-              Text(
-                '$analysisTitle: ${analysisText()}',
-                style: const TextStyle(fontWeight: FontWeight.w900),
+              Builder(
+                builder: (context) {
+                  final tt = Theme.of(context).textTheme;
+                  return Text(
+                    '$analysisTitle: ${analysisText()}',
+                    style: tt.titleSmall,
+                  );
+                },
               ),
             ],
           ),
@@ -502,9 +518,12 @@ class TrainingCharts {
     final metrics = <String>[];
     if (session.focus != null) metrics.add('🎯 Focus: ${session.focus}/10');
     if (session.stress != null) metrics.add('😰 Stress: ${session.stress}/10');
-    if (session.energia != null) metrics.add('⚡ Energia: ${session.energia}/10');
-    if (session.fiducia != null) metrics.add('💪 Fiducia: ${session.fiducia}/10');
-    if (session.distrazioni != null) metrics.add('📱 Distrazioni: ${session.distrazioni}/10');
+    if (session.energia != null)
+      metrics.add('⚡ Energia: ${session.energia}/10');
+    if (session.fiducia != null)
+      metrics.add('💪 Fiducia: ${session.fiducia}/10');
+    if (session.distrazioni != null)
+      metrics.add('📱 Distrazioni: ${session.distrazioni}/10');
 
     if (metrics.isNotEmpty) {
       buffer.write('\n${metrics.join(' • ')}');
@@ -528,8 +547,10 @@ class TrainingCharts {
 
     final targetCenter = _targetCenterFor(target);
 
-    final meanX = valid.map((t) => t.position.dx).reduce((a, b) => a + b) / valid.length;
-    final meanY = valid.map((t) => t.position.dy).reduce((a, b) => a + b) / valid.length;
+    final meanX =
+        valid.map((t) => t.position.dx).reduce((a, b) => a + b) / valid.length;
+    final meanY =
+        valid.map((t) => t.position.dy).reduce((a, b) => a + b) / valid.length;
 
     double varX = 0;
     double varY = 0;
@@ -555,10 +576,11 @@ class TrainingCharts {
     return _UnifiedTrainingMetricCard(
       icon: Icons.open_with_rounded,
       title: 'Bias direzionale',
-      subtitle: 'Deriva media rispetto al target $target e dispersione del gruppo frecce.',
+      subtitle:
+          'Deriva media rispetto al target $target e dispersione del gruppo frecce.',
       infoTitle: 'Bias direzionale',
       infoText:
-      'Mostra dove tende a spostarsi il gruppo frecce rispetto al target selezionato, non rispetto al bull. '
+          'Mostra dove tende a spostarsi il gruppo frecce rispetto al target selezionato, non rispetto al bull. '
           'Lo spostamento indica la direzione media dell’errore; la dispersione indica quanto il gruppo è largo.',
       advice: const [
         'Bias alto ma dispersione bassa = gesto ripetibile, ma fuori asse rispetto al target.',
@@ -577,8 +599,16 @@ class TrainingCharts {
             meanYmm.abs(),
             '${meanYmm >= 0 ? '+' : ''}${meanYmm.toStringAsFixed(0)} mm ($yDir)',
           ),
-          _MetricBarData('Dispersione X', stdXmm, '${stdXmm.toStringAsFixed(0)} mm'),
-          _MetricBarData('Dispersione Y', stdYmm, '${stdYmm.toStringAsFixed(0)} mm'),
+          _MetricBarData(
+            'Dispersione X',
+            stdXmm,
+            '${stdXmm.toStringAsFixed(0)} mm',
+          ),
+          _MetricBarData(
+            'Dispersione Y',
+            stdYmm,
+            '${stdYmm.toStringAsFixed(0)} mm',
+          ),
         ],
       ),
     );
@@ -587,15 +617,33 @@ class TrainingCharts {
   static Offset _targetCenterFor(String target) {
     final normalized = target.trim().toUpperCase();
 
-    if (normalized == 'BULL' || normalized == '25' || normalized.endsWith('25')) {
+    if (normalized == 'BULL' ||
+        normalized == '25' ||
+        normalized.endsWith('25')) {
       return const Offset(0.5, 0.5);
     }
 
     const sectors = [
-      20, 1, 18, 4, 13,
-      6, 10, 15, 2, 17,
-      3, 19, 7, 16, 8,
-      11, 14, 9, 12, 5,
+      20,
+      1,
+      18,
+      4,
+      13,
+      6,
+      10,
+      15,
+      2,
+      17,
+      3,
+      19,
+      7,
+      16,
+      8,
+      11,
+      14,
+      9,
+      12,
+      5,
     ];
 
     const sectorAngle = 2 * pi / 20;
@@ -610,24 +658,24 @@ class TrainingCharts {
 
     final angle = startOffset + index * sectorAngle + sectorAngle / 2;
 
-    const bullOuter = 15.9 / 225.5;
-    const tripleInner = 99 / 225.5;
-    const tripleOuter = 107 / 225.5;
-    const doubleInner = 162 / 225.5;
-    const doubleOuter = 170 / 225.5;
+    const boardDiameterMm = 451.0;
+
+    const bullOuter = 15.9 / boardDiameterMm;
+    const tripleInner = 99 / boardDiameterMm;
+    const tripleOuter = 107 / boardDiameterMm;
+    const doubleInner = 162 / boardDiameterMm;
+    const doubleOuter = 170 / boardDiameterMm;
 
     final radius = switch (ring) {
       'T' => (tripleInner + tripleOuter) / 2,
       'D' => (doubleInner + doubleOuter) / 2,
-      _ => (bullOuter + tripleInner) / 2,
+      _ =>
+        (tripleOuter + doubleInner) /
+            2, // SINGOLO: zona esterna tra triplo e doppio
     };
 
-    final normalizedRadius = radius * 0.5;
-
-    return Offset(
-      0.5 + cos(angle) * normalizedRadius,
-      0.5 + sin(angle) * normalizedRadius,
-    );
+    // NOTA: radius è già in coordinate centro→bordo (0-0.5), non moltiplicare per 0.5
+    return Offset(0.5 + cos(angle) * radius, 0.5 + sin(angle) * radius);
   }
 
   /// Funzione: descrive in modo semplice questo blocco di logica.
@@ -650,16 +698,14 @@ class TrainingCharts {
       }
     }
 
-    final turns = _buildTurns(orderedThrows)
-        .where((turn) {
+    final turns = _buildTurns(orderedThrows).where((turn) {
       if (turn.length != 3) return false;
 
       final dartIndexes = turn.map((t) => t.dartInTurn).toSet();
       return dartIndexes.contains(1) &&
           dartIndexes.contains(2) &&
           dartIndexes.contains(3);
-    })
-        .toList();
+    }).toList();
 
     int best0 = 0;
     int best1 = 0;
@@ -715,7 +761,7 @@ class TrainingCharts {
       subtitle: 'Migliori sequenze consecutive su freccette e turni completi.',
       infoTitle: 'Serie consecutive',
       infoText:
-      'Misura la miglior serie consecutiva di freccette sul target $target e la miglior serie di turni completi chiusi con esattamente 0, 1, 2 o 3 hit.',
+          'Misura la miglior serie consecutiva di freccette sul target $target e la miglior serie di turni completi chiusi con esattamente 0, 1, 2 o 3 hit.',
       advice: const [
         'Serie corte ma frequenti indicano controllo reale.',
         'Prima stabilizza i turni da 1 e 2 hit, poi cerca il 3/3.',
@@ -729,31 +775,14 @@ class TrainingCharts {
             bestDartStreak.toDouble(),
             bestDartStreak == 0 ? 'mai' : '$bestDartStreak consecutive',
           ),
-          _MetricBarData(
-            'Turni 0 hit',
-            best0.toDouble(),
-            turnText(best0),
-          ),
-          _MetricBarData(
-            'Turni 1 hit',
-            best1.toDouble(),
-            turnText(best1),
-          ),
-          _MetricBarData(
-            'Turni 2 hit',
-            best2.toDouble(),
-            turnText(best2),
-          ),
-          _MetricBarData(
-            'Turni 3 hit',
-            best3.toDouble(),
-            turnText(best3),
-          ),
+          _MetricBarData('Turni 0 hit', best0.toDouble(), turnText(best0)),
+          _MetricBarData('Turni 1 hit', best1.toDouble(), turnText(best1)),
+          _MetricBarData('Turni 2 hit', best2.toDouble(), turnText(best2)),
+          _MetricBarData('Turni 3 hit', best3.toDouble(), turnText(best3)),
         ],
       ),
     );
   }
-
 
   /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget performanceScore(List<DartThrow> throws, String target) {
@@ -761,16 +790,14 @@ class TrainingCharts {
 
     final orderedThrows = _sortThrowsChronologically(throws);
 
-    final turns = _buildTurns(orderedThrows)
-        .where((turn) {
+    final turns = _buildTurns(orderedThrows).where((turn) {
       if (turn.length != 3) return false;
 
       final dartIndexes = turn.map((t) => t.dartInTurn).toSet();
       return dartIndexes.contains(1) &&
           dartIndexes.contains(2) &&
           dartIndexes.contains(3);
-    })
-        .toList();
+    }).toList();
 
     if (turns.isEmpty) return _empty();
 
@@ -790,11 +817,11 @@ class TrainingCharts {
 
     final avgPrecision =
         metrics.map((e) => e.precisionForChart).reduce((a, b) => a + b) /
-            metrics.length;
+        metrics.length;
 
     final avgControl =
         metrics.map((e) => e.consistencyNorm).reduce((a, b) => a + b) /
-            metrics.length;
+        metrics.length;
 
     String level(double value) {
       if (value >= 75) return 'alta';
@@ -810,7 +837,7 @@ class TrainingCharts {
       };
 
       final weakest = values.entries.reduce(
-            (a, b) => a.value <= b.value ? a : b,
+        (a, b) => a.value <= b.value ? a : b,
       );
 
       switch (weakest.key) {
@@ -828,10 +855,11 @@ class TrainingCharts {
     return _UnifiedTrainingMetricCard(
       icon: Icons.speed_rounded,
       title: 'Indice performance',
-      subtitle: 'Sintesi unica di hit, precisione e controllo sui turni completi.',
+      subtitle:
+          'Sintesi unica di hit, precisione e controllo sui turni completi.',
       infoTitle: 'Indice performance',
       infoText:
-      'L’indice performance combina hit, precisione e controllo. Non rappresenta i punti segnati sul tabellone: è una misura tecnica da 0 a 100 della qualità dei turni completi.',
+          'L’indice performance combina hit, precisione e controllo. Non rappresenta i punti segnati sul tabellone: è una misura tecnica da 0 a 100 della qualità dei turni completi.',
       advice: const [
         'Indice alto = buon equilibrio tra hit, distanza e controllo.',
         'Hit alta ma controllo basso = risultato buono ma fragile.',
@@ -858,46 +886,39 @@ class TrainingCharts {
                 avgPrecision,
                 '${avgPrecision.round()}%',
               ),
-              _MetricBarData(
-                'Controllo',
-                avgControl,
-                '${avgControl.round()}%',
-              ),
+              _MetricBarData('Controllo', avgControl, '${avgControl.round()}%'),
             ],
           ),
           const SizedBox(height: 10),
-          Text(
-            weakestMetric(),
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-            ),
+          Builder(
+            builder: (context) {
+              final tt = Theme.of(context).textTheme;
+              return Text(weakestMetric(), style: tt.titleSmall);
+            },
           ),
         ],
       ),
     );
   }
 
-
   /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget relationalPerformance(
-      List<DartThrow> throws,
-      String target, {
-        bool showSessionTime = false,
-      }) {
+    List<DartThrow> throws,
+    String target, {
+    bool showSessionTime = false,
+  }) {
     if (throws.length < 3) return _empty();
 
     final orderedThrows = _sortThrowsChronologically(throws);
 
-    final turns = _buildTurns(orderedThrows)
-        .where((turn) {
+    final turns = _buildTurns(orderedThrows).where((turn) {
       if (turn.length != 3) return false;
 
       final dartIndexes = turn.map((t) => t.dartInTurn).toSet();
       return dartIndexes.contains(1) &&
           dartIndexes.contains(2) &&
           dartIndexes.contains(3);
-    })
-        .toList();
+    }).toList();
 
     if (turns.isEmpty) return _empty();
 
@@ -926,7 +947,7 @@ class TrainingCharts {
 
     final avgControl =
         metrics.map((e) => e.consistencyNorm).reduce((a, b) => a + b) /
-            metrics.length;
+        metrics.length;
 
     String level(double value) {
       if (value >= 75) return 'alta';
@@ -1015,7 +1036,7 @@ class TrainingCharts {
           y: metrics[i].score,
           label: 'Turno ${metrics[i].turnNumber}',
           detail:
-          'Turno ${metrics[i].turnNumber} • Score ${metrics[i].score.toStringAsFixed(0)} • Hit ${metrics[i].hits}/3 • Distanza ${metrics[i].avgMm.toStringAsFixed(1)} mm • Controllo ${metrics[i].consistencyNorm.toStringAsFixed(0)}%',
+              'Turno ${metrics[i].turnNumber} • Score ${metrics[i].score.toStringAsFixed(0)} • Hit ${metrics[i].hits}/3 • Distanza ${metrics[i].avgMm.toStringAsFixed(1)} mm • Controllo ${metrics[i].consistencyNorm.toStringAsFixed(0)}%',
         ),
     ];
 
@@ -1028,24 +1049,31 @@ class TrainingCharts {
         padding: const EdgeInsets.only(bottom: 9),
         child: Row(
           children: [
-            Expanded(
-              flex: 34,
-              child: Text(label),
-            ),
+            Expanded(flex: 34, child: Text(label)),
             Expanded(
               flex: 33,
-              child: Text(
-                bestValue,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontWeight: FontWeight.w900),
+              child: Builder(
+                builder: (context) {
+                  final tt = Theme.of(context).textTheme;
+                  return Text(
+                    bestValue,
+                    textAlign: TextAlign.center,
+                    style: tt.titleSmall,
+                  );
+                },
               ),
             ),
             Expanded(
               flex: 33,
-              child: Text(
-                worstValue,
-                textAlign: TextAlign.right,
-                style: const TextStyle(fontWeight: FontWeight.w900),
+              child: Builder(
+                builder: (context) {
+                  final tt = Theme.of(context).textTheme;
+                  return Text(
+                    worstValue,
+                    textAlign: TextAlign.right,
+                    style: tt.titleSmall,
+                  );
+                },
               ),
             ),
           ],
@@ -1057,16 +1085,17 @@ class TrainingCharts {
       children: [
         UnifiedStatsChart(
           title: 'Confronto performance',
-          subtitle: 'Indice di performace turno per turno: mostra picchi, cali e stabilità reale.',
+          subtitle:
+              'Indice di performace turno per turno: mostra picchi, cali e stabilità reale.',
           points: points,
           mode: UnifiedStatsChartMode.lineAndPoints,
           xAxisLabel: 'turno',
           yAxisLabel: 'indice',
           minYValue: 0,
-          maxYValue: 100,
+          maxYValue: 105,
           infoTitle: 'Confronto performance',
           infoText:
-          'L\'indice combina hit, precisione e controllo. Serve a capire in quali turni il risultato è stato migliore o peggiore e quale metrica ha inciso di più.',
+              'L\'indice combina hit, precisione e controllo. Serve a capire in quali turni il risultato è stato migliore o peggiore e quale metrica ha inciso di più.',
           advice: const [
             'Indice alto con controllo alto = turno realmente solido.',
             'Indice alto con controllo basso = picco buono ma fragile.',
@@ -1077,10 +1106,11 @@ class TrainingCharts {
         _UnifiedTrainingMetricCard(
           icon: Icons.compare_arrows_rounded,
           title: 'Migliore vs peggiore',
-          subtitle: 'Confronto diretto tra il turno più forte e quello più fragile.',
+          subtitle:
+              'Confronto diretto tra il turno più forte e quello più fragile.',
           infoTitle: 'Migliore vs peggiore',
           infoText:
-          'Confronta il miglior turno e il peggior turno usando indice, hit, distanza media e controllo. Non legge solo il risultato finale, ma anche perché quel turno è stato forte o debole.',
+              'Confronta il miglior turno e il peggior turno usando indice, hit, distanza media e controllo. Non legge solo il risultato finale, ma anche perché quel turno è stato forte o debole.',
           advice: const [
             'Replica la condizione tecnica del turno migliore.',
             'Se il peggiore ha controllo basso, lavora sulla routine tra le frecce.',
@@ -1091,22 +1121,32 @@ class TrainingCharts {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
-                children: const [
+                children: [
                   Expanded(flex: 34, child: Text('')),
                   Expanded(
                     flex: 33,
-                    child: Text(
-                      'BEST',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.w900),
+                    child: Builder(
+                      builder: (context) {
+                        final tt = Theme.of(context).textTheme;
+                        return Text(
+                          'BEST',
+                          textAlign: TextAlign.center,
+                          style: tt.titleSmall,
+                        );
+                      },
                     ),
                   ),
                   Expanded(
                     flex: 33,
-                    child: Text(
-                      'WORST',
-                      textAlign: TextAlign.right,
-                      style: TextStyle(fontWeight: FontWeight.w900),
+                    child: Builder(
+                      builder: (context) {
+                        final tt = Theme.of(context).textTheme;
+                        return Text(
+                          'WORST',
+                          textAlign: TextAlign.right,
+                          style: tt.titleSmall,
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -1138,19 +1178,31 @@ class TrainingCharts {
                 worstValue: '${worst.consistencyNorm.toStringAsFixed(0)}%',
               ),
               const Divider(height: 22),
-              Text(
-                'Migliore: ${bestReason(best)}.',
-                style: const TextStyle(fontWeight: FontWeight.w800),
+              Builder(
+                builder: (context) {
+                  final tt = Theme.of(context).textTheme;
+                  return Text(
+                    'Migliore: ${bestReason(best)}.',
+                    style: tt.titleSmall,
+                  );
+                },
               ),
               const SizedBox(height: 6),
-              Text(
-                'Peggiore: ${worstReason(worst)}.',
-                style: const TextStyle(fontWeight: FontWeight.w800),
+              Builder(
+                builder: (context) {
+                  final tt = Theme.of(context).textTheme;
+                  return Text(
+                    'Peggiore: ${worstReason(worst)}.',
+                    style: tt.titleSmall,
+                  );
+                },
               ),
               const SizedBox(height: 10),
-              Text(
-                relationText(),
-                style: const TextStyle(fontWeight: FontWeight.w900),
+              Builder(
+                builder: (context) {
+                  final tt = Theme.of(context).textTheme;
+                  return Text(relationText(), style: tt.titleSmall);
+                },
               ),
             ],
           ),
@@ -1158,6 +1210,7 @@ class TrainingCharts {
       ],
     );
   }
+
   static String _formatHitFrequencyFromHitRate(double hitRatePercent) {
     final percent = hitRatePercent.round();
 
@@ -1181,14 +1234,14 @@ class TrainingCharts {
 
     return '$hitPercent% · 1 hit ogni $dartsPerHit freccette';
   }
+
   /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget consistencyTrend(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
 
     final orderedThrows = _sortThrowsChronologically(throws);
 
-    final turns = _buildTurns(orderedThrows)
-        .where((turn) {
+    final turns = _buildTurns(orderedThrows).where((turn) {
       if (turn.length != 3) return false;
 
       final dartIndexes = turn.map((t) => t.dartInTurn).toSet();
@@ -1204,16 +1257,21 @@ class TrainingCharts {
     for (int i = 0; i < turns.length; i++) {
       final turn = turns[i];
       final hits = turn.where((e) => e.sector == target).length;
-      final avgMm = turn.map((e) => e.distanceMm).reduce((a, b) => a + b) / turn.length;
+      final avgMm =
+          turn.map((e) => e.distanceMm).reduce((a, b) => a + b) / turn.length;
 
-      final variance = turn
-          .map((e) => pow(e.distanceMm - avgMm, 2).toDouble())
-          .reduce((a, b) => a + b) /
+      final variance =
+          turn
+              .map((e) => pow(e.distanceMm - avgMm, 2).toDouble())
+              .reduce((a, b) => a + b) /
           turn.length;
       final stdDevMm = sqrt(variance);
 
-      final maxAcceptableMm = _maxDispersionForTarget(target);  // ← nome cambiato
-      double consistency = (1 - (stdDevMm / maxAcceptableMm)).clamp(0.0, 1.0) * 100.0;
+      final maxAcceptableMm = _maxDispersionForTarget(
+        target,
+      ); // ← nome cambiato
+      double consistency =
+          (1 - (stdDevMm / maxAcceptableMm)).clamp(0.0, 1.0) * 100.0;
       consistency = consistency.roundToDouble();
 
       points.add(
@@ -1221,22 +1279,25 @@ class TrainingCharts {
           x: i + 1.0,
           y: consistency,
           label: 'Turno ${i + 1}',
-          detail: 'Turno ${i + 1} • Hit $hits/3 • Distanza media ${avgMm.toStringAsFixed(1)} mm • Dispersione ${stdDevMm.toStringAsFixed(1)} mm • Controllo ${consistency.toStringAsFixed(0)}%',
+          detail:
+              'Turno ${i + 1} • Hit $hits/3 • Distanza media ${avgMm.toStringAsFixed(1)} mm • Dispersione ${stdDevMm.toStringAsFixed(1)} mm • Controllo ${consistency.toStringAsFixed(0)}%',
         ),
       );
     }
 
     return UnifiedStatsChart(
       title: 'Controllo nel tempo',
-      subtitle: 'Compattezza del gruppo (dispersione in mm) - più alto è meglio',
+      subtitle:
+          'Compattezza del gruppo (dispersione in mm) - più alto è meglio',
       points: points,
       mode: UnifiedStatsChartMode.lineAndPoints,
       xAxisLabel: 'turno',
       yAxisLabel: 'controllo %',
       minYValue: 0,
-      maxYValue: 100,
+      maxYValue: 105,
       infoTitle: 'Controllo nel tempo',
-      infoText: 'Misura quanto le 3 frecce sono raggruppate tra loro. '
+      infoText:
+          'Misura quanto le 3 frecce sono raggruppate tra loro. '
           'Più il valore è alto, più il gruppo è compatto. '
           'Una dispersione < 10mm è eccellente, 10-20mm è buono, > 20mm indica instabilità.',
       advice: const [
@@ -1251,16 +1312,17 @@ class TrainingCharts {
   /// Restituisce la dispersione massima accettabile (in mm) per il target
   static double _maxDispersionForTarget(String target) {
     if (target == 'BULL' || target == '25') {
-      return 10.0;   // 10mm di dispersione = 100% scarso se supera
+      return 10.0; // 10mm di dispersione = 100% scarso se supera
     }
     if (target.startsWith('T')) {
-      return 15.0;   // 15mm di dispersione massima accettabile
+      return 15.0; // 15mm di dispersione massima accettabile
     }
     if (target.startsWith('D')) {
       return 25.0;
     }
-    return 30.0;     // Singoli
+    return 30.0; // Singoli
   }
+
   /// Funzione: descrive in modo semplice questo blocco di logica.
   static List<List<DartThrow>> _buildTurns(List<DartThrow> throws) {
     final orderedThrows = _sortThrowsChronologically(throws);
@@ -1298,48 +1360,55 @@ class TrainingCharts {
     for (int i = 0; i < turns.length; i++) {
       final turn = turns[i];
       final hits = turn.where((t) => t.sector == target).length;
-      final avgMm = turn.map((t) => t.distanceMm).reduce((a, b) => a + b) / turn.length;
-      final variance = turn
-          .map((t) => pow(t.distanceMm - avgMm, 2).toDouble())
-          .reduce((a, b) => a + b) /
+      final avgMm =
+          turn.map((t) => t.distanceMm).reduce((a, b) => a + b) / turn.length;
+      final variance =
+          turn
+              .map((t) => pow(t.distanceMm - avgMm, 2).toDouble())
+              .reduce((a, b) => a + b) /
           turn.length;
-      final stdDevMm = sqrt(variance);  // ← Calcola la deviazione standard in mm
+      final stdDevMm = sqrt(variance); // ← Calcola la deviazione standard in mm
 
-      raw.add(_TurnMetricRaw(
-        turnNumber: i + 1,
-        hits: hits,
-        hitRate: (hits / 3) * 100,
-        avgMm: avgMm,
-        variance: variance,
-        stdDevMm: stdDevMm,  // ← Aggiungi questo campo
-      ));
+      raw.add(
+        _TurnMetricRaw(
+          turnNumber: i + 1,
+          hits: hits,
+          hitRate: (hits / 3) * 100,
+          avgMm: avgMm,
+          variance: variance,
+          stdDevMm: stdDevMm, // ← Aggiungi questo campo
+        ),
+      );
     }
 
     // 🔧 CALCOLO PRECISIONE: usa scala assoluta (mm)
     // La precisione è inversamente proporzionale alla distanza dal target
     // 0mm = 100%, 50mm = 0% (oltre 50mm è completamente fuori bersaglio)
-    const maxAcceptableDistance = 50.0;  // mm
+    const maxAcceptableDistance = 50.0; // mm
 
     // 🔧 CALCOLO CONTROLLO: usa dispersione assoluta (mm)
     // Usa la stessa logica di consistencyTrend ma normalizzata
-    final sessionDurations = showSessionTime ? _buildSessionDurations(turns) : <int, Duration>{};
+    final sessionDurations = showSessionTime
+        ? _buildSessionDurations(turns)
+        : <int, Duration>{};
 
     return raw.map((r) {
       // 1. HIT RATE: già in percentuale 0-100 (OK)
       final hitRate = r.hitRate;
 
       // 2. PRECISIONE: basata sulla distanza media dal target
-      final precisionScore = (1 - (r.avgMm / maxAcceptableDistance))
-          .clamp(0.0, 1.0) * 100;
+      final precisionScore =
+          (1 - (r.avgMm / maxAcceptableDistance)).clamp(0.0, 1.0) * 100;
 
       // 3. CONTROLLO (CONSISTENZA): basato sulla dispersione (stdDev)
       final maxAcceptableDispersion = _maxDispersionForTarget(target);
-      final consistencyScore = (1 - (r.stdDevMm / maxAcceptableDispersion))
-          .clamp(0.0, 1.0) * 100;
+      final consistencyScore =
+          (1 - (r.stdDevMm / maxAcceptableDispersion)).clamp(0.0, 1.0) * 100;
 
       // 4. SCORE TURNO: pesi rivisti (hit 40%, precisione 35%, controllo 25%)
       // Meno peso al controllo perché è più difficile da ottenere
-      final score = (hitRate * 0.4) + (precisionScore * 0.35) + (consistencyScore * 0.25);
+      final score =
+          (hitRate * 0.4) + (precisionScore * 0.35) + (consistencyScore * 0.25);
 
       return _TurnMetric(
         turnNumber: r.turnNumber,
@@ -1347,7 +1416,7 @@ class TrainingCharts {
         hitRate: hitRate,
         avgMm: r.avgMm,
         variance: r.variance,
-        consistencyNorm: consistencyScore,  // ← Ora è in scala assoluta!
+        consistencyNorm: consistencyScore, // ← Ora è in scala assoluta!
         precisionForChart: precisionScore,
         score: score,
         sessionDuration: sessionDurations[r.turnNumber],
@@ -1355,20 +1424,29 @@ class TrainingCharts {
     }).toList();
   }
 
-
-
-  static Map<int, Duration> _buildSessionDurations(List<List<DartThrow>> turns) {
+  static Map<int, Duration> _buildSessionDurations(
+    List<List<DartThrow>> turns,
+  ) {
     final out = <int, Duration>{};
     int sessionStart = 0;
 
     /// Funzione: descrive in modo semplice questo blocco di logica.
     void flush(int endExclusive) {
       if (sessionStart >= endExclusive) return;
-      final block = turns.sublist(sessionStart, endExclusive).expand((e) => e).toList();
+      final block = turns
+          .sublist(sessionStart, endExclusive)
+          .expand((e) => e)
+          .toList();
       if (block.isEmpty) return;
-      final start = block.map((e) => e.timestamp).reduce((a, b) => a.isBefore(b) ? a : b);
-      final end = block.map((e) => e.timestamp).reduce((a, b) => a.isAfter(b) ? a : b);
-      final duration = end.isAfter(start) ? end.difference(start) : Duration.zero;
+      final start = block
+          .map((e) => e.timestamp)
+          .reduce((a, b) => a.isBefore(b) ? a : b);
+      final end = block
+          .map((e) => e.timestamp)
+          .reduce((a, b) => a.isAfter(b) ? a : b);
+      final duration = end.isAfter(start)
+          ? end.difference(start)
+          : Duration.zero;
       for (int i = sessionStart; i < endExclusive; i++) {
         out[i + 1] = duration;
       }
@@ -1399,13 +1477,11 @@ class TrainingCharts {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label),
-          Text('${value.toStringAsFixed(0)}%'),
-        ],
+        children: [Text(label), Text('${value.toStringAsFixed(0)}%')],
       ),
     );
   }
+
   /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget distanceAnalysis(List<DartThrow> throws, String target) {
     if (throws.isEmpty) return _empty();
@@ -1413,11 +1489,7 @@ class TrainingCharts {
     final totalAvg =
         throws.map((e) => e.distanceMm).reduce((a, b) => a + b) / throws.length;
 
-    final dartMap = <int, List<DartThrow>>{
-      1: [],
-      2: [],
-      3: [],
-    };
+    final dartMap = <int, List<DartThrow>>{1: [], 2: [], 3: []};
 
     for (final t in throws) {
       if (dartMap.containsKey(t.dartInTurn)) {
@@ -1427,7 +1499,8 @@ class TrainingCharts {
 
     double avg(List<DartThrow> list) {
       if (list.isEmpty) return 0;
-      return list.map((e) => e.distanceMm).reduce((a, b) => a + b) / list.length;
+      return list.map((e) => e.distanceMm).reduce((a, b) => a + b) /
+          list.length;
     }
 
     return _UnifiedTrainingMetricCard(
@@ -1436,7 +1509,7 @@ class TrainingCharts {
       subtitle: 'Distanza media totale, e per freccia, verso il $target.',
       infoTitle: 'Analisi distanza dal target',
       infoText:
-      'Mostra la distanza media dal target $target. Valori più bassi sono migliori: più possibilità di hit.',
+          'Mostra la distanza media dal target $target. Valori più bassi sono migliori: più possibilità di hit.',
       advice: const [
         'Una distanza media più bassa indica una mira più efficiente e ripetibile nel tempo.',
         'Una barra più lunga rappresenta maggiore errore dal target, non una prestazione migliore.',
@@ -1449,13 +1522,127 @@ class TrainingCharts {
       ],
       child: _MetricBars(
         rows: [
-          _MetricBarData('Media totale', totalAvg, '${totalAvg.toStringAsFixed(0)} mm'),
-          _MetricBarData('Dart 1', avg(dartMap[1]!), '${avg(dartMap[1]!).toStringAsFixed(0)} mm'),
-          _MetricBarData('Dart 2', avg(dartMap[2]!), '${avg(dartMap[2]!).toStringAsFixed(0)} mm'),
-          _MetricBarData('Dart 3', avg(dartMap[3]!), '${avg(dartMap[3]!).toStringAsFixed(0)} mm'),
+          _MetricBarData(
+            'Media totale',
+            totalAvg,
+            '${totalAvg.toStringAsFixed(0)} mm',
+          ),
+          _MetricBarData(
+            'Dart 1',
+            avg(dartMap[1]!),
+            '${avg(dartMap[1]!).toStringAsFixed(0)} mm',
+          ),
+          _MetricBarData(
+            'Dart 2',
+            avg(dartMap[2]!),
+            '${avg(dartMap[2]!).toStringAsFixed(0)} mm',
+          ),
+          _MetricBarData(
+            'Dart 3',
+            avg(dartMap[3]!),
+            '${avg(dartMap[3]!).toStringAsFixed(0)} mm',
+          ),
         ],
       ),
     );
+  }
+  static Widget quadrantDistance(List<DartThrow> throws, String target) {
+    if (throws.isEmpty) return _empty();
+
+    final valid = throws.where((t) => !t.isPass).toList();
+    if (valid.isEmpty) return _empty();
+
+    final normalizedTarget = target.trim().toUpperCase();
+    final hits = valid
+        .where((t) => t.sector.trim().toUpperCase() == normalizedTarget)
+        .length;
+
+    final misses = valid
+        .where((t) => t.sector.trim().toUpperCase() != normalizedTarget)
+        .toList();
+
+    final quadrants = <String, int>{
+      'tl': 0,
+      'tr': 0,
+      'bl': 0,
+      'br': 0,
+    };
+
+    final targetCenter = _targetCenterFor(target);
+
+    for (final dart in misses) {
+      final quadrant = _resolveTargetQuadrant(dart, targetCenter);
+      quadrants[quadrant] = (quadrants[quadrant] ?? 0) + 1;
+    }
+
+    final avgDistance =
+        valid.map((t) => t.distanceMm).reduce((a, b) => a + b) / valid.length;
+
+    final hitPercent = (hits / valid.length) * 100.0;
+
+    return _UnifiedTrainingMetricCard(
+      icon: Icons.grid_view_rounded,
+      title: 'Quadranti errore',
+      subtitle: 'Dove finiscono gli errori rispetto al target $target.',
+      infoTitle: 'Quadranti errore',
+      infoText:
+      'Mostra in quale quadrante finiscono i miss rispetto al target selezionato. '
+          'Il centro verde indica la percentuale di hit, mentre i quadranti indicano la direzione prevalente degli errori.',
+      advice: const [
+        'Un quadrante dominante indica una deriva tecnica ricorrente.',
+        'Errori distribuiti su più quadranti indicano instabilità generale del gesto.',
+        'Usalo insieme al bias direzionale per capire se correggere mira o routine.',
+      ],
+      child: SizedBox(
+        height: 300,
+        child: TrainingQuadrantDistance(
+          quadrants: quadrants,
+          totalMiss: misses.length,
+          distanceMm: avgDistance,
+          hitPercent: hitPercent,
+        ),
+      ),
+    );
+  }
+
+  static String _resolveTargetQuadrant(DartThrow dart, Offset targetCenter) {
+    final stored = dart.targetQuadrant?.trim().toLowerCase();
+
+    if (stored == 'tl' ||
+        stored == 'top-left' ||
+        stored == 'topLeft' ||
+        stored == 'alto-sinistra') {
+      return 'tl';
+    }
+
+    if (stored == 'tr' ||
+        stored == 'top-right' ||
+        stored == 'topRight' ||
+        stored == 'alto-destra') {
+      return 'tr';
+    }
+
+    if (stored == 'bl' ||
+        stored == 'bottom-left' ||
+        stored == 'bottomLeft' ||
+        stored == 'basso-sinistra') {
+      return 'bl';
+    }
+
+    if (stored == 'br' ||
+        stored == 'bottom-right' ||
+        stored == 'bottomRight' ||
+        stored == 'basso-destra') {
+      return 'br';
+    }
+
+    final isLeft = dart.position.dx < targetCenter.dx;
+    final isTop = dart.position.dy < targetCenter.dy;
+
+    if (isTop && isLeft) return 'tl';
+    if (isTop && !isLeft) return 'tr';
+    if (!isTop && isLeft) return 'bl';
+    return 'br';
   }
   /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget ringDistribution(List<DartThrow> throws, String target) {
@@ -1466,10 +1653,11 @@ class TrainingCharts {
     return _UnifiedTrainingMetricCard(
       icon: Icons.pie_chart_rounded,
       title: 'Distribuzione colpi',
-      subtitle: 'Dove finiscono i lanci tra settori, singoli, doppi, tripli e miss.',
+      subtitle:
+          'Dove finiscono i lanci tra settori, singoli, doppi, tripli e miss.',
       infoTitle: 'Distribuzione colpi',
       infoText:
-      'Mostra la distribuzione reale dei colpi sul bersaglio. Serve a capire se gli errori sono casuali oppure se tendono a concentrarsi sempre negli stessi settori.',
+          'Mostra la distribuzione reale dei colpi sul bersaglio. Serve a capire se gli errori sono casuali oppure se tendono a concentrarsi sempre negli stessi settori.',
       advice: const [
         'Settori fuori target molto frequenti indicano una deriva ricorrente.',
         'Molti miss indicano perdita di riferimento o distanza tecnica eccessiva.',
@@ -1487,8 +1675,9 @@ class TrainingCharts {
     );
   }
 
-
-  static Map<String, Map<String, int>> _buildSectorStats(List<DartThrow> throws) {
+  static Map<String, Map<String, int>> _buildSectorStats(
+    List<DartThrow> throws,
+  ) {
     final result = <String, Map<String, int>>{};
 
     for (final t in throws) {
@@ -1562,12 +1751,13 @@ class TrainingCharts {
     final double max = isPercent
         ? 100.0
         : (data.values.isEmpty
-        ? 1.0
-        : data.values.reduce((a, b) => a > b ? a : b));
+              ? 1.0
+              : data.values.reduce((a, b) => a > b ? a : b));
 
     /// Funzione: descrive in modo semplice questo blocco di logica.
     return _box(
       title,
+
       /// Funzione: descrive in modo semplice questo blocco di logica.
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1618,12 +1808,12 @@ class TrainingCharts {
 
   /// Funzione: descrive in modo semplice questo blocco di logica.
   static Widget _box(
-      String title,
-      Widget child, {
-        String? description,
-        String? insight,
-        String? tip,
-      }) {
+    String title,
+    Widget child, {
+    String? description,
+    String? insight,
+    String? tip,
+  }) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 12),
@@ -1636,29 +1826,44 @@ class TrainingCharts {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+          Builder(
+            builder: (context) {
+              final tt = Theme.of(context).textTheme;
+              return Text(title, style: tt.titleMedium);
+            },
           ),
           if (description != null) ...[
             const SizedBox(height: 4),
-            Text(
-              description,
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+            Builder(
+              builder: (context) {
+                final t = AppTokens.of(context);
+                final tt = Theme.of(context).textTheme;
+                return Text(
+                  description,
+                  style: tt.bodySmall?.copyWith(color: t.textSecondary),
+                );
+              },
             ),
           ],
           if (insight != null) ...[
             const SizedBox(height: 8),
-            Text('Cosa guardare: $insight'),
+            Builder(
+              builder: (context) {
+                final tt = Theme.of(context).textTheme;
+                return Text('Cosa guardare: $insight', style: tt.bodyMedium);
+              },
+            ),
           ],
           if (tip != null) ...[
             const SizedBox(height: 6),
-            Text(
-              'Cosa fare: $tip',
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                color: Colors.blue,
-              ),
+            Builder(
+              builder: (context) {
+                final tt = Theme.of(context).textTheme;
+                return Text(
+                  'Cosa fare: $tip',
+                  style: tt.titleSmall?.copyWith(color: Colors.blue),
+                );
+              },
             ),
           ],
           const SizedBox(height: 8),
@@ -1672,7 +1877,8 @@ class TrainingCharts {
     String title = 'Nessun dato',
     String subtitle = 'Non ci sono dati per il filtro selezionato.',
     String infoTitle = 'Nessun dato disponibile',
-    String infoText = 'Questa sezione non può essere calcolata perché il filtro corrente non contiene dati sufficienti.',
+    String infoText =
+        'Questa sezione non può essere calcolata perché il filtro corrente non contiene dati sufficienti.',
     List<String> advice = const [
       'Cambia periodo, sessione o target.',
       'Rimuovi eventuali filtri sulle singole freccette.',
@@ -1690,12 +1896,13 @@ class TrainingCharts {
       child: Builder(
         builder: (context) {
           final t = AppTokens.of(context);
+          final tt = Theme.of(context).textTheme;
 
           return Padding(
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
             child: Text(
               'Nessun dato disponibile.',
-              style: t.bodySmall(t.textMuted),
+              style: tt.bodySmall?.copyWith(color: t.textMuted),
             ),
           );
         },
@@ -1791,13 +1998,15 @@ class ChartDataSource {
     for (int i = 0; i < turns.length; i++) {
       final turn = turns[i];
       final hits = singleDart
-          ? ((turn.firstWhere(
-            (t) => t.dartInTurn == selectedDart,
-        orElse: () => turn.first,
-      ).sector ==
-          target)
-          ? 1
-          : 0)
+          ? ((turn
+                        .firstWhere(
+                          (t) => t.dartInTurn == selectedDart,
+                          orElse: () => turn.first,
+                        )
+                        .sector ==
+                    target)
+                ? 1
+                : 0)
           : turn.where((t) => t.sector == target).length;
       points.add(ChartDataPoint(x: i.toDouble(), y: hits.toDouble()));
     }
@@ -1812,7 +2021,8 @@ class ChartDataSource {
   static ChartSeries mmTrendSeries({required List<List<DartThrow>> turns}) {
     final points = <ChartDataPoint>[];
     for (int i = 0; i < turns.length; i++) {
-      final avgMm = turns[i].map((e) => e.distanceMm).reduce((a, b) => a + b) / 3;
+      final avgMm =
+          turns[i].map((e) => e.distanceMm).reduce((a, b) => a + b) / 3;
       points.add(ChartDataPoint(x: i.toDouble(), y: avgMm));
     }
     return ChartSeries(name: 'Distanza', points: points, color: Colors.orange);
@@ -1832,7 +2042,11 @@ class ChartDataSource {
     return [
       ChartSeries(name: 'Hit', color: Colors.blue, points: hit),
       ChartSeries(name: 'Precisione', color: Colors.orange, points: precision),
-      ChartSeries(name: 'Consistenza', color: Colors.purple, points: consistency),
+      ChartSeries(
+        name: 'Consistenza',
+        color: Colors.purple,
+        points: consistency,
+      ),
     ];
   }
 }
@@ -1939,6 +2153,7 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
   /// Funzione: descrive in modo semplice questo blocco di logica.
   void _onHoverIndex(int? index) {
     if (widget.tooltipBuilder == null) return;
+
     /// Funzione: descrive in modo semplice questo blocco di logica.
     setState(() {
       _tooltipText = index == null ? null : widget.tooltipBuilder!(index);
@@ -1993,6 +2208,7 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
       newEnd = maxIndex;
       newStart = newEnd - span;
     }
+
     /// Funzione: descrive in modo semplice questo blocco di logica.
     setState(() {
       _viewStart = newStart.clamp(minIndex, maxIndex);
@@ -2002,14 +2218,20 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
 
   /// Funzione: descrive in modo semplice questo blocco di logica.
   bool _isCtrlPressed() {
-    return RawKeyboard.instance.keysPressed.contains(LogicalKeyboardKey.controlLeft) ||
-        RawKeyboard.instance.keysPressed.contains(LogicalKeyboardKey.controlRight);
+    return RawKeyboard.instance.keysPressed.contains(
+          LogicalKeyboardKey.controlLeft,
+        ) ||
+        RawKeyboard.instance.keysPressed.contains(
+          LogicalKeyboardKey.controlRight,
+        );
   }
 
   @override
   /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
     if (_totalTurns == 0) return TrainingCharts._empty();
+    final tt = Theme.of(context).textTheme;
+
     /// Funzione: descrive in modo semplice questo blocco di logica.
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -2020,7 +2242,8 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
           final end = _viewEnd.ceil().clamp(0, s.points.length - 1);
           final slice = s.points.sublist(start, end + 1);
           final maxPoints = max(40, (width / 4).round());
-          if (slice.length <= maxPoints) return ChartSeries(name: s.name, points: slice, color: s.color);
+          if (slice.length <= maxPoints)
+            return ChartSeries(name: s.name, points: slice, color: s.color);
           final step = (slice.length / maxPoints).ceil();
           final sampled = <ChartDataPoint>[];
           for (int i = 0; i < slice.length; i += step) {
@@ -2041,6 +2264,7 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
 
         return TrainingCharts._box(
           widget.title,
+
           /// Funzione: descrive in modo semplice questo blocco di logica.
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2055,7 +2279,6 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
                     final factor = event.scrollDelta.dy > 0 ? 1.2 : 0.8;
 
                     _zoomAround(factor, centerX);
-
                   }
                 },
                 child: RawKeyboardListener(
@@ -2065,54 +2288,59 @@ class _BaseChartWidgetState extends State<BaseChartWidget> {
                     focusNode: _widgetFocusNode,
                     autofocus: true,
                     child: GestureDetector(
-                        onTap: () => _widgetFocusNode.requestFocus(),                      onScaleStart: (_) => _lastScale = 1,
-                        onScaleUpdate: (details) {
-                          if (details.pointerCount != 2) return;
-                          if ((details.scale - _lastScale).abs() > 0.02) {
-                            final centerX = _viewStart + ((details.localFocalPoint.dx / width) * span);
-                            final factor = details.scale / _lastScale;
-                            _zoomAround(factor, centerX);
-                            _lastScale = details.scale;
-                          } else {
-                            final deltaTurns = (details.focalPointDelta.dx / width) * span;
-                            _pan(deltaTurns);
-                          }
-                        },
-                        child: RepaintBoundary(
-                          child: SizedBox(
-                            height: 220,
-                            width: double.infinity,
-                            child: widget.rendererBuilder(ctx),
-                          ),
-                        )
+                      onTap: () => _widgetFocusNode.requestFocus(),
+                      onScaleStart: (_) => _lastScale = 1,
+                      onScaleUpdate: (details) {
+                        if (details.pointerCount != 2) return;
+                        if ((details.scale - _lastScale).abs() > 0.02) {
+                          final centerX =
+                              _viewStart +
+                              ((details.localFocalPoint.dx / width) * span);
+                          final factor = details.scale / _lastScale;
+                          _zoomAround(factor, centerX);
+                          _lastScale = details.scale;
+                        } else {
+                          final deltaTurns =
+                              (details.focalPointDelta.dx / width) * span;
+                          _pan(deltaTurns);
+                        }
+                      },
+                      child: RepaintBoundary(
+                        child: SizedBox(
+                          height: 220,
+                          width: double.infinity,
+                          child: widget.rendererBuilder(ctx),
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
               const SizedBox(height: 8),
               Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: AnimatedSize(
-                    duration: const Duration(milliseconds: 150),
-                    alignment: Alignment.topCenter,
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _tooltipText ?? 'Tocca un punto del grafico per vedere i dettagli',
-                        style: const TextStyle(fontSize: 13),
-                      ),
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: AnimatedSize(
+                  duration: const Duration(milliseconds: 150),
+                  alignment: Alignment.topCenter,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                  )
+                    child: Text(
+                      _tooltipText ??
+                          'Tocca un punto del grafico per vedere i dettagli',
+                      style: tt.bodySmall,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 8),
               _SimpleLegend(series: widget.series, text: widget.legendText),
@@ -2150,7 +2378,11 @@ class LineChartRenderer extends StatelessWidget {
   final _BaseChartContext ctx;
   final bool showDots;
 
-  const LineChartRenderer({required this.ctx, this.showDots = false, super.key});
+  const LineChartRenderer({
+    required this.ctx,
+    this.showDots = false,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2183,7 +2415,6 @@ class LineChartRenderer extends StatelessWidget {
   }
 }
 
-
 class MultiLineChartRenderer extends StatelessWidget {
   final _BaseChartContext ctx;
 
@@ -2207,21 +2438,25 @@ class MultiLineChartRenderer extends StatelessWidget {
         lineTouchData: _touch(ctx.onHoverIndex),
         rangeAnnotations: RangeAnnotations(
           verticalRangeAnnotations: ctx.highlightedRanges
-              .map((r) => VerticalRangeAnnotation(
-            x1: r.start - 0.5,
-            x2: r.end + 0.5,
-            color: r.color,
-          ))
+              .map(
+                (r) => VerticalRangeAnnotation(
+                  x1: r.start - 0.5,
+                  x2: r.end + 0.5,
+                  color: r.color,
+                ),
+              )
               .toList(),
         ),
         lineBarsData: ctx.series
-            .map((s) => LineChartBarData(
-          spots: s.points.map((p) => FlSpot(p.x, p.y)).toList(),
-          isCurved: false,
-          barWidth: 2,
-          color: s.color,
-          dotData: const FlDotData(show: false),
-        ))
+            .map(
+              (s) => LineChartBarData(
+                spots: s.points.map((p) => FlSpot(p.x, p.y)).toList(),
+                isCurved: false,
+                barWidth: 2,
+                color: s.color,
+                dotData: const FlDotData(show: false),
+              ),
+            )
             .toList(),
       ),
     );
@@ -2232,12 +2467,8 @@ class MultiLineChartRenderer extends StatelessWidget {
 FlTitlesData _titles(ChartConfig config) {
   /// Funzione: descrive in modo semplice questo blocco di logica.
   return FlTitlesData(
-    topTitles: const AxisTitles(
-      sideTitles: SideTitles(showTitles: false),
-    ),
-    rightTitles: const AxisTitles(
-      sideTitles: SideTitles(showTitles: false),
-    ),
+    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
     leftTitles: AxisTitles(
       sideTitles: SideTitles(
         showTitles: true,
@@ -2246,7 +2477,12 @@ FlTitlesData _titles(ChartConfig config) {
         getTitlesWidget: (v, _) {
           final text = config.yLabelBuilder?.call(v) ?? v.toStringAsFixed(0);
           if (text.isEmpty) return const SizedBox.shrink();
-          return Text(text, style: const TextStyle(fontSize: 10));
+          return Builder(
+            builder: (context) {
+              final tt = Theme.of(context).textTheme;
+              return Text(text, style: tt.labelSmall);
+            },
+          );
         },
       ),
     ),
@@ -2256,12 +2492,13 @@ FlTitlesData _titles(ChartConfig config) {
         interval: config.xInterval,
         reservedSize: 28,
         getTitlesWidget: (v, _) {
-          final isInt =
-              (v - v.roundToDouble()).abs() < 0.001;
+          final isInt = (v - v.roundToDouble()).abs() < 0.001;
           if (!isInt) return const SizedBox.shrink();
-          return Text(
-            '${v.toInt() + 1}',
-            style: const TextStyle(fontSize: 10),
+          return Builder(
+            builder: (context) {
+              final tt = Theme.of(context).textTheme;
+              return Text('${v.toInt() + 1}', style: tt.labelSmall);
+            },
           );
         },
       ),
@@ -2286,9 +2523,7 @@ LineTouchData _touch(void Function(int? index) onHoverIndex) {
       final spot = response.lineBarSpots!.first;
       onHoverIndex(spot.x.toInt());
     },
-    touchTooltipData: LineTouchTooltipData(
-      getTooltipItems: (_) => [],
-    ),
+    touchTooltipData: LineTouchTooltipData(getTooltipItems: (_) => []),
   );
 }
 
@@ -2302,6 +2537,9 @@ class _SimpleLegend extends StatelessWidget {
   @override
   /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
+
     /// Funzione: descrive in modo semplice questo blocco di logica.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2313,18 +2551,18 @@ class _SimpleLegend extends StatelessWidget {
           children: series
               .map(
                 (s) => Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(width: 10, height: 10, color: s.color),
-                const SizedBox(width: 4),
-                Text(s.name, style: const TextStyle(fontSize: 12)),
-              ],
-            ),
-          )
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(width: 10, height: 10, color: s.color),
+                    const SizedBox(width: 4),
+                    Text(s.name, style: tt.labelSmall),
+                  ],
+                ),
+              )
               .toList(),
         ),
         const SizedBox(height: 6),
-        Text(text, style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
+        Text(text, style: tt.bodySmall?.copyWith(color: t.textSecondary)),
       ],
     );
   }
@@ -2337,7 +2575,7 @@ class _TurnMetricRaw {
   final double hitRate;
   final double avgMm;
   final double variance;
-  final double stdDevMm;  // ← NUOVO
+  final double stdDevMm; // ← NUOVO
 
   const _TurnMetricRaw({
     required this.turnNumber,
@@ -2408,6 +2646,7 @@ class _UnifiedTrainingMetricCard extends StatelessWidget {
     );
   }
 }
+
 class _MetricBarData {
   final String label;
   final double value;
@@ -2420,10 +2659,7 @@ class _MetricBars extends StatelessWidget {
   final List<_MetricBarData> rows;
   final double maxReference;
 
-  const _MetricBars({
-    required this.rows,
-    this.maxReference = 100,
-  });
+  const _MetricBars({required this.rows, this.maxReference = 100});
 
   @override
   Widget build(BuildContext context) {
@@ -2457,7 +2693,10 @@ class _MetricValueRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
-    final ratio = maxReference <= 0 ? 0.0 : (value / maxReference).clamp(0.0, 1.0);
+    final tt = Theme.of(context).textTheme;
+    final ratio = maxReference <= 0
+        ? 0.0
+        : (value / maxReference).clamp(0.0, 1.0);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
@@ -2465,8 +2704,13 @@ class _MetricValueRow extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Text(label, style: t.bodyBold(t.textPrimary))),
-              Text(valueText, style: t.bodyBold(t.accent)),
+              Expanded(
+                child: Text(
+                  label,
+                  style: tt.titleMedium?.copyWith(color: t.textPrimary),
+                ),
+              ),
+              Text(valueText, style: tt.titleMedium?.copyWith(color: t.accent)),
             ],
           ),
           const SizedBox(height: 7),

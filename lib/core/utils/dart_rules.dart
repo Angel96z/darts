@@ -102,7 +102,8 @@ class DartRules {
           } else if (ring == 'D') {
             targetRadius = (doubleInner + doubleOuter) / 2;
           } else {
-            targetRadius = (bullOuter + tripleInner) / 2;
+            // SINGOLO: zona esterna tra triplo e doppio
+            targetRadius = (tripleOuter + doubleInner) / 2;
           }
 
           final targetX = centerX + cos(angle) * targetRadius;

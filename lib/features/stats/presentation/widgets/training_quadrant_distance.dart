@@ -1,6 +1,7 @@
 /// File: training_quadrant_distance.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
-
 import 'package:flutter/material.dart';
+
+import '../../../../app_theme.dart';
 
 class TrainingQuadrantDistance extends StatelessWidget {
   final Map<String, int> quadrants;
@@ -20,8 +21,6 @@ class TrainingQuadrantDistance extends StatelessWidget {
   static const _cellBg = Color(0xFFF2F4F7);
   static const _cellBorder = Color(0xFFE0E4EC);
   static const _distBg = Color(0xFFF2F4F7);
-  static const _distText = Color(0xFF4A5568);
-
   static const double _gridSize = 150;
 
   /// Funzione: descrive in modo semplice questo blocco di logica.
@@ -38,8 +37,7 @@ class TrainingQuadrantDistance extends StatelessWidget {
   }
 
   /// Funzione: descrive in modo semplice questo blocco di logica.
-  Widget _cell(int value, int total) {
-
+  Widget _cell(int value, int total, AppTokens t, TextTheme tt) {
     final percent = total == 0 ? 0 : ((value / total) * 100).round();
     final isEmpty = percent == 0;
 
@@ -51,17 +49,17 @@ class TrainingQuadrantDistance extends StatelessWidget {
         border: Border.all(color: _cellBorder),
       ),
       child: Text(
-        isEmpty ? "—" : "$percent%",
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          color: isEmpty ? Colors.black26 : Colors.black54,
+        isEmpty ? '—' : '$percent%',
+        style: tt.labelSmall?.copyWith(
+          color: isEmpty ? t.textMuted : t.textSecondary,
         ),
       ),
     );
   }
 
   Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final total = totalMiss == 0 ? 1 : totalMiss;
 
     return LayoutBuilder(
@@ -76,7 +74,9 @@ class TrainingQuadrantDistance extends StatelessWidget {
         double gridSize = availableWidth.clamp(96.0, 260.0).toDouble();
 
         if (availableHeight.isFinite) {
-          final maxGridByHeight = (availableHeight - 48).clamp(80.0, 260.0).toDouble();
+          final maxGridByHeight = (availableHeight - 48)
+              .clamp(80.0, 260.0)
+              .toDouble();
           if (maxGridByHeight < gridSize) {
             gridSize = maxGridByHeight;
           }
@@ -115,13 +115,13 @@ class TrainingQuadrantDistance extends StatelessWidget {
                             SizedBox(
                               width: cellSize,
                               height: cellSize,
-                              child: _cell(quadrants["tl"] ?? 0, total),
+                              child: _cell(quadrants['tl'] ?? 0, total, t, tt),
                             ),
                             const SizedBox(width: gap),
                             SizedBox(
                               width: cellSize,
                               height: cellSize,
-                              child: _cell(quadrants["tr"] ?? 0, total),
+                              child: _cell(quadrants['tr'] ?? 0, total, t, tt),
                             ),
                           ],
                         ),
@@ -131,13 +131,13 @@ class TrainingQuadrantDistance extends StatelessWidget {
                             SizedBox(
                               width: cellSize,
                               height: cellSize,
-                              child: _cell(quadrants["bl"] ?? 0, total),
+                              child: _cell(quadrants['bl'] ?? 0, total, t, tt),
                             ),
                             const SizedBox(width: gap),
                             SizedBox(
                               width: cellSize,
                               height: cellSize,
-                              child: _cell(quadrants["br"] ?? 0, total),
+                              child: _cell(quadrants['br'] ?? 0, total, t, tt),
                             ),
                           ],
                         ),
@@ -161,21 +161,26 @@ class TrainingQuadrantDistance extends StatelessWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            "${percent.toStringAsFixed(0)}%",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: (gridSize * 0.095).clamp(10.0, 14.0),
-                              fontWeight: FontWeight.w800,
+                          MediaQuery(
+                            data: AppTokens.clampScore(context),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                '${percent.toStringAsFixed(0)}%',
+                                style: AppTokens.scoreSmallStyle.copyWith(
+                                  color: Colors.white,
+                                ),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            freqText,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: (gridSize * 0.075).clamp(8.0, 11.0),
-                              fontWeight: FontWeight.w700,
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              freqText,
+                              style: tt.bodySmall?.copyWith(
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ],
@@ -186,7 +191,10 @@ class TrainingQuadrantDistance extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   color: _distBg,
@@ -198,15 +206,16 @@ class TrainingQuadrantDistance extends StatelessWidget {
                     Icon(
                       Icons.straighten_rounded,
                       size: 16,
-                      color: _distText.withOpacity(0.6),
+                      color: t.textSecondary.withOpacity(0.6),
                     ),
                     const SizedBox(width: 5),
-                    Text(
-                      "${distanceMm.toStringAsFixed(1)} mm",
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: _distText,
+                    MediaQuery(
+                      data: AppTokens.clampScore(context),
+                      child: Text(
+                        '${distanceMm.toStringAsFixed(1)} mm',
+                        style: AppTokens.scoreSmallStyle.copyWith(
+                          color: t.textSecondary,
+                        ),
                       ),
                     ),
                   ],

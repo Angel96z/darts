@@ -58,6 +58,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Scaffold(
       backgroundColor: t.bg,
@@ -71,29 +72,35 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
               const SizedBox(height: 24),
               Text(
                 'Verifica la tua email',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: t.textPrimary),
+                style: tt.titleMedium?.copyWith(color: t.textPrimary),
               ),
               const SizedBox(height: 16),
               Text(
                 'Abbiamo inviato un link di verifica a:',
-                style: TextStyle(color: t.textSecondary),
+                style: tt.bodySmall?.copyWith(color: t.textSecondary),
               ),
               const SizedBox(height: 8),
               Text(
                 widget.email,
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: t.accent),
+                style: tt.titleMedium?.copyWith(color: t.accent),
               ),
               const SizedBox(height: 24),
               Text(
                 'Clicca sul link nell\'email per completare la registrazione',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: t.textSecondary),
+                style: tt.bodySmall?.copyWith(color: t.textSecondary),
               ),
               const SizedBox(height: 32),
               if (_message != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
-                  child: Text(_message!, style: TextStyle(color: _message!.contains('Errore') ? t.red : t.green), textAlign: TextAlign.center),
+                  child: Text(
+                    _message!,
+                    style: tt.bodySmall?.copyWith(
+                      color: _message!.contains('Errore') ? t.red : t.green,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ElevatedButton(
                 onPressed: _isChecking ? null : _checkVerification,
@@ -106,12 +113,18 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                 ),
                 child: _isChecking
                     ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: t.accentFg))
-                    : const Text('HO VERIFICATO', style: TextStyle(fontSize: 16)),
+                    : Text(
+                        'HO VERIFICATO',
+                        style: tt.titleSmall?.copyWith(color: t.accentFg),
+                      ),
               ),
               const SizedBox(height: 12),
               TextButton(
                 onPressed: _resendVerification,
-                child: Text('Reinvia email di verifica', style: TextStyle(color: t.accent)),
+                child: Text(
+                  'Reinvia email di verifica',
+                  style: tt.titleSmall?.copyWith(color: t.accent),
+                ),
               ),
             ],
           ),

@@ -19,6 +19,7 @@ class MatchHistoryTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -27,10 +28,15 @@ class MatchHistoryTable extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
             child: Row(children: [
-              Expanded(child: Text('SCORE', style: t.labelCaps(t.textMuted))),
-              Text('$startScore', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: t.textSecondary)),
+              Expanded(
+                child: Text(
+                  'SCORE',
+                  style: tt.labelSmall?.copyWith(color: t.textMuted),
+                ),
+              ),
+              Text('$startScore', style: tt.titleSmall?.copyWith(color: t.textSecondary)),
               const SizedBox(width: 24),
-              Text('R', style: t.labelCaps(t.textMuted)),
+              Text('R', style: tt.labelSmall?.copyWith(color: t.textMuted)),
             ]),
           ),
           Container(height: 1, color: t.divider),
@@ -39,7 +45,10 @@ class MatchHistoryTable extends StatelessWidget {
           Center(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Text('Nessun turno ancora', style: t.bodySmall(t.textMuted)),
+              child: Text(
+                'Nessun turno ancora',
+                style: tt.bodySmall?.copyWith(color: t.textMuted),
+              ),
             ),
           )
         else
@@ -92,6 +101,7 @@ class _HistoryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     final scoreColor = row.isCheckout ? t.green : row.isBust ? t.red : t.textPrimary;
 
     return Container(
@@ -100,24 +110,29 @@ class _HistoryRow extends StatelessWidget {
       child: Row(children: [
         Expanded(
           child: Row(children: [
-            Text(row.turnTotal, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: scoreColor)),
+            Text(row.turnTotal, style: tt.titleSmall?.copyWith(color: scoreColor)),
             const SizedBox(width: 6),
             Flexible(
-              child: Text(row.dartsLabel, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 9, color: t.textMuted)),
+              child: Text(
+                row.dartsLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: tt.bodySmall?.copyWith(color: t.textMuted),
+              ),
             ),
           ]),
         ),
         SizedBox(
           width: 44,
           child: Text(row.scoreAfterTurn, textAlign: TextAlign.right,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
-                  color: row.isCheckout ? t.green : t.textSecondary)),
+              style: tt.titleSmall?.copyWith(
+                color: row.isCheckout ? t.green : t.textSecondary,
+              )),
         ),
         SizedBox(
           width: 24,
           child: Text(row.roundNumber, textAlign: TextAlign.right,
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: t.textMuted)),
+              style: tt.labelSmall?.copyWith(color: t.textMuted)),
         ),
       ]),
     );

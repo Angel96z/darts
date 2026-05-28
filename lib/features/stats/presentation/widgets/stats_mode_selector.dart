@@ -47,6 +47,7 @@ class StatsModeSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Container(
       decoration: BoxDecoration(
@@ -79,9 +80,7 @@ class StatsModeSelector extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     mode.label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                    style: tt.titleSmall?.copyWith(
                       color: isSelected ? t.accentFg : t.textSecondary,
                     ),
                   ),

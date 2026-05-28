@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import '../../features/score/presentation/state/score_controller.dart';
+import '../../app_theme.dart';
 
 class ScoreView extends StatelessWidget {
 
@@ -16,6 +17,7 @@ class ScoreView extends StatelessWidget {
   @override
   /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
 
     /// Funzione: descrive in modo semplice questo blocco di logica.
     return AnimatedBuilder(
@@ -28,10 +30,7 @@ class ScoreView extends StatelessWidget {
             /// Funzione: descrive in modo semplice questo blocco di logica.
             Text(
               "Totale ${controller.total}",
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+              style: tt.titleMedium,
             ),
 
             /// Funzione: descrive in modo semplice questo blocco di logica.

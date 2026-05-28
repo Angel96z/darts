@@ -36,6 +36,14 @@ class UserRepository {
 
   /// Recupera profilo utente
   Future<UserProfile> fetchProfile(String uid) async {
+
+
+    print('🔵 fetchProfile - uid: $uid');
+    final doc = await _profileRef(uid).get();
+    print('🔵 doc.exists: ${doc.exists}');
+    print('🔵 doc.data(): ${doc.data()}');
+
+
     try {
       final doc = await _profileRef(uid).get();
       if (!doc.exists) {
@@ -52,20 +60,31 @@ class UserRepository {
       throw ProfileNotFoundFailure(technicalDetails: e.toString());
     }
   }
-
+  /// Stream del profilo per sync in tempo reale
+  Stream<UserProfile> watchProfile(String uid) {
+    return _profileRef(uid).snapshots().map((doc) {
+      if (!doc.exists) {
+        throw ProfileNotFoundFailure();
+      }
+      final data = doc.data() as Map<String, dynamic>;
+      return UserProfile.fromMap(uid, data);
+    });
+  }
   /// Recupera profilo utente corrente (con fallback creazione se non esiste)
   Future<UserProfile> fetchOrCreateProfile() async {
     final uid = _currentUid;
     final user = _auth.currentUser;
-    if (user == null) {
-      throw const AuthFailure(message: 'Utente non autenticato');
-    }
-    final email = user.email ?? '';
+    final email = user?.email ?? '';
+
+    print('🔵 fetchOrCreateProfile - uid: $uid');
+    print('🔵 email: $email');
 
     try {
-      return await fetchProfile(uid);
+      final profile = await fetchProfile(uid);
+      print('🟢 Profilo TROVATO: ${profile.displayName}');
+      return profile;
     } on ProfileNotFoundFailure {
-      // Crea profilo di default
+      print('🟡 Profilo NON TROVATO, creazione...');
       final newProfile = UserProfile(
         uid: uid,
         email: email,
@@ -76,6 +95,7 @@ class UserRepository {
         updatedAt: DateTime.now(),
       );
       await upsertProfile(newProfile);
+      print('🟢 Profilo CREATO');
       return newProfile;
     }
   }
@@ -87,30 +107,30 @@ class UserRepository {
     required String nickname,
   }) async {
     final uid = _currentUid;
-    await _profileRef(uid).update({
+    await _profileRef(uid).set({
       'firstName': firstName,
       'lastName': lastName,
       'nickname': nickname,
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    }, SetOptions(merge: true));
   }
 
   /// Aggiorna preferenze utente
   Future<void> updatePreferences(UserPreferences preferences) async {
     final uid = _currentUid;
-    await _profileRef(uid).update({
+    await _profileRef(uid).set({
       'preferences': preferences.toMap(),
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    }, SetOptions(merge: true));
   }
 
   /// Aggiorna avatar URL
   Future<void> updateAvatar(String? avatarUrl) async {
     final uid = _currentUid;
-    await _profileRef(uid).update({
+    await _profileRef(uid).set({
       'avatarUrl': avatarUrl,
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    }, SetOptions(merge: true));
   }
 
   /// Aggiorna statistiche aggregate

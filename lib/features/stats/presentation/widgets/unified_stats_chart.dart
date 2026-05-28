@@ -5,11 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../app_theme.dart';
 
-enum UnifiedStatsChartMode {
-  line,
-  points,
-  lineAndPoints,
-}
+enum UnifiedStatsChartMode { line, points, lineAndPoints }
 
 class UnifiedStatsPoint {
   final double x;
@@ -24,6 +20,7 @@ class UnifiedStatsPoint {
     required this.detail,
   });
 }
+
 class UnifiedStatsInfoData {
   final String title;
   final String text;
@@ -121,10 +118,7 @@ class _UnifiedStatsCardBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
 
-    final content = Padding(
-      padding: padding ?? EdgeInsets.zero,
-      child: child,
-    );
+    final content = Padding(padding: padding ?? EdgeInsets.zero, child: child);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -153,7 +147,9 @@ class _UnifiedStatsCardBody extends StatelessWidget {
                 Expanded(
                   child: Text(
                     footerText!,
-                    style: t.bodySmall(t.textMuted),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: t.textMuted),
                   ),
                 ),
               ],
@@ -164,7 +160,6 @@ class _UnifiedStatsCardBody extends StatelessWidget {
     );
   }
 }
-
 
 class UnifiedStatsChart extends StatefulWidget {
   final String title;
@@ -227,13 +222,14 @@ class UnifiedStatsChart extends StatefulWidget {
     return UnifiedStatsChart(
       key: key,
       title: 'Grafico statistiche unico',
-      subtitle: 'Grafico XY reale: pan e zoom modificano i valori degli assi, non una immagine.',
+      subtitle:
+          'Grafico XY reale: pan e zoom modificano i valori degli assi, non una immagine.',
       points: points,
       xAxisLabel: 'freccetta',
       yAxisLabel: 'valore',
       infoTitle: 'Come leggere il grafico',
       infoText:
-      'Il grafico lavora come un grafico professionale: trascinando sposti il range visibile, '
+          'Il grafico lavora come un grafico professionale: trascinando sposti il range visibile, '
           'zoomando in orizzontale restringi o allarghi X, zoomando in verticale restringi o allarghi Y.',
       advice: const [
         'Zoom orizzontale: restringe o allarga il range X visibile.',
@@ -260,10 +256,11 @@ class _TwoPointerScaleData {
   });
 }
 
-
 class _TwoPointerScaleGestureRecognizer extends OneSequenceGestureRecognizer {
-  void Function(Offset globalFocalPoint, double distanceX, double distanceY)? onStart;
-  void Function(Offset globalFocalPoint, double distanceX, double distanceY)? onUpdate;
+  void Function(Offset globalFocalPoint, double distanceX, double distanceY)?
+  onStart;
+  void Function(Offset globalFocalPoint, double distanceX, double distanceY)?
+  onUpdate;
 
   VoidCallback? onEnd;
 
@@ -406,12 +403,7 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
 
   _UnifiedStatsBounds _calculateDataBounds() {
     if (widget.points.isEmpty) {
-      return const _UnifiedStatsBounds(
-        minX: 0,
-        maxX: 1,
-        minY: 0,
-        maxY: 1,
-      );
+      return const _UnifiedStatsBounds(minX: 0, maxX: 1, minY: 0, maxY: 1);
     }
 
     final rawMinX = widget.points.map((p) => p.x).reduce(math.min);
@@ -438,22 +430,18 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
     final hasFixedMinY = widget.minYValue != null;
     final hasFixedMaxY = widget.maxYValue != null;
 
-    final xPadding = hasFixedMinX && hasFixedMaxX ? 0.0 : effectiveXRange * 0.08;
-    final yPadding = hasFixedMinY && hasFixedMaxY ? 0.0 : effectiveYRange * 0.18;
+    final xPadding = hasFixedMinX && hasFixedMaxX
+        ? 0.0
+        : effectiveXRange * 0.08;
+    final yPadding = hasFixedMinY && hasFixedMaxY
+        ? 0.0
+        : effectiveYRange * 0.18;
 
     return _UnifiedStatsBounds(
-      minX: hasFixedMinX
-          ? minXRaw
-          : xCenter - effectiveXRange / 2 - xPadding,
-      maxX: hasFixedMaxX
-          ? maxXRaw
-          : xCenter + effectiveXRange / 2 + xPadding,
-      minY: hasFixedMinY
-          ? minYRaw
-          : yCenter - effectiveYRange / 2 - yPadding,
-      maxY: hasFixedMaxY
-          ? maxYRaw
-          : yCenter + effectiveYRange / 2 + yPadding,
+      minX: hasFixedMinX ? minXRaw : xCenter - effectiveXRange / 2 - xPadding,
+      maxX: hasFixedMaxX ? maxXRaw : xCenter + effectiveXRange / 2 + xPadding,
+      minY: hasFixedMinY ? minYRaw : yCenter - effectiveYRange / 2 - yPadding,
+      maxY: hasFixedMaxY ? maxYRaw : yCenter + effectiveYRange / 2 + yPadding,
     );
   }
 
@@ -463,7 +451,6 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
       _visibleBounds = _dataBounds;
     });
   }
-
 
   Offset _plotLocalFromGlobal(Offset globalPosition) {
     final context = _plotKey.currentContext;
@@ -476,10 +463,10 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
   }
 
   void _onTwoPointerScaleStart(
-      Offset globalFocalPoint,
-      double distanceX,
-      double distanceY,
-      ) {
+    Offset globalFocalPoint,
+    double distanceX,
+    double distanceY,
+  ) {
     if (_plotSize.width <= 0 || _plotSize.height <= 0) return;
 
     _twoPointerStartBounds = _visibleBounds;
@@ -489,41 +476,51 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
   }
 
   void _onTwoPointerScaleUpdate(
-      Offset globalFocalPoint,
-      double distanceX,
-      double distanceY,
-      ) {
+    Offset globalFocalPoint,
+    double distanceX,
+    double distanceY,
+  ) {
     if (_plotSize.width <= 0 || _plotSize.height <= 0) return;
 
     final currentFocal = _plotLocalFromGlobal(globalFocalPoint);
     final currentDistanceX = distanceX <= 1 ? 1 : distanceX;
     final currentDistanceY = distanceY <= 1 ? 1 : distanceY;
 
-    final scaleX =
-    (currentDistanceX / _twoPointerStartDistanceX).clamp(0.25, 8.0);
-    final scaleY =
-    (currentDistanceY / _twoPointerStartDistanceY).clamp(0.25, 8.0);
+    final scaleX = (currentDistanceX / _twoPointerStartDistanceX).clamp(
+      0.25,
+      8.0,
+    );
+    final scaleY = (currentDistanceY / _twoPointerStartDistanceY).clamp(
+      0.25,
+      8.0,
+    );
 
-    final startFocalXRatio =
-    (_twoPointerStartFocal.dx / _plotSize.width).clamp(0.0, 1.0);
-    final startFocalYRatio =
-    (_twoPointerStartFocal.dy / _plotSize.height).clamp(0.0, 1.0);
+    final startFocalXRatio = (_twoPointerStartFocal.dx / _plotSize.width).clamp(
+      0.0,
+      1.0,
+    );
+    final startFocalYRatio = (_twoPointerStartFocal.dy / _plotSize.height)
+        .clamp(0.0, 1.0);
 
-    final focalX = _twoPointerStartBounds.minX +
+    final focalX =
+        _twoPointerStartBounds.minX +
         _twoPointerStartBounds.xRange * startFocalXRatio;
 
     final focalY = widget.invertYAxis
         ? _twoPointerStartBounds.minY +
-        _twoPointerStartBounds.yRange * startFocalYRatio
+              _twoPointerStartBounds.yRange * startFocalYRatio
         : _twoPointerStartBounds.maxY -
-        _twoPointerStartBounds.yRange * startFocalYRatio;
+              _twoPointerStartBounds.yRange * startFocalYRatio;
 
+    final nextXRange = (_twoPointerStartBounds.xRange / scaleX).clamp(
+      _dataBounds.xRange / 80,
+      _dataBounds.xRange * 4,
+    );
 
-    final nextXRange = (_twoPointerStartBounds.xRange / scaleX)
-        .clamp(_dataBounds.xRange / 80, _dataBounds.xRange * 4);
-
-    final nextYRange = (_twoPointerStartBounds.yRange / scaleY)
-        .clamp(_dataBounds.yRange / 80, _dataBounds.yRange * 4);
+    final nextYRange = (_twoPointerStartBounds.yRange / scaleY).clamp(
+      _dataBounds.yRange / 80,
+      _dataBounds.yRange * 4,
+    );
 
     final focalDelta = currentFocal - _twoPointerStartFocal;
 
@@ -531,7 +528,6 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
     final panDy = widget.invertYAxis
         ? -(focalDelta.dy / _plotSize.height) * nextYRange
         : (focalDelta.dy / _plotSize.height) * nextYRange;
-
 
     final minX = focalX - nextXRange * startFocalXRatio + panDx;
     final maxX = minX + nextXRange;
@@ -546,15 +542,10 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
       maxY = focalY + nextYRange * startFocalYRatio + panDy;
       minY = maxY - nextYRange;
     }
-    
+
     setState(() {
       _visibleBounds = _clampToData(
-        _UnifiedStatsBounds(
-          minX: minX,
-          maxX: maxX,
-          minY: minY,
-          maxY: maxY,
-        ),
+        _UnifiedStatsBounds(minX: minX, maxX: maxX, minY: minY, maxY: maxY),
       );
     });
   }
@@ -605,14 +596,14 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
     _singleFingerPanStart = null;
   }
 
-
   void _selectNearestPoint(Offset local) {
-    if (_plotSize.width <= 0 || _plotSize.height <= 0 || widget.points.isEmpty) {
+    if (_plotSize.width <= 0 ||
+        _plotSize.height <= 0 ||
+        widget.points.isEmpty) {
       return;
     }
     final isCompact = MediaQuery.sizeOf(context).width < 600;
     final hitRadius = isCompact ? 90.0 : 72.0;
-
 
     UnifiedStatsPoint? nearest;
     double nearestDistance = double.infinity;
@@ -680,11 +671,12 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
     return delta < 0 ? 0.86 : 1.16;
   }
 
-
   void _zoomX(double factor, double focalRatio) {
     final focal = _visibleBounds.minX + _visibleBounds.xRange * focalRatio;
-    final nextRange = (_visibleBounds.xRange * factor)
-        .clamp(_dataBounds.xRange / 80, _dataBounds.xRange * 4);
+    final nextRange = (_visibleBounds.xRange * factor).clamp(
+      _dataBounds.xRange / 80,
+      _dataBounds.xRange * 4,
+    );
 
     final minX = focal - nextRange * focalRatio;
     final maxX = minX + nextRange;
@@ -703,8 +695,10 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
 
   void _zoomY(double factor, double focalRatio) {
     final focal = _visibleBounds.maxY - _visibleBounds.yRange * focalRatio;
-    final nextRange = (_visibleBounds.yRange * factor)
-        .clamp(_dataBounds.yRange / 80, _dataBounds.yRange * 4);
+    final nextRange = (_visibleBounds.yRange * factor).clamp(
+      _dataBounds.yRange / 80,
+      _dataBounds.yRange * 4,
+    );
 
     final maxY = focal + nextRange * focalRatio;
     final minY = maxY - nextRange;
@@ -755,12 +749,7 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
       minY = maxY - yRange;
     }
 
-    return _UnifiedStatsBounds(
-      minX: minX,
-      maxX: maxX,
-      minY: minY,
-      maxY: maxY,
-    );
+    return _UnifiedStatsBounds(minX: minX, maxX: maxX, minY: minY, maxY: maxY);
   }
 
   @override
@@ -783,7 +772,9 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
               child: Text(
                 'Nessun dato disponibile.',
-                style: t.bodySmall(t.textMuted),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: t.textMuted),
               ),
             )
           else ...[
@@ -866,16 +857,17 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
                               behavior: HitTestBehavior.opaque,
                               gestures: <Type, GestureRecognizerFactory>{
                                 _TwoPointerScaleGestureRecognizer:
-                                GestureRecognizerFactoryWithHandlers<
-                                    _TwoPointerScaleGestureRecognizer>(
+                                    GestureRecognizerFactoryWithHandlers<
+                                      _TwoPointerScaleGestureRecognizer
+                                    >(
                                       () => _TwoPointerScaleGestureRecognizer(),
                                       (recognizer) {
-                                    recognizer
-                                      ..onStart = _onTwoPointerScaleStart
-                                      ..onUpdate = _onTwoPointerScaleUpdate
-                                      ..onEnd = _onTwoPointerScaleEnd;
-                                  },
-                                ),
+                                        recognizer
+                                          ..onStart = _onTwoPointerScaleStart
+                                          ..onUpdate = _onTwoPointerScaleUpdate
+                                          ..onEnd = _onTwoPointerScaleEnd;
+                                      },
+                                    ),
                               },
                               child: RepaintBoundary(
                                 key: _plotKey,
@@ -917,7 +909,9 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
                   Expanded(
                     child: Text(
                       widget.footerText!,
-                      style: t.bodySmall(t.textMuted),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: t.textMuted),
                     ),
                   ),
                 ],
@@ -929,6 +923,7 @@ class _UnifiedStatsChartState extends State<UnifiedStatsChart> {
     );
   }
 }
+
 class _UnifiedStatsInfoSheet extends StatelessWidget {
   final String title;
   final String text;
@@ -953,11 +948,7 @@ class _UnifiedStatsInfoSheet extends StatelessWidget {
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withOpacity(0.55),
       builder: (_) {
-        return _UnifiedStatsInfoSheet(
-          title: title,
-          text: text,
-          advice: advice,
-        );
+        return _UnifiedStatsInfoSheet(title: title, text: text, advice: advice);
       },
     );
   }
@@ -965,6 +956,7 @@ class _UnifiedStatsInfoSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return DraggableScrollableSheet(
       expand: false,
@@ -974,7 +966,7 @@ class _UnifiedStatsInfoSheet extends StatelessWidget {
       builder: (context, scrollController) {
         return DecoratedBox(
           decoration: BoxDecoration(
-            color: t.overlay,
+            color: t.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             border: Border(top: BorderSide(color: t.border)),
           ),
@@ -1011,12 +1003,7 @@ class _UnifiedStatsInfoSheet extends StatelessWidget {
                   Expanded(
                     child: Text(
                       title,
-                      style: TextStyle(
-                        color: t.textPrimary,
-                        fontSize: 18,
-                        height: 1.18,
-                        fontWeight: FontWeight.w900,
-                      ),
+                      style: tt.titleMedium?.copyWith(color: t.textPrimary),
                     ),
                   ),
                   IconButton(
@@ -1027,26 +1014,15 @@ class _UnifiedStatsInfoSheet extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 18),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: t.surface,
-                  borderRadius: AppTokens.r16,
-                  border: Border.all(color: t.border),
-                ),
-                child: Text(
-                  text,
-                  style: TextStyle(
-                    color: t.textSecondary,
-                    fontSize: 14,
-                    height: 1.48,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
+              Text(text, style: tt.bodyMedium?.copyWith(color: t.textPrimary)),
               if (advice.isNotEmpty) ...[
                 const SizedBox(height: 22),
-                Text('CONSIGLI', style: t.labelCaps(t.textMuted)),
+                Text(
+                  'CONSIGLI',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: t.textMuted),
+                ),
                 const SizedBox(height: 10),
                 for (final item in advice)
                   Padding(
@@ -1054,23 +1030,24 @@ class _UnifiedStatsInfoSheet extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: t.surface,
+                        color: t.bg,
                         borderRadius: AppTokens.r12,
                         border: Border.all(color: t.border),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.check_circle_rounded, color: t.green, size: 18),
+                          Icon(
+                            Icons.check_circle_rounded,
+                            color: t.green,
+                            size: 18,
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               item,
-                              style: TextStyle(
+                              style: tt.bodySmall?.copyWith(
                                 color: t.textPrimary,
-                                fontSize: 13,
-                                height: 1.38,
-                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
@@ -1103,10 +1080,7 @@ class _UnifiedStatsBounds {
   double get xRange => maxX - minX;
   double get yRange => maxY - minY;
 
-  _UnifiedStatsBounds shifted({
-    required double dx,
-    required double dy,
-  }) {
+  _UnifiedStatsBounds shifted({required double dx, required double dy}) {
     return _UnifiedStatsBounds(
       minX: minX + dx,
       maxX: maxX + dx,
@@ -1130,6 +1104,7 @@ class _UnifiedStatsHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 14, 10, 12),
@@ -1152,23 +1127,14 @@ class _UnifiedStatsHeader extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: TextStyle(
-                    color: t.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: tt.titleMedium?.copyWith(color: t.textPrimary),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   subtitle,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: t.textSecondary,
-                    fontSize: 12,
-                    height: 1.2,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: tt.bodySmall?.copyWith(color: t.textSecondary),
                 ),
               ],
             ),
@@ -1223,18 +1189,10 @@ class _UnifiedStatsFixedYAxisPainter extends CustomPainter {
         Offset(7, y - 7),
         tokens.textMuted,
         10,
-        FontWeight.w800,
       );
     }
 
-    _drawText(
-      canvas,
-      axisLabel,
-      const Offset(8, 4),
-      tokens.accent,
-      11,
-      FontWeight.w900,
-    );
+    _drawText(canvas, axisLabel, const Offset(8, 4), tokens.accent, 11);
   }
 
   List<double> _niceTicks(double min, double max, int targetCount) {
@@ -1242,7 +1200,9 @@ class _UnifiedStatsFixedYAxisPainter extends CustomPainter {
     if (range == 0) return [min];
 
     final rawStep = range / targetCount;
-    final magnitude = math.pow(10, (math.log(rawStep) / math.ln10).floor()).toDouble();
+    final magnitude = math
+        .pow(10, (math.log(rawStep) / math.ln10).floor())
+        .toDouble();
     final residual = rawStep / magnitude;
 
     final niceStep = residual >= 5
@@ -1273,21 +1233,17 @@ class _UnifiedStatsFixedYAxisPainter extends CustomPainter {
   }
 
   void _drawText(
-      Canvas canvas,
-      String text,
-      Offset offset,
-      Color color,
-      double size,
-      FontWeight weight,
-      ) {
+    Canvas canvas,
+    String text,
+    Offset offset,
+    Color color,
+    double size,
+  ) {
+    final style = AppTokens.scoreSmallStyle.copyWith(color: color);
     final painter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: color,
-          fontSize: size,
-          fontWeight: weight,
-        ),
+      text: TextSpan(text: text, style: style),
+      textScaler: TextScaler.linear(
+        size / (AppTokens.scoreSmallStyle.fontSize ?? 18),
       ),
       textDirection: TextDirection.ltr,
     )..layout(maxWidth: 45);
@@ -1321,11 +1277,7 @@ class _UnifiedStatsFixedXAxisPainter extends CustomPainter {
       ..color = tokens.border
       ..strokeWidth = 1.4;
 
-    canvas.drawLine(
-      const Offset(0, 1),
-      Offset(size.width, 1),
-      axisPaint,
-    );
+    canvas.drawLine(const Offset(0, 1), Offset(size.width, 1), axisPaint);
 
     final ticks = _niceTicks(visibleBounds.minX, visibleBounds.maxX, 5);
 
@@ -1339,7 +1291,6 @@ class _UnifiedStatsFixedXAxisPainter extends CustomPainter {
         Offset(x - 8, 10),
         tokens.textMuted,
         10,
-        FontWeight.w800,
       );
     }
 
@@ -1349,7 +1300,6 @@ class _UnifiedStatsFixedXAxisPainter extends CustomPainter {
       Offset(size.width - 4, 10),
       tokens.accent,
       11,
-      FontWeight.w900,
     );
   }
 
@@ -1358,7 +1308,9 @@ class _UnifiedStatsFixedXAxisPainter extends CustomPainter {
     if (range == 0) return [min];
 
     final rawStep = range / targetCount;
-    final magnitude = math.pow(10, (math.log(rawStep) / math.ln10).floor()).toDouble();
+    final magnitude = math
+        .pow(10, (math.log(rawStep) / math.ln10).floor())
+        .toDouble();
     final residual = rawStep / magnitude;
 
     final niceStep = residual >= 5
@@ -1389,49 +1341,43 @@ class _UnifiedStatsFixedXAxisPainter extends CustomPainter {
   }
 
   void _drawText(
-      Canvas canvas,
-      String text,
-      Offset offset,
-      Color color,
-      double size,
-      FontWeight weight,
-      ) {
+    Canvas canvas,
+    String text,
+    Offset offset,
+    Color color,
+    double size,
+  ) {
+    final style = AppTokens.scoreSmallStyle.copyWith(color: color);
     final painter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: color,
-          fontSize: size,
-          fontWeight: weight,
-        ),
+      text: TextSpan(text: text, style: style),
+      textScaler: TextScaler.linear(
+        size / (AppTokens.scoreSmallStyle.fontSize ?? 18),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
 
     painter.paint(canvas, offset);
   }
+
   void _drawTextRightAligned(
-      Canvas canvas,
-      String text,
-      Offset offset,
-      Color color,
-      double size,
-      FontWeight weight,
-      ) {
+    Canvas canvas,
+    String text,
+    Offset offset,
+    Color color,
+    double size,
+  ) {
+    final style = AppTokens.scoreSmallStyle.copyWith(color: color);
     final painter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: color,
-          fontSize: size,
-          fontWeight: weight,
-        ),
+      text: TextSpan(text: text, style: style),
+      textScaler: TextScaler.linear(
+        size / (AppTokens.scoreSmallStyle.fontSize ?? 18),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
 
     painter.paint(canvas, Offset(offset.dx - painter.width, offset.dy));
   }
+
   @override
   bool shouldRepaint(covariant _UnifiedStatsFixedXAxisPainter oldDelegate) {
     return oldDelegate.visibleBounds != visibleBounds ||
@@ -1494,7 +1440,6 @@ class _UnifiedStatsPlotPainter extends CustomPainter {
       ..strokeWidth = 2.8
       ..style = PaintingStyle.stroke;
 
-
     Offset mapPoint(UnifiedStatsPoint p) {
       final dx = (p.x - visibleBounds.minX) / visibleBounds.xRange;
       final dy = (p.y - visibleBounds.minY) / visibleBounds.yRange;
@@ -1532,7 +1477,8 @@ class _UnifiedStatsPlotPainter extends CustomPainter {
 
     final allMapped = points.map(mapPoint).toList();
 
-    if (mode == UnifiedStatsChartMode.line || mode == UnifiedStatsChartMode.lineAndPoints) {
+    if (mode == UnifiedStatsChartMode.line ||
+        mode == UnifiedStatsChartMode.lineAndPoints) {
       final path = Path()..moveTo(allMapped.first.dx, allMapped.first.dy);
       for (int i = 1; i < allMapped.length; i++) {
         path.lineTo(allMapped[i].dx, allMapped[i].dy);
@@ -1540,7 +1486,8 @@ class _UnifiedStatsPlotPainter extends CustomPainter {
       canvas.drawPath(path, linePaint);
     }
 
-    if (mode == UnifiedStatsChartMode.points || mode == UnifiedStatsChartMode.lineAndPoints) {
+    if (mode == UnifiedStatsChartMode.points ||
+        mode == UnifiedStatsChartMode.lineAndPoints) {
       for (int i = 0; i < visiblePoints.length; i++) {
         final point = visiblePoints[i];
         final p = mapPoint(point);
@@ -1561,7 +1508,6 @@ class _UnifiedStatsPlotPainter extends CustomPainter {
             Offset(p.dx + 6, p.dy - 18),
             tokens.textSecondary,
             10,
-            FontWeight.w800,
           );
         }
       }
@@ -1573,7 +1519,9 @@ class _UnifiedStatsPlotPainter extends CustomPainter {
     if (range == 0) return [min];
 
     final rawStep = range / targetCount;
-    final magnitude = math.pow(10, (math.log(rawStep) / math.ln10).floor()).toDouble();
+    final magnitude = math
+        .pow(10, (math.log(rawStep) / math.ln10).floor())
+        .toDouble();
     final residual = rawStep / magnitude;
 
     final niceStep = residual >= 5
@@ -1598,21 +1546,17 @@ class _UnifiedStatsPlotPainter extends CustomPainter {
   }
 
   void _drawText(
-      Canvas canvas,
-      String text,
-      Offset offset,
-      Color color,
-      double size,
-      FontWeight weight,
-      ) {
+    Canvas canvas,
+    String text,
+    Offset offset,
+    Color color,
+    double size,
+  ) {
+    final style = AppTokens.scoreSmallStyle.copyWith(color: color);
     final painter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: color,
-          fontSize: size,
-          fontWeight: weight,
-        ),
+      text: TextSpan(text: text, style: style),
+      textScaler: TextScaler.linear(
+        size / (AppTokens.scoreSmallStyle.fontSize ?? 18),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -1630,7 +1574,6 @@ class _UnifiedStatsPlotPainter extends CustomPainter {
         oldDelegate.invertYAxis != invertYAxis;
   }
 }
-
 
 class _UnifiedStatsPointDetails extends StatelessWidget {
   final UnifiedStatsPoint? point;
@@ -1657,7 +1600,9 @@ class _UnifiedStatsPointDetails extends StatelessWidget {
             Expanded(
               child: Text(
                 'Tocca un punto del grafico per leggere il dettaglio.',
-                style: t.bodySmall(t.textMuted),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: t.textMuted),
               ),
             ),
           ],
@@ -1688,7 +1633,9 @@ class _UnifiedStatsPointDetails extends StatelessWidget {
                 ),
                 Text(
                   point!.detail,
-                  style: t.bodySmall(t.textSecondary),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
                 ),
               ],
             ),
@@ -1704,15 +1651,11 @@ class _UnifiedStatsPointDetails extends StatelessWidget {
   }
 }
 
-
 class _UnifiedStatsPointChip extends StatelessWidget {
   final String label;
   final String value;
 
-  const _UnifiedStatsPointChip({
-    required this.label,
-    required this.value,
-  });
+  const _UnifiedStatsPointChip({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -1727,12 +1670,13 @@ class _UnifiedStatsPointChip extends StatelessWidget {
       ),
       child: Text(
         '$label $value',
-        style: t.bodyBold(t.textPrimary),
+        style: Theme.of(
+          context,
+        ).textTheme.titleSmall?.copyWith(color: t.textPrimary),
       ),
     );
   }
 }
-
 
 class UnifiedStatsDistanceBucket {
   final String label;
@@ -1787,7 +1731,12 @@ class UnifiedStatsHorizontalBars extends StatelessWidget {
           if (buckets.isEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
-              child: Text('Nessun dato disponibile.', style: t.bodySmall(t.textMuted)),
+              child: Text(
+                'Nessun dato disponibile.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: t.textMuted),
+              ),
             )
           else
             Padding(
@@ -1810,6 +1759,7 @@ class UnifiedStatsHorizontalBars extends StatelessWidget {
     );
   }
 }
+
 class UnifiedStatsTowerSegment {
   final String label;
   final double value;
@@ -1844,10 +1794,7 @@ class UnifiedStatsTowerGroup {
   final String xLabel;
   final List<UnifiedStatsTowerValue> values;
 
-  const UnifiedStatsTowerGroup({
-    required this.xLabel,
-    required this.values,
-  });
+  const UnifiedStatsTowerGroup({required this.xLabel, required this.values});
 }
 
 class UnifiedStatsTowerChart extends StatefulWidget {
@@ -1871,7 +1818,8 @@ class UnifiedStatsTowerChart extends StatefulWidget {
     this.yAxisLabel = '',
     this.height = 320,
     this.infoTitle = 'Come leggere il grafico',
-    this.infoText = 'Il grafico a torre mostra categorie sull’asse orizzontale e quantità o medie sull’asse verticale.',
+    this.infoText =
+        'Il grafico a torre mostra categorie sull’asse orizzontale e quantità o medie sull’asse verticale.',
     this.advice = const [],
     this.customLegend,
     this.footerText,
@@ -1883,7 +1831,6 @@ class UnifiedStatsTowerChart extends StatefulWidget {
 }
 
 class _UnifiedStatsTowerChartState extends State<UnifiedStatsTowerChart> {
-
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
@@ -1892,11 +1839,14 @@ class _UnifiedStatsTowerChartState extends State<UnifiedStatsTowerChart> {
 
     final maxBarsInGroup = widget.groups.fold<int>(
       1,
-          (max, group) => group.values.length > max ? group.values.length : max,
+      (max, group) => group.values.length > max ? group.values.length : max,
     );
 
-    final minWidth = (widget.groups.length * (maxBarsInGroup <= 1 ? 46.0 : 92.0))
-        .clamp(520.0, 9000.0);
+    final minWidth =
+        (widget.groups.length * (maxBarsInGroup <= 1 ? 46.0 : 92.0)).clamp(
+          520.0,
+          9000.0,
+        );
 
     return UnifiedStatsCard(
       title: widget.title,
@@ -1949,7 +1899,9 @@ class _UnifiedStatsTowerChartState extends State<UnifiedStatsTowerChart> {
                   child: Text(
                     widget.footerText ??
                         'Confronta le barre per categoria e usa Info per leggere il significato del dato.',
-                    style: t.bodySmall(t.textMuted),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: t.textMuted),
                   ),
                 ),
               ],
@@ -1997,7 +1949,7 @@ class _UnifiedStatsTowerPainter extends CustomPainter {
 
     final maxValue = allValues.fold<double>(
       0,
-          (max, item) => item.value > max ? item.value : max,
+      (max, item) => item.value > max ? item.value : max,
     );
 
     final yMax = maxValue < 4 ? 4.0 : maxValue.ceilToDouble();
@@ -2048,17 +2000,19 @@ class _UnifiedStatsTowerPainter extends CustomPainter {
       }
     }
 
-
     final compactGroupWidth = 84.0;
     final totalWidth = groups.length * compactGroupWidth;
-    final horizontalOffset =
-    totalWidth < chart.width ? (chart.width - totalWidth) / 6 : 0;
+    final horizontalOffset = totalWidth < chart.width
+        ? (chart.width - totalWidth) / 6
+        : 0;
 
     final groupWidth = compactGroupWidth;
 
     for (int i = 0; i < groups.length; i++) {
       final group = groups[i];
-      final visibleValues = group.values.where((value) => value.value > 0).toList();
+      final visibleValues = group.values
+          .where((value) => value.value > 0)
+          .toList();
       if (visibleValues.isEmpty) continue;
 
       final centerX =
@@ -2106,10 +2060,7 @@ class _UnifiedStatsTowerPainter extends CustomPainter {
             );
 
             canvas.drawRRect(
-              RRect.fromRectAndRadius(
-                segmentRect,
-                const Radius.circular(4),
-              ),
+              RRect.fromRectAndRadius(segmentRect, const Radius.circular(4)),
               Paint()
                 ..color = segment.color
                 ..style = PaintingStyle.fill,
@@ -2119,10 +2070,7 @@ class _UnifiedStatsTowerPainter extends CustomPainter {
               _drawCenteredText(
                 canvas,
                 segment.value.toStringAsFixed(1),
-                Offset(
-                  segmentRect.center.dx,
-                  segmentRect.center.dy - 6,
-                ),
+                Offset(segmentRect.center.dx, segmentRect.center.dy - 6),
                 Colors.white.withOpacity(0.92),
                 9,
               );
@@ -2164,7 +2112,13 @@ class _UnifiedStatsTowerPainter extends CustomPainter {
     }
 
     if (yAxisLabel.isNotEmpty) {
-      _drawText(canvas, yAxisLabel, Offset(0, chart.top - 14), tokens.textMuted, 10);
+      _drawText(
+        canvas,
+        yAxisLabel,
+        Offset(0, chart.top - 14),
+        tokens.textMuted,
+        10,
+      );
     }
 
     _drawLegend(canvas, chart);
@@ -2188,33 +2142,24 @@ class _UnifiedStatsTowerPainter extends CustomPainter {
           ..style = PaintingStyle.fill,
       );
 
-      _drawText(
-        canvas,
-        label,
-        Offset(x + 18, y - 1),
-        tokens.textMuted,
-        10,
-      );
+      _drawText(canvas, label, Offset(x + 18, y - 1), tokens.textMuted, 10);
 
       x += 62;
     }
   }
 
   void _drawCenteredText(
-      Canvas canvas,
-      String text,
-      Offset center,
-      Color color,
-      double size,
-      ) {
+    Canvas canvas,
+    String text,
+    Offset center,
+    Color color,
+    double size,
+  ) {
+    final style = AppTokens.scoreSmallStyle.copyWith(color: color);
     final painter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: color,
-          fontSize: size,
-          fontWeight: FontWeight.w700,
-        ),
+      text: TextSpan(text: text, style: style),
+      textScaler: TextScaler.linear(
+        size / (AppTokens.scoreSmallStyle.fontSize ?? 18),
       ),
       textDirection: TextDirection.ltr,
     );
@@ -2224,20 +2169,17 @@ class _UnifiedStatsTowerPainter extends CustomPainter {
   }
 
   void _drawText(
-      Canvas canvas,
-      String text,
-      Offset offset,
-      Color color,
-      double size,
-      ) {
+    Canvas canvas,
+    String text,
+    Offset offset,
+    Color color,
+    double size,
+  ) {
+    final style = AppTokens.scoreSmallStyle.copyWith(color: color);
     final painter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: color,
-          fontSize: size,
-          fontWeight: FontWeight.w700,
-        ),
+      text: TextSpan(text: text, style: style),
+      textScaler: TextScaler.linear(
+        size / (AppTokens.scoreSmallStyle.fontSize ?? 18),
       ),
       textDirection: TextDirection.ltr,
     );
@@ -2256,20 +2198,18 @@ class _UnifiedStatsTowerPainter extends CustomPainter {
   }
 }
 
-
 class _UnifiedDistanceBarRow extends StatelessWidget {
   final UnifiedStatsDistanceBucket bucket;
   final double maxCount;
 
-  const _UnifiedDistanceBarRow({
-    required this.bucket,
-    required this.maxCount,
-  });
+  const _UnifiedDistanceBarRow({required this.bucket, required this.maxCount});
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
-    final ratio = maxCount <= 0 ? 0.0 : (bucket.count / maxCount).clamp(0.0, 1.0);
+    final ratio = maxCount <= 0
+        ? 0.0
+        : (bucket.count / maxCount).clamp(0.0, 1.0);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2277,11 +2217,18 @@ class _UnifiedDistanceBarRow extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: Text(bucket.label, style: t.bodyBold(t.textPrimary)),
+              child: Text(
+                bucket.label,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(color: t.textPrimary),
+              ),
             ),
             Text(
               '${bucket.count} • ${bucket.percent.toStringAsFixed(1)}%',
-              style: t.bodyBold(t.accent),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: t.accent),
             ),
           ],
         ),
@@ -2296,7 +2243,12 @@ class _UnifiedDistanceBarRow extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 5),
-        Text(bucket.detail, style: t.bodySmall(t.textSecondary)),
+        Text(
+          bucket.detail,
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+        ),
       ],
     );
   }

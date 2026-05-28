@@ -21,6 +21,7 @@ class MatchResultNotifier extends StateNotifier<MatchResultState> {
     required Match match,
     required List<PlayerInfo> players,
     required bool isTeamMode,
+    required bool isCricket,
     required Map<String, String> playerToTeam,
   }) async {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
@@ -37,7 +38,13 @@ class MatchResultNotifier extends StateNotifier<MatchResultState> {
       );
 
       try {
-        final stats = await _repository.calculateStatistics(match, players, isTeamMode);
+        final stats = await _repository.calculateStatistics(
+          match,
+          players,
+          isTeamMode,
+          isCricket,
+        );
+
         state = state.copyWith(
           match: match,
           playerStats: stats,

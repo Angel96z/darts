@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../app_theme.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -82,8 +83,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(title: const Text("Login")),
+      appBar: AppBar(title: const Text("Accedi a My Darts roses trainer")),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -95,9 +98,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 10),
-                  const Text(
+                  Text(
                     "Accedi",
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    style: tt.titleMedium?.copyWith(color: t.textPrimary),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 30),
@@ -154,7 +157,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
                       );
                     },
-                    child: const Text("Password dimenticata?", style: TextStyle(fontSize: 12)),
+                    child: Text(
+                      "Password dimenticata?",
+                      style: tt.bodySmall?.copyWith(color: t.textSecondary),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   TextButton(
@@ -170,7 +176,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 20),
                     Text(
                       error,
-                      style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w500),
+                      style: tt.bodySmall?.copyWith(color: t.red),
                       textAlign: TextAlign.center,
                     ),
                   ],

@@ -1,6 +1,7 @@
 /// File: blocking_overlay.dart. Contiene componenti condivisi usati in più parti dell'app.
 
 import 'package:flutter/material.dart';
+import '../../app_theme.dart';
 
 enum OverlayState { loading, success, error, pending }
 
@@ -26,6 +27,8 @@ class BlockingOverlay extends StatelessWidget {
   @override
   /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     IconData icon;
     Color color;
 
@@ -74,10 +77,7 @@ class BlockingOverlay extends StatelessWidget {
 
                 Text(
                   message ?? "",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                  ),
+                  style: tt.bodyMedium?.copyWith(color: t.textPrimary),
                   textAlign: TextAlign.center,
                 ),
 

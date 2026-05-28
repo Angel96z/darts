@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../app_theme.dart';
 
 import '../pages/login_screen.dart';
 import '../pages/profile_screen.dart';
@@ -85,12 +86,20 @@ class ProfilePanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final userState = ref.watch(userProvider);
     final user = FirebaseAuth.instance.currentUser;
     final isLogged = user != null;
     final profile = userState.profile;
     final isEmailVerified = user?.emailVerified ?? false;
 
+    // 🔥 FORZA CARICAMENTO PROFILO SE LOGGATO E DATI MANCANTI
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (isLogged && userState.status == AppStatus.idle) {
+        ref.read(userProvider.notifier).loadProfile();
+      }
+    });
     return Drawer(
       child: SafeArea(
         child: Column(
@@ -99,10 +108,10 @@ class ProfilePanel extends ConsumerWidget {
 
             CircleAvatar(
               radius: 45,
-              backgroundColor: Colors.blue.shade100,
+              backgroundColor: t.accent.withOpacity(0.12),
               child: Text(
                 userState.initials,
-                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.blue),
+                style: AppTokens.scoreSmallStyle.copyWith(color: t.accent),
               ),
             ),
 
@@ -110,14 +119,14 @@ class ProfilePanel extends ConsumerWidget {
 
             Text(
               userState.displayName,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: tt.titleMedium?.copyWith(color: t.textPrimary),
             ),
 
             const SizedBox(height: 4),
 
             Text(
               profile?.email ?? user?.email ?? "Utente",
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              style: tt.bodySmall?.copyWith(color: t.textSecondary),
             ),
 
             // 🔥 BADGE VERIFICA EMAIL
@@ -140,9 +149,7 @@ class ProfilePanel extends ConsumerWidget {
                     const SizedBox(width: 4),
                     Text(
                       isEmailVerified ? "Email verificata" : "Email non verificata",
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
+                      style: tt.labelSmall?.copyWith(
                         color: isEmailVerified ? Colors.green.shade700 : Colors.orange.shade700,
                       ),
                     ),
@@ -181,17 +188,12 @@ class ProfilePanel extends ConsumerWidget {
                   children: [
                     Text(
                       "VERIFICA EMAIL",
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade600,
-                        letterSpacing: 0.5,
-                      ),
+                      style: tt.labelSmall?.copyWith(color: t.textSecondary),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       "Verifica il tuo indirizzo email per accedere a tutte le funzionalità",
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      style: tt.bodySmall?.copyWith(color: t.textSecondary),
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -205,7 +207,7 @@ class ProfilePanel extends ConsumerWidget {
                               foregroundColor: Colors.orange.shade700,
                               side: BorderSide(color: Colors.orange.shade300),
                               padding: const EdgeInsets.symmetric(vertical: 10),
-                              textStyle: const TextStyle(fontSize: 12),
+                              textStyle: tt.bodySmall,
                             ),
                           ),
                         ),

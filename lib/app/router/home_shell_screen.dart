@@ -6,6 +6,7 @@ import '../../app/link/app_link_state.dart';
 import '../../app_theme.dart';
 import '../../features/consigli/admin/consigli_admin_screen.dart';
 import '../../features/consigli/consigli_feature.dart';
+import '../../features/dartboard_sandbox_page.dart';
 import '../../features/players/application/user_notifier.dart';
 import '../../features/room_v4/presentation/room_lobby_page.dart';
 import '../../features/stats/presentation/pages/stats_home_screen.dart';
@@ -22,10 +23,8 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  // 🔥 ID UTENTI AUTORIZZATI PER ADMIN CONSIGLI
   static const Set<String> _adminUserIds = {
     'P6nsNSF0F5djBCJJR9kyTzYuO3f2',
-    // Aggiungi altri admin qui se necessario
   };
 
   bool get _isAdmin {
@@ -39,7 +38,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final state = ref.read(appLinkCoordinatorProvider);
-      final hasPendingRoom = state.pendingRoomId != null && state.pendingRoomId!.isNotEmpty;
+      final hasPendingRoom =
+          state.pendingRoomId != null && state.pendingRoomId!.isNotEmpty;
 
       if (hasPendingRoom && mounted) {
         _navigateToRoomLobby();
@@ -48,28 +48,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _navigateToTraining() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const TrainingScreen(title: 'ROSES Throws', mode: TrainingMode.bull)));
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const TrainingScreen(
+          title: 'ROSES Throws',
+          mode: TrainingMode.bull,
+        ),
+      ),
+    );
   }
 
   void _navigateToStats() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const StatsHomeScreen()));
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const StatsHomeScreen()),
+    );
   }
 
   void _navigateToRoomLobby() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const RoomLobbyPage()));
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const RoomLobbyPage()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
+
     final user = FirebaseAuth.instance.currentUser;
     final isLoggedIn = user != null;
     final isAdmin = isLoggedIn && _adminUserIds.contains(user.uid);
 
     ref.listen<AppLinkState>(appLinkCoordinatorProvider, (prev, next) {
-      final hasPendingRoom = next.pendingRoomId != null && next.pendingRoomId!.isNotEmpty;
-      final hadPendingRoom = prev?.pendingRoomId != null && prev!.pendingRoomId!.isNotEmpty;
-      if (hasPendingRoom && !hadPendingRoom && mounted) _navigateToRoomLobby();
+      final hasPendingRoom =
+          next.pendingRoomId != null && next.pendingRoomId!.isNotEmpty;
+      final hadPendingRoom =
+          prev?.pendingRoomId != null && prev!.pendingRoomId!.isNotEmpty;
+
+      if (hasPendingRoom && !hadPendingRoom && mounted) {
+        _navigateToRoomLobby();
+      }
     });
 
     return Scaffold(
@@ -81,13 +102,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           Consumer(
             builder: (context, ref, _) {
               final userState = ref.watch(userProvider);
+
               return Row(
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: Text(
                       userState.displayName,
-                      style: TextStyle(fontSize: 12, color: t.textSecondary),
+                      style: tt.bodySmall?.copyWith(
+                        color: t.textSecondary,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -108,7 +132,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       endDrawer: const ProfilePanel(),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final isDesktop = constraints.maxWidth >= 800;
+          final isDesktop = constraints.maxWidth >= 650;
           final horizontalPadding = isDesktop ? 32.0 : 20.0;
           final verticalPadding = isDesktop ? 32.0 : 20.0;
           final maxContentWidth = isDesktop ? 540.0 : double.infinity;
@@ -139,7 +163,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 onTap: _navigateToStats,
                 showBadge: false,
               ),
-              const SizedBox(height: 80),
+              const SizedBox(height: 40),
+              _buildCard(
+                icon: Icons.biotech,
+                title: 'Dartboard Sandbox Test',
+                subtitle: 'Pagina isolata per riprogettare le aree di zoom e click',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const DartboardSandboxPage(),
+                    ),
+                  );
+                },
+                showBadge: false,
+              ),
               if (isLoggedIn) ...[
                 const ConsigliCarouselWidget(),
                 const SizedBox(height: 20),
@@ -152,7 +190,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const ConsigliAdminScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => const ConsigliAdminScreen(),
+                      ),
                     );
                   },
                   showBadge: false,
@@ -188,11 +228,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildCard({required IconData icon, required String title, required String subtitle, required VoidCallback onTap, required bool showBadge}) {
+  Widget _buildCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    required bool showBadge,
+  }) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
+
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: t.border, width: 1)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: t.border, width: 1),
+      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
@@ -200,7 +251,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: t.accent.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: t.accent, size: 28)),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: t.accent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: t.accent, size: 28),
+              ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -208,15 +266,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   children: [
                     Row(
                       children: [
-                        Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: t.textPrimary)),
+                        Text(
+                          title,
+                          style: tt.titleMedium?.copyWith(
+                            color: t.textPrimary,
+                          ),
+                        ),
                         if (showBadge) ...[
                           const SizedBox(width: 8),
-                          Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: t.accent.withOpacity(0.15), borderRadius: BorderRadius.circular(4)), child: Text('NEW', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: t.accent, letterSpacing: 0.5))),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: t.accent.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'NEW',
+                              style: tt.labelSmall?.copyWith(
+                                color: t.accent,
+                              ),
+                            ),
+                          ),
                         ],
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Text(subtitle, style: TextStyle(fontSize: 13, color: t.textSecondary)),
+                    Text(
+                      subtitle,
+                      style: tt.bodySmall?.copyWith(
+                        color: t.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               ),

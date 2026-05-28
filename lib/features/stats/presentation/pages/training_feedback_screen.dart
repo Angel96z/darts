@@ -70,6 +70,7 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
   /// Widget carousel per selezione valore 1-10
   Widget _ratingCarousel(String label, int? value, ValueChanged<int?> onChanged) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -79,12 +80,14 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
             Expanded(
               child: Text(
                 label,
-                style: t.bodyBold(t.textSecondary),
+                style: tt.titleSmall?.copyWith(color: t.textSecondary),
               ),
             ),
             Text(
               value == null ? '—/10' : '$value/10',
-              style: t.bodyBold(value == null ? t.textMuted : t.accent),
+              style: tt.titleMedium?.copyWith(
+                color: value == null ? t.textMuted : t.accent,
+              ),
             ),
           ],
         ),
@@ -113,8 +116,8 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
                   child: Center(
                     child: Text(
                       ratingValue.toString(),
-                      style: t.numericMedium(
-                        isSelected ? t.accentFg : t.textPrimary,
+                      style: tt.titleSmall?.copyWith(
+                        color: isSelected ? t.accentFg : t.textPrimary,
                       ),
                     ),
                   ),
@@ -191,6 +194,7 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
 
   Widget _buildOverlay(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final loading = _overlayState == OverlayState.loading;
 
     return Container(
@@ -227,7 +231,7 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
                 // Messaggio
                 Text(
                   _overlayMessage ?? '',
-                  style: t.bodyBold(t.textPrimary),
+                  style: tt.titleMedium?.copyWith(color: t.textPrimary),
                   textAlign: TextAlign.center,
                 ),
 
@@ -256,7 +260,7 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
                         ),
                         child: Text(
                         'Torna alla home',
-                          style: t.bodyBold(t.textPrimary),
+                          style: tt.titleSmall?.copyWith(color: t.textPrimary),
                         ),
                       ),
                     ),
@@ -282,7 +286,7 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
                         ),
                         child: Text(
     'Vai alle statistiche',
-                          style: t.bodyBold(t.accentFg),
+                          style: tt.titleSmall?.copyWith(color: t.accentFg),
                         ),
                       ),
                     ),
@@ -299,6 +303,7 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final showOverlay = _overlayState != null;
 
     return Scaffold(
@@ -307,7 +312,7 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
       appBar: AppBar(
         title: Text(
             'Feedback sessione',
-          style: TextStyle(color: t.textPrimary),
+          style: tt.titleMedium?.copyWith(color: t.textPrimary),
         ),
         backgroundColor: t.surface,
         elevation: 0,
@@ -328,17 +333,17 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
                 // Commento in alto
                 Text(
             'Commento (opzionale)',
-            style: t.bodyBold(t.textSecondary),
+            style: tt.titleSmall?.copyWith(color: t.textSecondary),
                 ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _commentoController,
                   minLines: 3,
                   maxLines: 5,
-                  style: t.bodySmall(t.textPrimary),
+                  style: tt.bodyMedium?.copyWith(color: t.textPrimary),
                   decoration: InputDecoration(
                     hintText: 'Scrivi tue considerazioni...',
-                    hintStyle: t.bodySmall(t.textMuted),
+                    hintStyle: tt.bodySmall?.copyWith(color: t.textMuted),
                     filled: true,
                     fillColor: t.surfaceHigh,
                     border: OutlineInputBorder(
@@ -365,7 +370,7 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
                 // Valutazioni
                 Text(
                     'Valutazioni (opzionali)',
-                  style: t.bodyBold(t.textPrimary),
+                  style: tt.titleMedium?.copyWith(color: t.textPrimary),
                 ),
                 const SizedBox(height: 16),
 
@@ -391,9 +396,9 @@ class _TrainingFeedbackScreenState extends State<TrainingFeedbackScreen> {
                         borderRadius: AppTokens.r12,
                       ),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Salva sessione',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      style: tt.titleSmall?.copyWith(color: t.accentFg),
                     ),
                   ),
                 ),

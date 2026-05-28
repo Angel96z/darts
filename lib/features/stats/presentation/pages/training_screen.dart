@@ -108,6 +108,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return WillPopScope(
       onWillPop: () async {
@@ -117,20 +118,23 @@ class _TrainingScreenState extends State<TrainingScreen> {
             backgroundColor: t.overlay,
             title: Text(
               "Lasciare l\'allenamento?",
-              style: TextStyle(color: t.textPrimary),
+              style: tt.titleMedium?.copyWith(color: t.textPrimary),
             ),
             content: Text(
               "Se esci ora, i tuoi progressi non verranno salvati.",
-              style: TextStyle(color: t.textSecondary),
+              style: tt.bodySmall?.copyWith(color: t.textSecondary),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: Text("Continuo ad allenarmi", style: TextStyle(color: t.accent)),
+                child: Text(
+                  "Continuo ad allenarmi",
+                  style: tt.titleSmall?.copyWith(color: t.accent),
+                ),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: Text("Esci", style: TextStyle(color: t.red)),
+                child: Text("Esci", style: tt.titleSmall?.copyWith(color: t.red)),
               ),
             ],
           ),
@@ -140,7 +144,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
       child: Scaffold(
         backgroundColor: t.bg,
         appBar: AppBar(
-          title: Text(widget.title, style: TextStyle(color: t.textPrimary)),
+          title: Text(widget.title, style: tt.titleMedium?.copyWith(color: t.textPrimary)),
           backgroundColor: t.surface,
           elevation: 0,
           scrolledUnderElevation: 0,
@@ -254,6 +258,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
               // Calcolo dimensioni responsive
               final buttonWidth = (screenWidth * 0.18).clamp(120.0, 200.0);
               final buttonHeight = (screenHeight * 0.06).clamp(44.0, 56.0);
+              final overlayTt = Theme.of(context).textTheme;
 
               return Positioned(
                 bottom: 16,
@@ -274,11 +279,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
                         icon: Icon(Icons.undo, size: 20, color: t.textPrimary),
                         label: Text(
                           "ANNULLA",
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: t.textPrimary,
-                          ),
+                          style: overlayTt.titleSmall?.copyWith(color: t.textPrimary),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: t.surfaceHigh,
@@ -315,11 +316,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
                           const SizedBox(width: 6),
                           Text(
                             "R$roundNumber",
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: t.textPrimary,
-                            ),
+                            style: overlayTt.titleSmall?.copyWith(color: t.textPrimary),
                           ),
                           Container(
                             width: 1,
@@ -331,19 +328,12 @@ class _TrainingScreenState extends State<TrainingScreen> {
                           const SizedBox(width: 6),
                           Text(
                             "$throwsCount",
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: t.textPrimary,
-                            ),
+                            style: overlayTt.titleSmall?.copyWith(color: t.textPrimary),
                           ),
                           const SizedBox(width: 4),
                           Text(
                             "Darts",
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: t.textMuted,
-                            ),
+                            style: overlayTt.bodySmall?.copyWith(color: t.textMuted),
                           ),
                         ],
                       ),
@@ -460,8 +450,9 @@ Widget buildStatsPanel(
     bool isDesktop,
     TrainingStats stats,
     ScoreController scoreController,
-    ) {
+) {
   final t = AppTokens.of(context);
+  final tt = Theme.of(context).textTheme;
 
   Widget piece(String text) {
     return Container(
@@ -474,7 +465,7 @@ Widget buildStatsPanel(
       ),
       child: Text(
         text,
-        style: t.bodyBold(t.textPrimary),
+        style: tt.titleMedium?.copyWith(color: t.textPrimary),
       ),
     );
   }

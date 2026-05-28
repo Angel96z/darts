@@ -62,7 +62,12 @@ class _CachedMatchRecord {
 
   });
 }
+int _x01RealTurnScore(PlayerTurn turn) {
+  if (turn.isBust) return 0;
 
+  final scored = turn.initialScore - turn.score;
+  return scored > 0 ? scored : 0;
+}
 // ============================================================
 // CONTROLLER (come StatsController del training)
 // ============================================================
@@ -124,7 +129,14 @@ class X01StatsController extends ChangeNotifier {
         final playerId = FirebaseAuth.instance.currentUser?.uid ?? '';
         final playerTurns = match.playerTurns[playerId] ?? [];
 
-        if (playerTurns.isEmpty) continue;
+        final dataset = const X01DartExtractor().extract(
+          records: [match],
+          playerId: playerId.isEmpty ? null : playerId,
+        );
+
+        final x01Turns = dataset.turns;
+
+        if (x01Turns.isEmpty && playerTurns.isEmpty) continue;
 
         int totalScore = 0;
         int totalDarts = 0;
@@ -135,19 +147,21 @@ class X01StatsController extends ChangeNotifier {
         int bestTurn = 0;
         int bestCheckout = 0;
 
-        for (final turn in playerTurns) {
-          totalScore += turn.total;
-          totalDarts += turn.throws.length;
+        for (final turn in x01Turns) {
+          final turnScore = turn.total;
+
+          totalScore += turnScore;
+          totalDarts += turn.dartsThrown;
 
           if (turn.isCheckout) {
             checkouts++;
-            if (turn.total > bestCheckout) bestCheckout = turn.total;
+            if (turnScore > bestCheckout) bestCheckout = turnScore;
           }
 
-          if (turn.total == 180) oneEighties++;
-          if (turn.total >= 140) oneForties++;
-          if (turn.total >= 100 && turn.total < 140) oneHundreds++;
-          if (turn.total > bestTurn) bestTurn = turn.total;
+          if (turnScore == 180) oneEighties++;
+          if (turnScore >= 140) oneForties++;
+          if (turnScore >= 100 && turnScore < 140) oneHundreds++;
+          if (turnScore > bestTurn) bestTurn = turnScore;
         }
 
         final average = totalDarts > 0 ? (totalScore / totalDarts) * 3 : 0.0;
@@ -403,12 +417,13 @@ class _X01StatsWidgetState extends State<X01StatsWidget>
   Widget build(BuildContext context) {
     super.build(context);
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Scaffold(
       backgroundColor: t.bg,
       appBar: widget.showAppBar
           ? AppBar(
-        title: Text(widget.title, style: TextStyle(color: t.textPrimary)),
+        title: Text(widget.title, style: tt.titleMedium?.copyWith(color: t.textPrimary)),
         backgroundColor: t.surface,
         elevation: 0,
       )
@@ -443,7 +458,7 @@ class _X01StatsWidgetState extends State<X01StatsWidget>
                         const SizedBox(height: 16),
                         Text(
                           _controller.error!,
-                          style: TextStyle(color: t.textSecondary),
+                          style: tt.bodySmall?.copyWith(color: t.textSecondary),
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton(
@@ -507,6 +522,7 @@ class _StateMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
@@ -518,20 +534,13 @@ class _StateMessage extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: t.textPrimary,
-                fontWeight: FontWeight.w800,
-                fontSize: 15,
-              ),
+              style: tt.titleMedium?.copyWith(color: t.textPrimary),
             ),
             const SizedBox(height: 6),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: t.textMuted,
-                fontSize: 12,
-              ),
+              style: tt.bodySmall?.copyWith(color: t.textMuted),
             ),
             if (action != null) ...[
               const SizedBox(height: 16),
@@ -605,19 +614,28 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Elimina sessioni', style: t.bodyBold(t.textPrimary)),
+        title: Text(
+          'Elimina sessioni',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(color: t.textPrimary),
+        ),
         content: Text(
           'Sei sicuro di voler eliminare ${_selectedIds.length} sessione${_selectedIds.length > 1 ? '?' : '?'}',
-          style: t.bodySmall(t.textSecondary),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Annulla', style: t.bodyBold(t.textSecondary)),
+            child: Text(
+              'Annulla',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(color: t.textSecondary),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Elimina', style: t.bodyBold(t.red)),
+            child: Text(
+              'Elimina',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(color: t.red),
+            ),
           ),
         ],
       ),
@@ -635,13 +653,14 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Scaffold(
       backgroundColor: t.bg,
       appBar: AppBar(
         title: Text(
           _isSelectionMode ? '${_selectedIds.length} selezionate' : 'Sessioni X01',
-          style: TextStyle(color: t.textPrimary),
+          style: tt.titleMedium?.copyWith(color: t.textPrimary),
         ),
         backgroundColor: t.surface,
         elevation: 0,
@@ -675,7 +694,12 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
         ],
       ),
       body: _sortedMatches.isEmpty
-          ? Center(child: Text('Nessuna sessione', style: t.bodySmall(t.textSecondary)))
+          ? Center(
+              child: Text(
+                'Nessuna sessione',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+              ),
+            )
           : ListView.builder(
         padding: const EdgeInsets.all(12),
         itemCount: _sortedMatches.length,
@@ -699,11 +723,11 @@ class _SessionPickerScreenState extends State<_SessionPickerScreen> {
                   : Icon(Icons.sports_score, color: t.accent),
               title: Text(
                 DateFormat('dd/MM/yyyy HH:mm').format(m.startTime),
-                style: TextStyle(fontWeight: FontWeight.w700, color: t.textPrimary),
+                style: tt.titleSmall?.copyWith(color: t.textPrimary),
               ),
               subtitle: Text(
                 'Media: ${m.average.toStringAsFixed(1)} · ${m.winnerName} vince',
-                style: TextStyle(fontSize: 12, color: t.textSecondary),
+                style: tt.bodySmall?.copyWith(color: t.textSecondary),
               ),
               trailing: !_isSelectionMode && isHighlighted
                   ? Icon(Icons.check_circle, color: t.green)
@@ -735,13 +759,17 @@ class _MatchDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     final playerId = FirebaseAuth.instance.currentUser?.uid ?? '';
     final sets = match.originalRecord.matchSets;  // ← DATI GIÀ STRUTTURATI
 
     return Scaffold(
       backgroundColor: t.bg,
       appBar: AppBar(
-        title: Text('Match ${match.startingScore}', style: TextStyle(color: t.textPrimary)),
+        title: Text(
+          'Match ${match.startingScore}',
+          style: tt.titleMedium?.copyWith(color: t.textPrimary),
+        ),
         backgroundColor: t.surface,
         elevation: 0,
         leading: IconButton(
@@ -787,8 +815,14 @@ class _SetCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: ExpansionTile(
-        title: Text('SET ${set['setNumber']}', style: t.bodyBold(t.accent)),
-        subtitle: Text('${legsWithPlayer.length} leg', style: t.bodySmall(t.textMuted)),
+        title: Text(
+          'SET ${set['setNumber']}',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(color: t.accent),
+        ),
+        subtitle: Text(
+          '${legsWithPlayer.length} leg',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.textMuted),
+        ),
         children: legsWithPlayer.map((leg) => _LegCard(leg: leg, playerId: playerId, t: t)).toList(),
       ),
     );
@@ -833,13 +867,21 @@ class _LegCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text('Leg ${leg['legNumber']}', style: t.bodyBold(isWon ? t.green : t.textPrimary)),
+              Text(
+                'Leg ${leg['legNumber']}',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: isWon ? t.green : t.textPrimary,
+                ),
+              ),
               if (isWon) ...[
                 const SizedBox(width: 8),
                 Icon(Icons.check_circle, color: t.green, size: 16),
               ],
               const Spacer(),
-              Text('${turnsList.length} turni', style: t.bodySmall(t.textMuted)),
+              Text(
+                '${turnsList.length} turni',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.textMuted),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -861,13 +903,14 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontSize: 13, color: t.textSecondary)),
-          Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: t.textPrimary)),
+          Text(label, style: tt.bodySmall?.copyWith(color: t.textSecondary)),
+          Text(value, style: tt.titleSmall?.copyWith(color: t.textPrimary)),
         ],
       ),
     );
@@ -936,14 +979,14 @@ class _SessionMatchCard extends StatelessWidget {
                   children: [
                     Text(
                       DateFormat('dd/MM/yyyy HH:mm').format(match.startTime),
-                      style: t.bodyBold(t.textPrimary),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(color: t.textPrimary),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Vincitore: ${match.winnerName} · Media: ${average.toStringAsFixed(1)} · $totalTurns turni',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: t.bodySmall(t.textSecondary),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.textSecondary),
                     ),
                   ],
                 ),
@@ -992,13 +1035,15 @@ class _ScorePhaseMetrics {
       for (final turn in match.playerTurns) {
         if (turn.initialScore <= 170) continue;
 
+        final turnScore = _x01RealTurnScore(turn);
+
         bucket.visits++;
-        bucket.totalScore += turn.total;
+        bucket.totalScore += turnScore;
         bucket.totalDarts += turn.throws.length;
 
-        if (turn.total == 180) bucket.oneEighties++;
-        if (turn.total >= 140) bucket.oneForties++;
-        if (turn.total >= 100 && turn.total < 140) bucket.oneHundreds++;
+        if (turnScore == 180) bucket.oneEighties++;
+        if (turnScore >= 140) bucket.oneForties++;
+        if (turnScore >= 100 && turnScore < 140) bucket.oneHundreds++;
       }
     }
 
@@ -1068,14 +1113,16 @@ class _CheckoutPhaseMetrics {
       for (final turn in match.playerTurns) {
         if (turn.initialScore > 170) continue;
 
+        final turnScore = _x01RealTurnScore(turn);
+
         bucket.visits++;
-        bucket.totalScore += turn.total;
+        bucket.totalScore += turnScore;
         bucket.totalDarts += turn.throws.length;
 
         if (turn.isCheckout) {
           bucket.checkouts++;
-          if (turn.total > bucket.bestCheckout) {
-            bucket.bestCheckout = turn.total;
+          if (turnScore > bucket.bestCheckout) {
+            bucket.bestCheckout = turnScore;
           }
         }
       }
@@ -1133,7 +1180,7 @@ class _StatsPanel extends StatelessWidget {
         : null;
 
     return CustomScrollView(
-      cacheExtent: 2500,
+      cacheExtent: 10000,
       slivers: [
         SliverPadding(
           padding: const EdgeInsets.all(16),
@@ -1507,7 +1554,7 @@ class _TurnScoreDistributionTableState extends State<_TurnScoreDistributionTable
                 Expanded(
                   child: Text(
                     'Ordina le colonne per individuare rapidamente i punteggi che definiscono il tuo ritmo di scoring.',
-                    style: widget.t.bodySmall(widget.t.textMuted),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: widget.t.textMuted),
                   ),
                 ),
               ],
@@ -1614,7 +1661,9 @@ class _TurnScoreDistributionTableState extends State<_TurnScoreDistributionTable
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
-                  style: widget.t.labelCaps(active ? widget.t.accent : widget.t.textPrimary),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: active ? widget.t.accent : widget.t.textPrimary,
+                  ),
                 ),
               ),
               const SizedBox(width: 4),
@@ -1658,7 +1707,9 @@ class _TurnScoreDistributionTableState extends State<_TurnScoreDistributionTable
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
-          style: widget.t.bodySmall(highlight ? widget.t.accent : widget.t.textPrimary),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: highlight ? widget.t.accent : widget.t.textPrimary,
+          ),
         ),
       ),
     );
@@ -1733,7 +1784,7 @@ class _ScoringVisitDartAverageTable extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Leggi lo scoring come fase di costruzione: quanti turni ti servono e quale freccetta sostiene o rompe il ritmo.',
-                    style: t.bodySmall(t.textMuted),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.textMuted),
                   ),
                 ),
               ],
@@ -1758,6 +1809,7 @@ class _MetricCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
@@ -1773,18 +1825,14 @@ class _MetricCell extends StatelessWidget {
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: t.textPrimary,
-              ),
+              style: tt.titleMedium?.copyWith(color: t.textPrimary),
             ),
             const SizedBox(height: 4),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: t.bodySmall(t.textMuted),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.textMuted),
             ),
           ],
         ),
@@ -2643,7 +2691,7 @@ class _CheckoutOpportunityBySectorTableState extends State<_CheckoutOpportunityB
                 Expanded(
                   child: Text(
                     'Tabella ordinabile: tocca una colonna per ordinare dal valore più alto o più basso.',
-                    style: widget.t.bodySmall(widget.t.textMuted),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: widget.t.textMuted),
                   ),
                 ),
               ],
@@ -2755,7 +2803,9 @@ class _CheckoutOpportunityBySectorTableState extends State<_CheckoutOpportunityB
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
-                  style: widget.t.labelCaps(active ? widget.t.accent : widget.t.textPrimary),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: active ? widget.t.accent : widget.t.textPrimary,
+                  ),
                 ),
               ),
               const SizedBox(width: 4),
@@ -2800,7 +2850,9 @@ class _CheckoutOpportunityBySectorTableState extends State<_CheckoutOpportunityB
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
-          style: widget.t.bodySmall(highlight ? widget.t.accent : widget.t.textPrimary),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: highlight ? widget.t.accent : widget.t.textPrimary,
+          ),
         ),
       ),
     );
@@ -3074,23 +3126,27 @@ class X01SummaryTable extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildHeaderRow(scores, t),
+                    _buildHeaderRow(context, scores, t),
                     _buildMetricRow(
+                      context,
                       'Avg partite',
                       metricsList.map((m) => m.avgMatchAverage.toStringAsFixed(1)).toList(),
                       t,
                     ),
                     _buildMetricRow(
+                      context,
                       'Avg turni nei leg vinti',
                       metricsList.map((m) => m.avgVisitsWhenWon.toStringAsFixed(1)).toList(),
                       t,
                     ),
                     _buildMetricRow(
+                      context,
                       'Avg turni nei leg persi',
                       metricsList.map((m) => m.avgVisitsWhenLost.toStringAsFixed(1)).toList(),
                       t,
                     ),
                     _buildMetricRow(
+                      context,
                       'Gap vinti/persi',
                       metricsList
                           .map(
@@ -3105,43 +3161,51 @@ class X01SummaryTable extends StatelessWidget {
                       },
                     ),
                     _buildMetricRow(
+                      context,
                       'Tempo medio leg vinti',
                       metricsList.map((m) => _formatDuration(m.avgWonLegDurationSeconds.toInt())).toList(),
                       t,
                     ),
                     _buildMetricRow(
+                      context,
                       'Tempo medio leg persi',
                       metricsList.map((m) => _formatDuration(m.avgLostLegDurationSeconds.toInt())).toList(),
                       t,
                     ),
                     _buildMetricRow(
+                      context,
                       'Turni zona checkout vinti',
                       metricsList.map((m) => m.avgVisitsToReachCloseWhenWon.toStringAsFixed(1)).toList(),
                       t,
                     ),
                     _buildMetricRow(
+                      context,
                       'Turni zona checkout persi',
                       metricsList.map((m) => m.avgVisitsToReachCloseWhenLost.toStringAsFixed(1)).toList(),
                       t,
                     ),
                     _buildMetricRow(
+                      context,
                       'Turni x checkout',
                       metricsList.map((m) => m.avgVisitsToCloseWhenWon.toStringAsFixed(1)).toList(),
                       t,
                     ),
                     _buildMetricRow(
+                      context,
                       'Turni checkout persi',
                       metricsList.map((m) => m.avgVisitsToCloseWhenLost.toStringAsFixed(1)).toList(),
                       t,
                     ),
 
                     _buildMetricRow(
+                      context,
                       'Punti rimasti nei leg persi',
                       metricsList
                           .map((m) => m.avgRemainingScoreWhenLost.toStringAsFixed(0))
                           .toList(),                      t,
                     ),
                     _buildMetricRow(
+                      context,
                       '% leg persi',
                       metricsList.map((m) => '${m.percentLost.toStringAsFixed(0)}%').toList(),
                       t,
@@ -3165,7 +3229,7 @@ class X01SummaryTable extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Analizza come vinci e come perdi: velocità di gioco, arrivo in checkout, gestione finale del leg e qualità delle sconfitte.',
-                    style: t.bodySmall(t.textMuted),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.textMuted),
                   ),
                 ),
               ],
@@ -3176,7 +3240,7 @@ class X01SummaryTable extends StatelessWidget {
     );
   }
 
-  Widget _buildHeaderRow(List<int> scores, AppTokens t) {
+  Widget _buildHeaderRow(BuildContext context, List<int> scores, AppTokens t) {
     return Container(
       decoration: BoxDecoration(
         color: t.accent.withOpacity(0.08),
@@ -3188,7 +3252,10 @@ class X01SummaryTable extends StatelessWidget {
             width: 160,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              child: Text('METRICA', style: t.labelCaps(t.accent)),
+              child: Text(
+                'METRICA',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(color: t.accent),
+              ),
             ),
           ),
           ...scores.map(
@@ -3198,7 +3265,7 @@ class X01SummaryTable extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                 child: Text(
                   score.toString(),
-                  style: t.labelCaps(t.textPrimary),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(color: t.textPrimary),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -3210,6 +3277,7 @@ class X01SummaryTable extends StatelessWidget {
   }
 
   Widget _buildMetricRow(
+      BuildContext context,
       String label,
       List<String> values,
       AppTokens t, {
@@ -3231,7 +3299,7 @@ class X01SummaryTable extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: t.bodySmall(t.textSecondary),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.textSecondary),
             ),
           ),
         ),
@@ -3253,7 +3321,9 @@ class X01SummaryTable extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style: t.bodySmall(isHighlighted ? t.red : t.textPrimary),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: isHighlighted ? t.red : t.textPrimary,
+                ),
               ),
             ),
           );

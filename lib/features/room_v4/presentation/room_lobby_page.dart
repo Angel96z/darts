@@ -28,6 +28,7 @@ class _RoomLobbyPageState extends ConsumerState<RoomLobbyPage> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final state = ref.watch(roomNotifierProvider);
 
     if (!_initialGameTypeApplied && widget.initialGameType != null) {
@@ -47,17 +48,19 @@ class _RoomLobbyPageState extends ConsumerState<RoomLobbyPage> {
         }
       });
     }
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      backgroundColor: t.bg,
-      appBar: AppBar(
+    return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) async {
+          if (didPop) return;
+          await _onBackPressed(context);
+        },
+        child: Scaffold(
+          resizeToAvoidBottomInset: false,
+          backgroundColor: t.bg,
+          appBar: AppBar(
         title: Text(
           'Gioca a freccette',
-          style: TextStyle(
-            color: t.textPrimary,
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-          ),
+          style: tt.titleMedium?.copyWith(color: t.textPrimary),
         ),
         backgroundColor: t.bg,
         foregroundColor: t.textPrimary,
@@ -68,17 +71,18 @@ class _RoomLobbyPageState extends ConsumerState<RoomLobbyPage> {
           onPressed: () => _onBackPressed(context),
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: _LobbyContent(),
+          body: Column(
+            children: [
+              Expanded(
+                child: _LobbyContent(),
+              ),
+              _BottomLobbyControls(
+                canStartMatch: state.canStartMatch,
+                onStart: () => _startMatch(context),
+              ),
+            ],
           ),
-          _BottomLobbyControls(
-            canStartMatch: state.canStartMatch,
-            onStart: () => _startMatch(context),
-          ),
-        ],
-      ),
+        ),
     );
   }
 
@@ -92,6 +96,7 @@ class _RoomLobbyPageState extends ConsumerState<RoomLobbyPage> {
 
   Future<void> _onBackPressed(BuildContext context) async {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     final confirm = await showDialog<bool>(
       context: context,
@@ -100,31 +105,25 @@ class _RoomLobbyPageState extends ConsumerState<RoomLobbyPage> {
         surfaceTintColor: Colors.transparent,
         title: Text(
           'Certo di voler uscire?',
-          style: TextStyle(
-            color: t.textPrimary,
-            fontWeight: FontWeight.w800,
-          ),
+          style: tt.titleMedium?.copyWith(color: t.textPrimary),
         ),
         content: Text(
           'I giocatori verranno rimossi.',
-          style: TextStyle(color: t.textSecondary),
+          style: tt.bodySmall?.copyWith(color: t.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
               'Annulla',
-              style: TextStyle(color: t.textSecondary),
+              style: tt.bodySmall?.copyWith(color: t.textSecondary),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text(
               'Esci',
-              style: TextStyle(
-                color: t.accent,
-                fontWeight: FontWeight.w900,
-              ),
+              style: tt.titleSmall?.copyWith(color: t.accent),
             ),
           ),
         ],
@@ -247,6 +246,7 @@ class _StartButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return SizedBox(
       height: 52,
@@ -262,13 +262,9 @@ class _StartButton extends StatelessWidget {
           ),
         ),
         onPressed: enabled ? onPressed : null,
-        child: const Text(
+        child: Text(
           'INIZIA PARTITA',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.5,
-          ),
+          style: tt.titleSmall?.copyWith(color: enabled ? t.accentFg : t.textMuted),
         ),
       ),
     );

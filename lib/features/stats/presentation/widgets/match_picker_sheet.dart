@@ -24,6 +24,7 @@ class MatchPickerSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -48,11 +49,7 @@ class MatchPickerSheet extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
               'Seleziona partita',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: t.textPrimary,
-              ),
+              style: tt.titleMedium?.copyWith(color: t.textPrimary),
             ),
           ),
           const SizedBox(height: 12),
@@ -62,7 +59,7 @@ class MatchPickerSheet extends StatelessWidget {
                 ? Center(
               child: Text(
                 'Nessuna partita trovata',
-                style: TextStyle(fontSize: 12, color: t.textSecondary),
+                style: tt.bodySmall?.copyWith(color: t.textSecondary),
               ),
             )
                 : ListView.builder(
@@ -85,15 +82,13 @@ class MatchPickerSheet extends StatelessWidget {
                     ),
                     title: Text(
                       DateFormat('dd/MM/yyyy HH:mm').format(m.startTime),
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                      style: tt.titleSmall?.copyWith(
                         color: isHighlighted ? t.accent : t.textPrimary,
                       ),
                     ),
                     subtitle: Text(
                       '$startingScore pts · $setsCount set · ${m.winnerName}',
-                      style: TextStyle(fontSize: 11, color: t.textSecondary),
+                      style: tt.bodySmall?.copyWith(color: t.textSecondary),
                     ),
                     trailing: isHighlighted
                         ? Icon(Icons.check_circle, color: t.accent, size: 18)

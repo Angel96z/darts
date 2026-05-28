@@ -104,7 +104,7 @@ class LocalAiCoachRepository implements AiCoachRepository {
 // 3. NUOVA IMPLEMENTAZIONE CON GEMINI AI
 // ==========================================
 class RemoteGeminiAiCoachRepository implements AiCoachRepository {
-  final String _apiKey = const String.fromEnvironment('GEMINI_API_KEY');
+  final String _apiKey = 'AIzaSyAaLpbvshIG90HpbHjgdcETxghPEzjt2XE';
 
   const RemoteGeminiAiCoachRepository();
 

@@ -313,6 +313,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Scaffold(
       backgroundColor: t.bg,
@@ -320,7 +321,7 @@ class _TrainingStatsScreenState extends State<TrainingStatsScreen> {
           ? AppBar(
         title: Text(
           'Statistiche - ${widget.title}',
-          style: TextStyle(color: t.textPrimary),
+          style: tt.titleMedium?.copyWith(color: t.textPrimary),
         ),
         backgroundColor: t.surface,
         elevation: 0,
@@ -490,6 +491,7 @@ class _TrainingStatsEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
@@ -505,20 +507,13 @@ class _TrainingStatsEmptyState extends StatelessWidget {
             Text(
               'Nessun dato training trovato',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: t.textPrimary,
-                fontWeight: FontWeight.w800,
-                fontSize: 15,
-              ),
+              style: tt.titleMedium?.copyWith(color: t.textPrimary),
             ),
             const SizedBox(height: 6),
             Text(
               'Non ci sono tiri per $target con il filtro selezionato.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: t.textMuted,
-                fontSize: 12,
-              ),
+              style: tt.bodySmall?.copyWith(color: t.textMuted),
             ),
             const SizedBox(height: 18),
             FilledButton.icon(
@@ -882,6 +877,7 @@ class _TrainingStatsCharts extends StatelessWidget {
         ),
         _ClusterTitle('RIEPILOGO', t),
         TrainingCharts.performanceScore(throws, vm.target),
+        TrainingCharts.quadrantDistance(throws, vm.target),
         TrainingCharts.ringDistribution(throws, vm.target),
         _ClusterTitle('SESSIONI', t),
         TrainingCharts.topSessions(vm.sessionPoints),
@@ -1013,6 +1009,8 @@ class _InsightBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -1022,9 +1020,15 @@ class _InsightBox extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: tokens.bodyBold(tokens.textPrimary)),
+          Text(
+            title,
+            style: tt.titleMedium?.copyWith(color: tokens.textPrimary),
+          ),
           const SizedBox(height: 6),
-          Text(text, style: tokens.bodySmall(tokens.textSecondary)),
+          Text(
+            text,
+            style: tt.bodySmall?.copyWith(color: tokens.textSecondary),
+          ),
         ],
       ),
     );
@@ -1039,6 +1043,8 @@ class _ClusterTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 8, top: 6),
@@ -1047,7 +1053,10 @@ class _ClusterTitle extends StatelessWidget {
         color: tokens.accent.withOpacity(0.08),
         borderRadius: AppTokens.r8,
       ),
-      child: Text(title, style: tokens.bodyBold(tokens.textPrimary)),
+      child: Text(
+        title,
+        style: tt.titleSmall?.copyWith(color: tokens.textPrimary),
+      ),
     );
   }
 }
@@ -1101,6 +1110,8 @@ class _SelectorButton<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+
     return GestureDetector(
       onTap: () => onSelected(value),
       child: Container(
@@ -1112,7 +1123,9 @@ class _SelectorButton<T> extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: tokens.bodyBold(selected ? tokens.accentFg : tokens.textPrimary),
+          style: tt.titleSmall?.copyWith(
+            color: selected ? tokens.accentFg : tokens.textPrimary,
+          ),
         ),
       ),
     );
@@ -1138,6 +1151,7 @@ class _TrainingStatsErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Center(
       child: Padding(
@@ -1147,20 +1161,23 @@ class _TrainingStatsErrorView extends StatelessWidget {
           children: [
             Text(
               'Errore caricamento statistiche',
-              style: t.bodyBold(t.textPrimary),
+              style: tt.titleMedium?.copyWith(color: t.textPrimary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               error?.toString() ?? 'Errore sconosciuto',
-              style: t.bodySmall(t.red),
+              style: tt.bodySmall?.copyWith(color: t.red),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             TextButton.icon(
               onPressed: onRetry,
               icon: Icon(Icons.refresh, color: t.accent),
-              label: Text('Riprova', style: t.bodyBold(t.accent)),
+              label: Text(
+                'Riprova',
+                style: tt.titleSmall?.copyWith(color: t.accent),
+              ),
             ),
           ],
         ),
@@ -1400,23 +1417,24 @@ class _TrainingStatsVisibleVm {
 
     final angle = startOffset + index * sectorAngle + sectorAngle / 2;
 
-    const bullOuter = 15.9 / 225.5;
-    const tripleInner = 99 / 225.5;
-    const tripleOuter = 107 / 225.5;
-    const doubleInner = 162 / 225.5;
-    const doubleOuter = 170 / 225.5;
+    const boardDiameterMm = 451.0;
+
+    const bullOuter = 15.9 / boardDiameterMm;
+    const tripleInner = 99 / boardDiameterMm;
+    const tripleOuter = 107 / boardDiameterMm;
+    const doubleInner = 162 / boardDiameterMm;
+    const doubleOuter = 170 / boardDiameterMm;
 
     final radius = switch (ring) {
       'T' => (tripleInner + tripleOuter) / 2,
       'D' => (doubleInner + doubleOuter) / 2,
-      _ => (bullOuter + tripleInner) / 2,
+      _ => (tripleOuter + doubleInner) / 2,  // SINGOLO: zona esterna tra triplo e doppio
     };
 
-    final normalizedRadius = radius * 0.5;
-
+    // NOTA: radius è già in coordinate centro→bordo (0-0.5), non moltiplicare per 0.5
     return Offset(
-      0.5 + math.cos(angle) * normalizedRadius,
-      0.5 + math.sin(angle) * normalizedRadius,
+      0.5 + math.cos(angle) * radius,
+      0.5 + math.sin(angle) * radius,
     );
   }
 

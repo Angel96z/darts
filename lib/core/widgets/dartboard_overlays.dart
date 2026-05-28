@@ -1,6 +1,7 @@
 /// File: dartboard_overlays.dart. Contiene componenti condivisi usati in più parti dell'app.
 
 import 'package:flutter/material.dart';
+import '../../app_theme.dart';
 
 class HitFeedbackOverlay extends StatefulWidget {
   final String sector;
@@ -38,6 +39,8 @@ class _HitFeedbackOverlayState extends State<HitFeedbackOverlay> {
   @override
   /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     return Center(
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 180),
@@ -57,20 +60,12 @@ class _HitFeedbackOverlayState extends State<HitFeedbackOverlay> {
                 children: [
                   Text(
                     widget.sector,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    style: AppTokens.scoreSmallStyle.copyWith(color: t.textPrimary),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '${widget.score}',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: tt.titleSmall?.copyWith(color: t.textSecondary),
                   ),
                 ],
               ),

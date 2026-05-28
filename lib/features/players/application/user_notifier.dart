@@ -5,6 +5,8 @@
 /// ERROR STRATEGY: Stato error con Failure tipizzata
 /// ANTI-REGRESSION: Mantenere login/logout esistente, aggiungere gestione profilo
 
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,18 +68,41 @@ class UserState {
 
 class UserNotifier extends StateNotifier<UserState> {
   final UserRepository _repository;
+  StreamSubscription<UserProfile>? _profileSubscription;
 
   UserNotifier(this._repository) : super(const UserState());
 
   /// Carica profilo utente corrente
+  /// Carica profilo utente corrente e ascolta cambiamenti in tempo reale
   Future<void> loadProfile() async {
     if (state.isLoading) return;
 
     state = state.copyWith(status: AppStatus.loading, failure: null);
 
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      state = state.copyWith(status: AppStatus.error, failure: const AuthFailure(message: 'Utente non autenticato'));
+      return;
+    }
+
     try {
+      // 1. Prima lettura singola
       final profile = await _repository.fetchOrCreateProfile();
       state = state.copyWith(profile: profile, status: AppStatus.success);
+
+      // 2. Poi ascolta gli aggiornamenti in tempo reale
+      _profileSubscription?.cancel();
+      _profileSubscription = _repository.watchProfile(uid).listen(
+            (updatedProfile) {
+          if (mounted) {
+            state = state.copyWith(profile: updatedProfile);
+            debugPrint('📡 Profilo aggiornato in tempo reale: ${updatedProfile.displayName}');
+          }
+        },
+        onError: (error) {
+          debugPrint('❌ Errore stream profilo: $error');
+        },
+      );
     } catch (e) {
       final failure = e is Failure ? e : ProfileNotFoundFailure(technicalDetails: e.toString());
       state = state.copyWith(status: AppStatus.error, failure: failure);
@@ -276,7 +301,14 @@ class UserNotifier extends StateNotifier<UserState> {
       state = state.copyWith(status: AppStatus.error, failure: failure);
     }
   }
+
+  @override
+  void dispose() {
+    _profileSubscription?.cancel();
+    super.dispose();
+  }
 }
+
 
 final userProvider = StateNotifierProvider<UserNotifier, UserState>((ref) {
   final repository = ref.watch(userRepositoryProvider);

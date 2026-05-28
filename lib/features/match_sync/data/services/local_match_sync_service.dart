@@ -23,6 +23,18 @@ class LocalMatchSyncService {
   final _uuid = const Uuid();
   bool _running = false;
 
+  bool get isSyncing => _running;
+
+  final _syncRunningController = StreamController<bool>.broadcast();
+
+  Stream<bool> get onSyncRunningChanged => _syncRunningController.stream;
+
+  void _setRunning(bool value) {
+    if (_running == value) return;
+    _running = value;
+    _syncRunningController.add(value);
+  }
+
   LocalMatchSyncService._internal();
 
   static LocalMatchSyncService get instance {
@@ -41,7 +53,7 @@ class LocalMatchSyncService {
       );
     }
 
-    await syncAll();
+    await syncAll(skipConnectionCheck: true);
     final updated = await getById(localId);
 
     return LocalMatchSaveResult(
@@ -102,20 +114,57 @@ class LocalMatchSyncService {
       return false;
     }
   }
+
+
   Future<void> deleteRecords(List<String> ids) async {
     if (ids.isEmpty) return;
 
-    for (final id in ids) {
-      await deleteRecord(id);
+    final idSet = ids.toSet();
+    final all = await _getAll();
+    var changed = false;
+
+    for (var i = 0; i < all.length; i++) {
+      final record = all[i];
+
+      final matches = idSet.contains(record.localId) ||
+          (record.remoteId != null && idSet.contains(record.remoteId));
+
+      if (!matches || record.isPendingDelete) continue;
+
+      all[i] = record.copyWith(
+        syncStatus: LocalMatchSyncStatus.pendingDelete,
+        deletedAt: DateTime.now(),
+      );
+
+      changed = true;
+
+      _syncStatusController.add({
+        record.localId: LocalMatchSyncStatus.pendingDelete,
+      });
+
+      if (record.remoteId != null) {
+        _syncStatusController.add({
+          record.remoteId!: LocalMatchSyncStatus.pendingDelete,
+        });
+      }
     }
+
+    if (!changed) return;
+
+    await _saveAll(all);
+    await syncAll();
   }
+
   /// Sincronizza i match senza queue separata:
   /// 1. push dei record locali pendenti
   /// 2. pull dei record remoti
   /// 3. aggiornamento stats una sola volta se qualcosa è cambiato
-  Future<void> syncAll() async {
+  Future<void> syncAll({bool skipConnectionCheck = false}) async {
     if (_running) return;
-    if (!await _checkBackendConnection()) return;
+
+    if (!skipConnectionCheck && !await _checkBackendConnection()) {
+      return;
+    }
 
     _running = true;
     try {
@@ -129,7 +178,6 @@ class LocalMatchSyncService {
       _running = false;
     }
   }
-
 
   final _syncStatusController = StreamController<Map<String, LocalMatchSyncStatus>>.broadcast();
   Stream<Map<String, LocalMatchSyncStatus>> get onSyncStatusChanged => _syncStatusController.stream;
@@ -840,6 +888,10 @@ class LocalMatchSyncService {
     record.syncStatus != LocalMatchSyncStatus.pendingDelete &&
         record.syncStatus != LocalMatchSyncStatus.failedDelete)
         .toList();
+  }
+
+  Future<List<LocalMatchRecord>> getAllRecordsForPicker() async {
+    return _getAll();
   }
 
   Future<List<LocalMatchRecord>> _getAll() async {

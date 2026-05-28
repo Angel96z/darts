@@ -17,6 +17,7 @@ class PlayersColumn extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(roomNotifierProvider);
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -26,7 +27,7 @@ class PlayersColumn extends ConsumerWidget {
           children: [
             Icon(Icons.people_rounded, size: 16, color: t.accent),
             const SizedBox(width: 8),
-            Text('PLAYERS', style: t.labelCaps(t.accent)),
+            Text('PLAYERS', style: tt.labelSmall?.copyWith(color: t.accent)),
             const SizedBox(width: 8),
 
             _CountBadge(count: state.players.length),
@@ -69,6 +70,7 @@ class _CountBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -78,11 +80,7 @@ class _CountBadge extends StatelessWidget {
       ),
       child: Text(
         '$count',
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          color: t.accent,
-        ),
+        style: tt.labelSmall?.copyWith(color: t.accent),
       ),
     );
   }
@@ -94,6 +92,7 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return SizedBox(
       width: double.infinity,
@@ -109,16 +108,12 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'Nessun giocatore',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: t.textSecondary,
-              ),
+              style: tt.titleSmall?.copyWith(color: t.textSecondary),
             ),
             const SizedBox(height: 4),
             Text(
               'Tocca + per aggiungere',
-              style: t.bodySmall(t.textMuted),
+              style: tt.bodySmall?.copyWith(color: t.textMuted),
             ),
           ],
         ),

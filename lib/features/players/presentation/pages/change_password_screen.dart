@@ -75,6 +75,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Scaffold(
       backgroundColor: t.bg,
@@ -122,7 +123,11 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
               ),
               const SizedBox(height: 16),
               if (_errorMessage != null)
-                Text(_errorMessage!, style: TextStyle(color: t.red), textAlign: TextAlign.center),
+                Text(
+                  _errorMessage!,
+                  style: tt.bodySmall?.copyWith(color: t.red),
+                  textAlign: TextAlign.center,
+                ),
               if (_successMessage != null)
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -130,7 +135,11 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                     color: t.green.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(_successMessage!, style: TextStyle(color: t.green), textAlign: TextAlign.center),
+                  child: Text(
+                    _successMessage!,
+                    style: tt.bodySmall?.copyWith(color: t.green),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               const SizedBox(height: 24),
               ElevatedButton(
@@ -143,7 +152,10 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                 ),
                 child: _isLoading
                     ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: t.accentFg))
-                    : const Text('CAMBIA PASSWORD', style: TextStyle(fontSize: 16)),
+                    : Text(
+                        'CAMBIA PASSWORD',
+                        style: tt.titleSmall?.copyWith(color: t.accentFg),
+                      ),
               ),
             ],
           ),
@@ -160,10 +172,11 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
     required AppTokens t,
     String? Function(String?)? validator,
   }) {
+    final tt = Theme.of(context).textTheme;
     return TextFormField(
       controller: controller,
       obscureText: obscure,
-      style: TextStyle(color: t.textPrimary),
+      style: tt.bodyMedium?.copyWith(color: t.textPrimary),
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(Icons.lock_outline, color: t.accent),

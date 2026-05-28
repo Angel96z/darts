@@ -61,6 +61,7 @@ class _ConfigSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -69,7 +70,7 @@ class _ConfigSection extends StatelessWidget {
           children: [
             Icon(icon, size: 16, color: t.accent),
             const SizedBox(width: 8),
-            Text(title, style: t.labelCaps(t.accent)),
+            Text(title, style: tt.labelSmall?.copyWith(color: t.accent)),
           ],
         ),
         const SizedBox(height: 12),
@@ -102,6 +103,7 @@ class _Carousel<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final currentIndex = options.indexOf(value);
     final canGoLeft = currentIndex > 0;
     final canGoRight = currentIndex < options.length - 1;
@@ -125,11 +127,7 @@ class _Carousel<T> extends StatelessWidget {
             child: Text(
               label(value),
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: t.textPrimary,
-              ),
+              style: tt.titleMedium?.copyWith(color: t.textPrimary),
             ),
           ),
           _CarouselButton(
@@ -164,6 +162,7 @@ class _CarouselButtonState extends State<_CarouselButton> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return GestureDetector(
       onTapDown: widget.isActive ? (_) => setState(() => _isPressed = true) : null,
@@ -227,6 +226,7 @@ class _ModernToggleState extends State<_ModernToggle> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _isPressed = true),
@@ -266,9 +266,7 @@ class _ModernToggleState extends State<_ModernToggle> {
               const SizedBox(width: 8),
               Text(
                 widget.label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: widget.value ? FontWeight.w700 : FontWeight.w500,
+                style: tt.titleSmall?.copyWith(
                   color: widget.value ? t.accent : t.textPrimary,
                 ),
               ),
@@ -293,11 +291,12 @@ class _LabeledField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: t.labelCaps(t.textSecondary)),
+        Text(label, style: tt.labelSmall?.copyWith(color: t.textSecondary)),
         const SizedBox(height: 6),
         child,
       ],
@@ -616,7 +615,13 @@ class _GameConfigCardState extends State<_GameConfigCard> {
 
   void _syncFromGameConfig(GameConfig config) {
     _type = config.type;
-    _startingScore = config.startingScore ?? 501;
+
+    final incomingScore = config.startingScore;
+    if (incomingScore != null && _scoreOptions.contains(incomingScore)) {
+      _startingScore = incomingScore;
+    } else if (!_scoreOptions.contains(_startingScore)) {
+      _startingScore = 501;
+    }
 
     // Mappa le configurazioni ai nuovi testi UI
     if (config.tripleOut == true) {
@@ -689,11 +694,17 @@ class _GameConfigCardState extends State<_GameConfigCard> {
                     onChanged: (v) {
                       setState(() {
                         _type = v;
+
+
                         if (_type == GameType.x01) {
+                          if (!_scoreOptions.contains(_startingScore)) {
+                            _startingScore = 501;
+                          }
                           _emitX01();
                         } else {
                           _emitCricket();
                         }
+
                       });
                     },
                   ),

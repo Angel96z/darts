@@ -29,7 +29,8 @@ class CricketBoard extends StatelessWidget {
                 children: numbers.map((number) {
                   final markCount = marks[number] ?? 0;
                   final isClosed = markCount >= 3;
-                  final isNumberClosedForAll = gameState.isCricketNumberClosedForAll(number);
+                  final isNumberClosedForAll = gameState
+                      .isCricketNumberClosedForAll(number);
                   return SizedBox(
                     width: itemWidth,
                     child: _CricketNumberTile(
@@ -67,46 +68,102 @@ class _CricketNumberTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    final deadColor = Color.lerp(
+      t.textMuted,
+      Colors.redAccent,
+      0.55,
+    )!.withOpacity(0.38);
+
     final color = isDead
-        ? t.textMuted.withOpacity(0.3)
+        ? deadColor
         : isClosed
         ? t.accent
         : t.textPrimary;
-
-    final textStyle = TextStyle(
-      fontSize: 13,
-      fontWeight: FontWeight.w700,
-      color: color,
-    );
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           number == 25 ? 'B' : number.toString(),
-          style: textStyle,
+          style: (tt.titleMedium ?? AppTokens.scoreSmallStyle).copyWith(
+            color: color,
+          ),
         ),
         const SizedBox(height: 2),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(3, (i) {
-            final hasMark = i < marks;
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 1.5),
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: hasMark ? color : Colors.transparent,
-                border: Border.all(
-                  color: color.withOpacity(hasMark ? 1 : 0.3),
-                  width: 1,
-                ),
-              ),
-            );
-          }),
+        SizedBox(
+          width: isDead ? 32 : 32,
+          height: isDead ? 32 : 32,
+          child: CustomPaint(
+            painter: _CricketMarksPainter(
+              marks: marks.clamp(0, 3),
+              color: color,
+              emptyColor: isDead
+                  ? deadColor.withOpacity(0.10)
+                  : color.withOpacity(0.12),
+            ),
+          ),
         ),
       ],
     );
+  }
+}
+
+class _CricketMarksPainter extends CustomPainter {
+  final int marks;
+  final Color color;
+  final Color emptyColor;
+
+  const _CricketMarksPainter({
+    required this.marks,
+    required this.color,
+    required this.emptyColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final activePaint = Paint()
+      ..color = color
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final inactivePaint = Paint()
+      ..color = emptyColor
+      ..strokeWidth = 1.6
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final firstSlashPaint = marks >= 1 ? activePaint : inactivePaint;
+    final secondSlashPaint = marks >= 2 ? activePaint : inactivePaint;
+    final circlePaint = marks >= 3 ? activePaint : inactivePaint;
+
+    // Primo segno: /
+    canvas.drawLine(
+      Offset(size.width * 0.30, size.height * 0.78),
+      Offset(size.width * 0.70, size.height * 0.22),
+      firstSlashPaint,
+    );
+
+    // Secondo segno: \  -> forma X
+    canvas.drawLine(
+      Offset(size.width * 0.30, size.height * 0.22),
+      Offset(size.width * 0.70, size.height * 0.78),
+      secondSlashPaint,
+    );
+
+    // Terzo segno: cerchio sopra la X
+    canvas.drawCircle(
+      Offset(size.width * 0.50, size.height * 0.50),
+      size.width * 0.34,
+      circlePaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CricketMarksPainter oldDelegate) {
+    return oldDelegate.marks != marks ||
+        oldDelegate.color != color ||
+        oldDelegate.emptyColor != emptyColor;
   }
 }

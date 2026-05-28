@@ -16,6 +16,7 @@ class TeamSelector extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(roomNotifierProvider);
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final teamSize = state.teamSize;
     final invalid = !state.canStartMatch && teamSize > 0;
 
@@ -56,11 +57,7 @@ class TeamSelector extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Text(
                   uiLabels[currentIndex],
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: t.textPrimary,
-                  ),
+                  style: tt.titleSmall?.copyWith(color: t.textPrimary),
                 ),
               ),
               _CarouselButton(

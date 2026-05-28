@@ -23,6 +23,7 @@ class PlayerScoreCard extends StatelessWidget {
     if (gameState.players.length <= 1) return const SizedBox.shrink();
 
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final player = gameState.getPlayer(playerId);
     final isCurrent = gameState.currentPlayerId == playerId;
     final isCricket = gameState.isCricket;
@@ -50,10 +51,14 @@ class PlayerScoreCard extends StatelessWidget {
         final fgColor = isCurrent ? t.green : t.textPrimary;
 
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
           decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(4),
+            color: isCurrent ? t.green.withOpacity(0.08) : t.surface,
+            borderRadius: AppTokens.r8,
+            border: Border.all(
+              color: isCurrent ? t.green.withOpacity(0.5) : t.border,
+              width: 0.5,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,50 +70,47 @@ class PlayerScoreCard extends StatelessWidget {
                     child: Text(
                       player.name,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: fgColor),
+                      style: tt.titleSmall?.copyWith(color: fgColor),
                     ),
                   ),
                   Text(
                     '$individualPoints',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fgColor),
+                    style: AppTokens.scoreSmallStyle.copyWith(color: fgColor),
                   ),
                 ],
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
               Wrap(
                 spacing: 4,
-                runSpacing: 1,
+                runSpacing: 4,
+                alignment: WrapAlignment.start,
                 children: cricketNumbers.map((number) {
                   final markCount = marks[number] ?? 0;
                   final isClosed = markCount >= 3;
-                  final isClosedGlobally = gameState.isCricketNumberClosedGlobally(number);
+                  final isClosedGlobally =
+                  gameState.isCricketNumberClosedGlobally(number);
+
                   final color = isClosedGlobally
-                      ? t.textMuted.withOpacity(0.4)
-                      : (isClosed ? t.accent : t.textSecondary);
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        number == 25 ? 'B' : number.toString(),
-                        style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: color),
+                      ? t.textMuted.withOpacity(0.18)
+                      : (isClosed ? t.accent : t.textMuted);
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: !isClosedGlobally && isClosed
+                          ? t.accent.withOpacity(0.1)
+                          : isClosedGlobally
+                          ? Colors.redAccent.withOpacity(0.08)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      number == 25 ? 'B' : number.toString(),
+                      style: tt.labelLarge?.copyWith(
+                        color: color,
+                        fontWeight: isClosed ? FontWeight.w800 : FontWeight.w600,
                       ),
-                      const SizedBox(width: 1),
-                      Row(
-                        children: List.generate(3, (i) {
-                          final hasMark = i < markCount;
-                          return Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 0.5),
-                            width: 3,
-                            height: 3,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: hasMark ? color : Colors.transparent,
-                              border: Border.all(color: color.withOpacity(hasMark ? 1 : 0.3), width: 0.3),
-                            ),
-                          );
-                        }),
-                      ),
-                    ],
+                    ),
                   );
                 }).toList(),
               ),
@@ -133,12 +135,12 @@ class PlayerScoreCard extends StatelessWidget {
                 child: Text(
                   player.name,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: fgColor),
+                  style: tt.bodySmall?.copyWith(color: fgColor),
                 ),
               ),
               Text(
                 displayValue,
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fgColor),
+                style: tt.titleSmall?.copyWith(color: fgColor),
               ),
             ],
           ),
@@ -175,20 +177,12 @@ class PlayerScoreCard extends StatelessWidget {
                   child: Text(
                     player.name,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: fgColor,
-                    ),
+                    style: tt.titleSmall?.copyWith(color: fgColor),
                   ),
                 ),
                 Text(
                   'Set $setsWon Leg $legsWon',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: t.textMuted,
-                  ),
+                  style: tt.labelSmall?.copyWith(color: t.textMuted),
                 ),
               ],
             ),
@@ -199,14 +193,9 @@ class PlayerScoreCard extends StatelessWidget {
               children: [
                 Text(
                   '$cricketPoints',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: fgColor,
-                    height: 1,
-                  ),
+                  style: AppTokens.scoreSmallStyle.copyWith(color: fgColor),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 42),
                 Expanded(
                   child: Wrap(
                     spacing: 4,
@@ -217,8 +206,8 @@ class PlayerScoreCard extends StatelessWidget {
                       final isClosed = markCount >= 3;
                       final isClosedGlobally = gameState.isCricketNumberClosedGlobally(number);
                       final color = isClosedGlobally
-                          ? t.textMuted.withOpacity(0.4)
-                          : (isClosed ? t.accent : t.textPrimary);
+                          ? t.textMuted.withOpacity(0.18)
+                          : (isClosed ? t.accent : t.textMuted);
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                         decoration: BoxDecoration(
@@ -230,30 +219,10 @@ class PlayerScoreCard extends StatelessWidget {
                           children: [
                             Text(
                               number == 25 ? 'B' : number.toString(),
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
+                              style: tt.labelLarge?.copyWith(
                                 color: color,
+                                fontWeight: isClosed ? FontWeight.w800 : FontWeight.w600,
                               ),
-                            ),
-                            const SizedBox(width: 2),
-                            Row(
-                              children: List.generate(3, (i) {
-                                final hasMark = i < markCount;
-                                return Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 1),
-                                  width: 4,
-                                  height: 4,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: hasMark ? color : Colors.transparent,
-                                    border: Border.all(
-                                      color: color.withOpacity(hasMark ? 1 : 0.3),
-                                      width: 0.5,
-                                    ),
-                                  ),
-                                );
-                              }),
                             ),
                           ],
                         ),
@@ -293,11 +262,7 @@ class PlayerScoreCard extends StatelessWidget {
                 child: Text(
                   player.name,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: fgColor,
-                  ),
+                  style: tt.titleSmall?.copyWith(color: fgColor),
                 ),
               ),
             ],
@@ -309,10 +274,7 @@ class PlayerScoreCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   winLabel ?? displayScore,
-                  style: TextStyle(
-                    fontSize: 22,
-                    height: 1,
-                    fontWeight: FontWeight.w900,
+                  style: AppTokens.scoreSmallStyle.copyWith(
                     color: winLabel != null ? t.accent : fgColor,
                   ),
                 ),
@@ -322,19 +284,11 @@ class PlayerScoreCard extends StatelessWidget {
                 children: [
                   Text(
                     'Set $setsWon',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: t.textMuted,
-                    ),
+                    style: tt.bodySmall?.copyWith(color: t.textMuted),
                   ),
                   Text(
                     'Leg $legsWon',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: t.textMuted,
-                    ),
+                    style: tt.bodySmall?.copyWith(color: t.textMuted),
                   ),
                 ],
               ),

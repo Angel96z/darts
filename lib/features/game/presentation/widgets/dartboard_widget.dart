@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../app_theme.dart';
 import '../../domain/entities/dart_models.dart';
 import '../../../../core/utils/dart_rules.dart';
 
@@ -145,6 +146,10 @@ class _DartboardWidgetState extends State<DartboardWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final boardNumberStyle = AppTokens.scoreSmallStyle.copyWith(
+      color: Colors.white,
+    );
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final side = min(constraints.maxWidth, constraints.maxHeight);
@@ -157,7 +162,8 @@ class _DartboardWidgetState extends State<DartboardWidget> {
               behavior: const _NoScrollBehavior(),
               child: Listener(
                 behavior: HitTestBehavior.opaque,
-                onPointerSignal: (event) => _handlePointerSignal(event, boardSize),
+                onPointerSignal: (event) =>
+                    _handlePointerSignal(event, boardSize),
                 child: InteractiveViewer(
                   transformationController: _controller,
                   minScale: widget.minScale,
@@ -180,6 +186,7 @@ class _DartboardWidgetState extends State<DartboardWidget> {
                           throws: widget.throws,
                           overlays: widget.overlays,
                           target: widget.target,
+                          boardNumberStyle: boardNumberStyle,
                         ),
                       ),
                     ),
@@ -207,10 +214,10 @@ class _NoScrollBehavior extends ScrollBehavior {
 
   @override
   Widget buildViewportChrome(
-      BuildContext context,
-      Widget child,
-      AxisDirection axisDirection,
-      ) {
+    BuildContext context,
+    Widget child,
+    AxisDirection axisDirection,
+  ) {
     return child;
   }
 }
@@ -219,18 +226,36 @@ class _DartboardPainter extends CustomPainter {
   final List<DartThrow> throws;
   final Set<DartboardOverlayType> overlays;
   final String? target;
+  final TextStyle boardNumberStyle;
 
   _DartboardPainter({
     required this.throws,
     required this.overlays,
     this.target,
+    required this.boardNumberStyle,
   });
 
   static const List<int> _sectors = [
-    20, 1, 18, 4, 13,
-    6, 10, 15, 2, 17,
-    3, 19, 7, 16, 8,
-    11, 14, 9, 12, 5,
+    20,
+    1,
+    18,
+    4,
+    13,
+    6,
+    10,
+    15,
+    2,
+    17,
+    3,
+    19,
+    7,
+    16,
+    8,
+    11,
+    14,
+    9,
+    12,
+    5,
   ];
 
   @override
@@ -322,8 +347,15 @@ class _DartboardPainter extends CustomPainter {
 
     final boardCenter = Offset(size.width / 2, size.height / 2);
     final targetCenter = _getTargetCenter(boardCenter, r);
-    final avgMm = validThrows.map((t) => t.distanceMm).reduce((a, b) => a + b) / validThrows.length;
-    final radiusPx = avgMm * (size.width / 451);
+    final avgMm =
+        validThrows.map((t) => t.distanceMm).reduce((a, b) => a + b) /
+        validThrows.length;
+
+    // Raggio massimo del tabellone in mm = 225.5
+    // Normalizza la distanza rispetto al raggio massimo
+    const maxRadiusMm = 225.5;
+    final normalizedDistance = (avgMm / maxRadiusMm).clamp(0.0, 1.0);
+    final radiusPx = normalizedDistance * r;
 
     final fill = Paint()
       ..color = Colors.blue.withOpacity(0.12)
@@ -362,7 +394,9 @@ class _DartboardPainter extends CustomPainter {
     final radius = switch (ring) {
       'T' => (tripleInner + tripleOuter) / 2,
       'D' => (doubleInner + doubleOuter) / 2,
-      _ => (bullOuter + tripleInner) / 2,
+      _ =>
+        (tripleOuter + doubleInner) /
+            2, // SINGOLO: zona esterna tra triplo e doppio
     };
 
     return Offset(
@@ -390,8 +424,12 @@ class _DartboardPainter extends CustomPainter {
     final targetCenter = _getTargetCenter(boardCenter, r);
 
     final mean = Offset(
-      validThrows.map((t) => t.position.dx).reduce((a, b) => a + b) / validThrows.length * size.width,
-      validThrows.map((t) => t.position.dy).reduce((a, b) => a + b) / validThrows.length * size.height,
+      validThrows.map((t) => t.position.dx).reduce((a, b) => a + b) /
+          validThrows.length *
+          size.width,
+      validThrows.map((t) => t.position.dy).reduce((a, b) => a + b) /
+          validThrows.length *
+          size.height,
     );
 
     final targetPaint = Paint()
@@ -420,11 +458,19 @@ class _DartboardPainter extends CustomPainter {
     final boardCenter = Offset(size.width / 2, size.height / 2);
     final targetCenter = _getTargetCenter(boardCenter, r);
 
-    final meanX = validThrows.map((t) => t.position.dx).reduce((a, b) => a + b) / validThrows.length;
-    final meanY = validThrows.map((t) => t.position.dy).reduce((a, b) => a + b) / validThrows.length;
+    final meanX =
+        validThrows.map((t) => t.position.dx).reduce((a, b) => a + b) /
+        validThrows.length;
+    final meanY =
+        validThrows.map((t) => t.position.dy).reduce((a, b) => a + b) /
+        validThrows.length;
 
-    final varX = validThrows.map((t) => pow(t.position.dx - meanX, 2)).reduce((a, b) => a + b);
-    final varY = validThrows.map((t) => pow(t.position.dy - meanY, 2)).reduce((a, b) => a + b);
+    final varX = validThrows
+        .map((t) => pow(t.position.dx - meanX, 2))
+        .reduce((a, b) => a + b);
+    final varY = validThrows
+        .map((t) => pow(t.position.dy - meanY, 2))
+        .reduce((a, b) => a + b);
 
     final stdX = sqrt(varX / validThrows.length);
     final stdY = sqrt(varY / validThrows.length);
@@ -444,8 +490,14 @@ class _DartboardPainter extends CustomPainter {
       ..color = Colors.orange.withOpacity(0.18)
       ..style = PaintingStyle.fill;
 
-    canvas.drawRect(Rect.fromLTWH(centerX - halfBandX, 0, halfBandX * 2, size.height), fillX);
-    canvas.drawRect(Rect.fromLTWH(0, centerY - halfBandY, size.width, halfBandY * 2), fillY);
+    canvas.drawRect(
+      Rect.fromLTWH(centerX - halfBandX, 0, halfBandX * 2, size.height),
+      fillX,
+    );
+    canvas.drawRect(
+      Rect.fromLTWH(0, centerY - halfBandY, size.width, halfBandY * 2),
+      fillY,
+    );
 
     final biasLine = Paint()
       ..color = Colors.red.withOpacity(0.75)
@@ -473,11 +525,19 @@ class _DartboardPainter extends CustomPainter {
     final validThrows = throws.where((t) => !t.isPass).toList();
     if (validThrows.length < 2) return;
 
-    final meanX = validThrows.map((t) => t.position.dx).reduce((a, b) => a + b) / validThrows.length;
-    final meanY = validThrows.map((t) => t.position.dy).reduce((a, b) => a + b) / validThrows.length;
+    final meanX =
+        validThrows.map((t) => t.position.dx).reduce((a, b) => a + b) /
+        validThrows.length;
+    final meanY =
+        validThrows.map((t) => t.position.dy).reduce((a, b) => a + b) /
+        validThrows.length;
 
-    final varX = validThrows.map((t) => pow(t.position.dx - meanX, 2)).reduce((a, b) => a + b);
-    final varY = validThrows.map((t) => pow(t.position.dy - meanY, 2)).reduce((a, b) => a + b);
+    final varX = validThrows
+        .map((t) => pow(t.position.dx - meanX, 2))
+        .reduce((a, b) => a + b);
+    final varY = validThrows
+        .map((t) => pow(t.position.dy - meanY, 2))
+        .reduce((a, b) => a + b);
 
     final stdX = sqrt(varX / validThrows.length);
     final stdY = sqrt(varY / validThrows.length);
@@ -496,11 +556,21 @@ class _DartboardPainter extends CustomPainter {
   }
 
   void _drawThrows(Canvas canvas, Size size, double r) {
+    const boardRadiusMm = 225.5;
+
+    // Marker espresso in millimetri reali del bersaglio.
+    // Così resta coerente rispetto al dartboard, non rispetto al layout.
+    const markerRadiusMm = 1.8;
+    const markerStrokeMm = 0.75;
+
+    final markerRadiusPx = r * (markerRadiusMm / boardRadiusMm);
+    final markerStrokePx = r * (markerStrokeMm / boardRadiusMm);
+
     final fill = Paint()..color = const Color(0xFF1976D2);
     final stroke = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
-      ..strokeWidth = max(1.0, r * 0.0045);
+      ..strokeWidth = markerStrokePx;
 
     for (final t in throws) {
       if (t.isPass) continue;
@@ -510,10 +580,8 @@ class _DartboardPainter extends CustomPainter {
         t.position.dy * size.height,
       );
 
-      final radius = max(3.0, r * 0.012);
-
-      canvas.drawCircle(pos, radius, fill);
-      canvas.drawCircle(pos, radius, stroke);
+      canvas.drawCircle(pos, markerRadiusPx, fill);
+      canvas.drawCircle(pos, markerRadiusPx, stroke);
     }
   }
 
@@ -529,7 +597,7 @@ class _DartboardPainter extends CustomPainter {
 
     final grid = List.generate(
       gridSize,
-          (_) => List<double>.filled(gridSize, 0),
+      (_) => List<double>.filled(gridSize, 0),
     );
 
     for (final t in validThrows) {
@@ -541,7 +609,7 @@ class _DartboardPainter extends CustomPainter {
 
     final blurred = List.generate(
       gridSize,
-          (_) => List<double>.filled(gridSize, 0),
+      (_) => List<double>.filled(gridSize, 0),
     );
 
     for (int x = 0; x < gridSize; x++) {
@@ -588,18 +656,12 @@ class _DartboardPainter extends CustomPainter {
         paint.color = _heatColor(v);
 
         canvas.drawRect(
-          Rect.fromLTWH(
-            x * cellW,
-            y * cellH,
-            cellW,
-            cellH,
-          ),
+          Rect.fromLTWH(x * cellW, y * cellH, cellW, cellH),
           paint,
         );
       }
     }
   }
-
 
   Color _heatColor(double t) {
     t = t.clamp(0.0, 1.0);
@@ -609,19 +671,27 @@ class _DartboardPainter extends CustomPainter {
     }
 
     if (t < 0.5) {
-      return Color.lerp(Colors.blue, Colors.green, (t - 0.25) * 4)!
-          .withOpacity(0.48);
+      return Color.lerp(
+        Colors.blue,
+        Colors.green,
+        (t - 0.25) * 4,
+      )!.withOpacity(0.48);
     }
 
     if (t < 0.75) {
-      return Color.lerp(Colors.green, Colors.yellow, (t - 0.5) * 4)!
-          .withOpacity(0.58);
+      return Color.lerp(
+        Colors.green,
+        Colors.yellow,
+        (t - 0.5) * 4,
+      )!.withOpacity(0.58);
     }
 
-    return Color.lerp(Colors.yellow, Colors.red, (t - 0.75) * 4)!
-        .withOpacity(0.72);
+    return Color.lerp(
+      Colors.yellow,
+      Colors.red,
+      (t - 0.75) * 4,
+    )!.withOpacity(0.72);
   }
-
 
   void _drawQuadrants(Canvas canvas, Size size, Offset c) {
     final paint = Paint()
@@ -665,10 +735,42 @@ class _DartboardPainter extends CustomPainter {
       final single = i.isEven ? paintBlack : paintCream;
       final ring = i.isEven ? paintRed : paintGreen;
 
-      _drawRing(canvas, center, bullOuter, tripleInner, start, sectorAngle, single);
-      _drawRing(canvas, center, tripleInner, tripleOuter, start, sectorAngle, ring);
-      _drawRing(canvas, center, tripleOuter, doubleInner, start, sectorAngle, single);
-      _drawRing(canvas, center, doubleInner, doubleOuter, start, sectorAngle, ring);
+      _drawRing(
+        canvas,
+        center,
+        bullOuter,
+        tripleInner,
+        start,
+        sectorAngle,
+        single,
+      );
+      _drawRing(
+        canvas,
+        center,
+        tripleInner,
+        tripleOuter,
+        start,
+        sectorAngle,
+        ring,
+      );
+      _drawRing(
+        canvas,
+        center,
+        tripleOuter,
+        doubleInner,
+        start,
+        sectorAngle,
+        single,
+      );
+      _drawRing(
+        canvas,
+        center,
+        doubleInner,
+        doubleOuter,
+        start,
+        sectorAngle,
+        ring,
+      );
     }
 
     canvas.drawCircle(center, bullOuter, paintGreen);
@@ -678,8 +780,14 @@ class _DartboardPainter extends CustomPainter {
       final angle = startOffset + i * sectorAngle;
 
       canvas.drawLine(
-        Offset(center.dx + cos(angle) * bullOuter, center.dy + sin(angle) * bullOuter),
-        Offset(center.dx + cos(angle) * doubleOuter, center.dy + sin(angle) * doubleOuter),
+        Offset(
+          center.dx + cos(angle) * bullOuter,
+          center.dy + sin(angle) * bullOuter,
+        ),
+        Offset(
+          center.dx + cos(angle) * doubleOuter,
+          center.dy + sin(angle) * doubleOuter,
+        ),
         wirePaint,
       );
     }
@@ -709,11 +817,10 @@ class _DartboardPainter extends CustomPainter {
 
       textPainter.text = TextSpan(
         text: _sectors[i].toString(),
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: max(10, boardRadius * 0.09),
-          fontWeight: FontWeight.w700,
-        ),
+        style: boardNumberStyle,
+      );
+      textPainter.textScaler = TextScaler.linear(
+        max(10, boardRadius * 0.09) / (boardNumberStyle.fontSize ?? 18),
       );
 
       textPainter.layout();
@@ -725,14 +832,14 @@ class _DartboardPainter extends CustomPainter {
   }
 
   void _drawRing(
-      Canvas canvas,
-      Offset center,
-      double inner,
-      double outer,
-      double start,
-      double sweep,
-      Paint paint,
-      ) {
+    Canvas canvas,
+    Offset center,
+    double inner,
+    double outer,
+    double start,
+    double sweep,
+    Paint paint,
+  ) {
     final outerRect = Rect.fromCircle(center: center, radius: outer);
     final innerRect = Rect.fromCircle(center: center, radius: inner);
 

@@ -1,11 +1,7 @@
-/// File: training_sector_hits.dart. Logica di presentazione per il riepilogo settori training.
+/// File: training_sector_hits.dart - VERSIONE BARRE COMPATTE (colori distinti)
 
 import 'package:flutter/material.dart';
 import '../../../../app_theme.dart';
-
-// ---------------------------------------------------------------------------
-// Root widget
-// ---------------------------------------------------------------------------
 
 class TrainingSectorHits extends StatelessWidget {
   const TrainingSectorHits({
@@ -22,14 +18,10 @@ class TrainingSectorHits extends StatelessWidget {
   final double maxHeight;
 
   static const List<int> boardOrder = [
-    20, 1, 18, 4, 13,
-    6, 10, 15, 2, 17,
-    3, 19, 7, 16, 8,
-    11, 14, 9, 12, 5,
+    20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5,
   ];
 
   String get _targetNumber => int.tryParse(target.substring(1))?.toString() ?? '';
-
   String get _targetType {
     if (target.startsWith('T')) return 'T';
     if (target.startsWith('D')) return 'D';
@@ -38,17 +30,14 @@ class TrainingSectorHits extends StatelessWidget {
 
   List<String> _orderedSectors() {
     final targetValue = int.tryParse(_targetNumber);
-
     if (_targetNumber == '25' || targetValue == null) {
       return [
         if (_targetNumber == '25') '25',
         ...boardOrder.map((n) => n.toString()),
       ];
     }
-
     final index = boardOrder.indexOf(targetValue);
     if (index == -1) return boardOrder.map((n) => n.toString()).toList();
-
     final result = [_targetNumber];
     for (int d = 1; d < boardOrder.length; d++) {
       result
@@ -71,7 +60,7 @@ class TrainingSectorHits extends StatelessWidget {
     return SizedBox(
       height: maxHeight,
       child: ListView.builder(
-        padding: EdgeInsets.zero,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         physics: const ClampingScrollPhysics(),
         itemCount: ordered.length,
         itemBuilder: (context, index) {
@@ -89,10 +78,6 @@ class TrainingSectorHits extends StatelessWidget {
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// Row: settore con barre lineari S / D / T
-// ---------------------------------------------------------------------------
 
 class _SectorRow extends StatelessWidget {
   const _SectorRow({
@@ -116,214 +101,208 @@ class _SectorRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
-    final total = _totalSectorHits;
+    final tt = Theme.of(context).textTheme;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 6),
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       decoration: BoxDecoration(
-        color: isTarget
-            ? t.accent.withOpacity(0.08)
-            : t.surfaceHigh.withOpacity(0.72),
-        borderRadius: AppTokens.r16,
+        // SFONDO: surface normale per tutti, MAI trasparente
+        color: t.surface,
+        borderRadius: AppTokens.r8,
+        // BORDO: accent solo per target, altrimenti border normale
         border: Border.all(
-          color: isTarget ? t.accent.withOpacity(0.60) : t.border,
-          width: isTarget ? 1.5 : 1,
+          color: isTarget ? t.accent : t.border,
+          width: isTarget ? 2 : 1,
         ),
       ),
-      child: ClipRRect(
-        borderRadius: AppTokens.r16,
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Accent strip verticale — solo sul target
-              if (isTarget)
-                Container(width: 3, color: t.accent),
-
-              // Numero settore + totale colpi
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  isTarget ? 10 : 12,
-                  10,
-                  8,
-                  10,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      number,
-                      style: TextStyle(
-                        fontSize: isTarget ? 20 : 15,
-                        height: 1,
-                        fontWeight: FontWeight.w900,
-                        color: isTarget
-                            ? t.accent
-                            : isMiss
-                            ? t.orange
-                            : t.textPrimary,
-                      ),
-                    ),
-                    if (total > 0) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        '$total',
-                        style: TextStyle(
-                          fontSize: 10,
-                          height: 1,
-                          fontWeight: FontWeight.w700,
-                          color: t.textMuted,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-
-              // Separatore verticale
-              VerticalDivider(
-                width: 1,
-                thickness: 1,
-                color: t.border.withOpacity(0.5),
-              ),
-
-              // Barre per ogni tipo
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  child: isMiss
-                      ? Center(
-                    child: _TypeBar(
-                      type: 'M',
-                      hits: total,
-                      isTargetType: false,
-                      totalThrows: totalThrows,
-                    ),
-                  )
-                      : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      for (final type in ['S', 'D', 'T']) ...[
-                        _TypeBar(
-                          type: type,
-                          hits: data[type] ?? 0,
-                          isTargetType: isTarget && targetType == type,
-                          totalThrows: totalThrows,
-                        ),
-                        if (type != 'T') const SizedBox(height: 5),
-                      ],
-                    ],
+      child: Row(
+        children: [
+          // NUMERO SETTORE
+          Container(
+            width: 50,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  number,
+                  style: (isTarget ? tt.titleMedium : tt.bodyMedium)?.copyWith(
+                    color: isTarget ? t.accent : t.textPrimary,
+                    fontWeight: isTarget ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
-              ),
-            ],
+                if (_totalSectorHits > 0)
+                  Text(
+                    '${_totalSectorHits}',
+                    style: tt.labelSmall?.copyWith(color: t.textSecondary),
+                  ),
+              ],
+            ),
           ),
-        ),
+          const SizedBox(width: 12),
+
+          // BARRE S/D/T
+          Expanded(
+            child: isMiss
+                ? _MissBar(
+              hits: _totalSectorHits,
+              totalThrows: totalThrows,
+            )
+                : Row(
+              children: [
+                _TypeBar(
+                  type: 'S',
+                  hits: data['S'] ?? 0,
+                  color: t.accent,
+                  isTargetType: isTarget && targetType == 'S',
+                  totalThrows: totalThrows,
+                ),
+                const SizedBox(width: 6),
+                _TypeBar(
+                  type: 'D',
+                  hits: data['D'] ?? 0,
+                  color: t.green,
+                  isTargetType: isTarget && targetType == 'D',
+                  totalThrows: totalThrows,
+                ),
+                const SizedBox(width: 6),
+                _TypeBar(
+                  type: 'T',
+                  hits: data['T'] ?? 0,
+                  color: t.red,
+                  isTargetType: isTarget && targetType == 'T',
+                  totalThrows: totalThrows,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// Barra lineare per un singolo tipo (S / D / T / M)
-// ---------------------------------------------------------------------------
-
 class _TypeBar extends StatelessWidget {
   const _TypeBar({
     required this.type,
     required this.hits,
+    required this.color,
     required this.isTargetType,
     required this.totalThrows,
   });
 
   final String type;
   final int hits;
+  final Color color;
   final bool isTargetType;
   final int totalThrows;
-
-  double get _ratio =>
-      totalThrows > 0 && hits > 0 ? (hits / totalThrows).clamp(0.0, 1.0) : 0.0;
-
-  static Color _colorFor(AppTokens t, String type) => switch (type) {
-    'T' => t.red,
-    'D' => t.green,
-    'S' => t.accent,
-    _ => t.orange, // M / fallback
-  };
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
-    final color = _colorFor(t, type);
-    final ratio = _ratio;
-    final percent = (ratio * 100).round();
+    final tt = Theme.of(context).textTheme;
+
+    final percent = totalThrows > 0 ? (hits / totalThrows).clamp(0.0, 1.0) : 0.0;
     final hasHits = hits > 0;
+
+    return Expanded(
+      child: Column(
+        children: [
+          // Label S/D/T
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            decoration: BoxDecoration(
+              color: isTargetType ? color.withOpacity(0.2) : Colors.transparent,
+              borderRadius: AppTokens.r4,
+            ),
+            child: Text(
+              type,
+              style: tt.labelSmall?.copyWith(
+                color: isTargetType ? color : (hasHits ? t.textSecondary : t.textMuted),
+                fontWeight: isTargetType ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          // Barra progresso
+          ClipRRect(
+            borderRadius: AppTokens.r4,
+            child: LinearProgressIndicator(
+              value: percent,
+              minHeight: 6,
+              backgroundColor: t.surfaceHigh,
+              valueColor: AlwaysStoppedAnimation(
+                hasHits ? color : t.border,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          // Numero colpi
+          Text(
+            hasHits ? '$hits' : '—',
+            style: tt.labelSmall?.copyWith(
+              color: hasHits ? t.textSecondary : t.textMuted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MissBar extends StatelessWidget {
+  const _MissBar({
+    required this.hits,
+    required this.totalThrows,
+  });
+
+  final int hits;
+  final int totalThrows;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
+
+    final percent = totalThrows > 0 ? (hits / totalThrows).clamp(0.0, 1.0) : 0.0;
+    final color = t.orange;
 
     return Row(
       children: [
-        // Label tipo
-        SizedBox(
-          width: 14,
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.15),
+            borderRadius: AppTokens.r8,
+          ),
           child: Text(
-            type,
-            style: TextStyle(
-              fontSize: 11,
-              height: 1,
-              fontWeight: FontWeight.w900,
-              color: hasHits || isTargetType ? color : t.textMuted,
+            'MISS',
+            style: tt.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ),
-        const SizedBox(width: 7),
-
-        // Barra di progresso
+        const SizedBox(width: 12),
         Expanded(
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(99),
+            borderRadius: AppTokens.r4,
             child: LinearProgressIndicator(
-              value: ratio,
-              minHeight: isTargetType ? 7 : 5,
+              value: percent,
+              minHeight: 6,
               backgroundColor: t.surfaceHigh,
-              valueColor: AlwaysStoppedAnimation(
-                hasHits ? color.withOpacity(isTargetType ? 1.0 : 0.75) : t.border,
-              ),
+              valueColor: AlwaysStoppedAnimation(color),
             ),
           ),
         ),
         const SizedBox(width: 8),
-
-        // Conteggio colpi
-        SizedBox(
-          width: 22,
-          child: Text(
-            hasHits ? '$hits' : '—',
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              fontSize: 11,
-              height: 1,
-              fontWeight: FontWeight.w800,
-              color: hasHits ? t.textPrimary : t.textMuted,
-            ),
-          ),
+        Text(
+          '$hits',
+          style: tt.bodyMedium?.copyWith(color: t.textPrimary),
         ),
-        const SizedBox(width: 4),
-
-        // Percentuale
-        SizedBox(
-          width: 30,
-          child: Text(
-            hasHits ? '$percent%' : '',
-            style: TextStyle(
-              fontSize: 9,
-              height: 1,
-              fontWeight: FontWeight.w600,
-              color: t.textMuted,
-            ),
-          ),
+        Text(
+          ' (${(percent * 100).round()}%)',
+          style: tt.labelSmall?.copyWith(color: t.textMuted),
         ),
       ],
     );

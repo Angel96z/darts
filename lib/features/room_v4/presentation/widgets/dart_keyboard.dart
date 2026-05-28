@@ -83,14 +83,13 @@ class _Board extends StatelessWidget {
 
   static const _geometry = _BoardGeometry();
 
-// SOSTITUISCI completamente il metodo build di _Board
+  // SOSTITUISCI completamente il metodo build di _Board
 
   @override
   Widget build(BuildContext context) {
     // DIMENSIONI FISSE - sempre uguali
     const double btnWidth = 70.0;
     const double btnHeight = 44.0;
-    const double btnFontSize = 16.0;
     const double horizontalMargin = 16.0;
     const double topMargin = 8.0;
     const double bottomMargin = 8.0;
@@ -103,7 +102,9 @@ class _Board extends StatelessWidget {
             behavior: HitTestBehavior.opaque,
             onTapDown: (details) {
               final RenderBox box = context.findRenderObject() as RenderBox;
-              final Offset localPosition = box.globalToLocal(details.globalPosition);
+              final Offset localPosition = box.globalToLocal(
+                details.globalPosition,
+              );
               final Size boardSize = Size.square(size);
               final Offset boardTopLeft = Offset(
                 (box.size.width - size) / 2,
@@ -121,9 +122,7 @@ class _Board extends StatelessWidget {
             },
             child: CustomPaint(
               size: Size.square(size),
-              painter: const _BoardPainter(
-                geometry: _geometry,
-              ),
+              painter: const _BoardPainter(geometry: _geometry),
             ),
           ),
         ),
@@ -138,7 +137,6 @@ class _Board extends StatelessWidget {
             t: t,
             width: btnWidth,
             height: btnHeight,
-            fontSize: btnFontSize,
           ),
         ),
         // Bottone T - alto destra
@@ -152,7 +150,6 @@ class _Board extends StatelessWidget {
             t: t,
             width: btnWidth,
             height: btnHeight,
-            fontSize: btnFontSize,
           ),
         ),
         // Bottone UNDO - basso sinistra
@@ -166,7 +163,6 @@ class _Board extends StatelessWidget {
             t: t,
             width: btnWidth,
             height: btnHeight,
-            fontSize: btnFontSize,
           ),
         ),
         // Bottone MISS - basso destra
@@ -179,7 +175,6 @@ class _Board extends StatelessWidget {
             t: t,
             width: btnWidth,
             height: btnHeight,
-            fontSize: btnFontSize,
           ),
         ),
       ],
@@ -261,38 +256,13 @@ class _BoardHit {
   final int sector;
   final int? multiplier;
 
-  const _BoardHit({
-    required this.sector,
-    this.multiplier,
-  });
+  const _BoardHit({required this.sector, this.multiplier});
 }
 
 class _BoardHitTester {
-  static const List<int> innerNumbers = [
-    5,
-    1,
-    4,
-    6,
-    15,
-    17,
-    19,
-    16,
-    11,
-    9,
-  ];
+  static const List<int> innerNumbers = [5, 1, 4, 6, 15, 17, 19, 16, 11, 9];
 
-  static const List<int> outerNumbers = [
-    20,
-    18,
-    13,
-    10,
-    2,
-    3,
-    7,
-    8,
-    14,
-    12,
-  ];
+  static const List<int> outerNumbers = [20, 18, 13, 10, 2, 3, 7, 8, 14, 12];
 
   static _BoardHit? hitTest({
     required Offset localPosition,
@@ -305,18 +275,12 @@ class _BoardHitTester {
     final distance = point.distance;
 
     if (distance <= geometry.doubleBullRadius) {
-      return const _BoardHit(
-        sector: 25,
-        multiplier: 2,
-      );
+      return const _BoardHit(sector: 25, multiplier: 2);
     }
 
     if (distance >= geometry.singleBullInnerRadius &&
         distance <= geometry.singleBullOuterRadius) {
-      return const _BoardHit(
-        sector: 25,
-        multiplier: 1,
-      );
+      return const _BoardHit(sector: 25, multiplier: 1);
     }
 
     if (distance >= geometry.innerSectorInnerRadius &&
@@ -380,35 +344,11 @@ class _BoardHitTester {
 class _BoardPainter extends CustomPainter {
   final _BoardGeometry geometry;
 
-  const _BoardPainter({
-    required this.geometry,
-  });
+  const _BoardPainter({required this.geometry});
 
-  static const List<int> innerNumbers = [
-    5,
-    1,
-    4,
-    6,
-    15,
-    17,
-    19,
-    16,
-    11,
-    9,
-  ];
+  static const List<int> innerNumbers = [5, 1, 4, 6, 15, 17, 19, 16, 11, 9];
 
-  static const List<int> outerNumbers = [
-    20,
-    18,
-    13,
-    10,
-    2,
-    3,
-    7,
-    8,
-    14,
-    12,
-  ];
+  static const List<int> outerNumbers = [20, 18, 13, 10, 2, 3, 7, 8, 14, 12];
 
   static const Color bg = Color(0xFF101418);
   static const Color sector = Color(0xFFD8D8D8);
@@ -453,44 +393,26 @@ class _BoardPainter extends CustomPainter {
       ..color = black
       ..style = PaintingStyle.fill;
 
-    canvas.drawCircle(
-      Offset.zero,
-      geometry.boardRadius,
-      paint,
-    );
+    canvas.drawCircle(Offset.zero, geometry.boardRadius, paint);
   }
 
   void _drawBull(Canvas canvas) {
     final paint = Paint()..style = PaintingStyle.fill;
 
     paint.color = green;
-    canvas.drawCircle(
-      Offset.zero,
-      geometry.singleBullOuterRadius,
-      paint,
-    );
+    canvas.drawCircle(Offset.zero, geometry.singleBullOuterRadius, paint);
 
     paint.color = black;
-    canvas.drawCircle(
-      Offset.zero,
-      geometry.singleBullInnerRadius,
-      paint,
-    );
+    canvas.drawCircle(Offset.zero, geometry.singleBullInnerRadius, paint);
 
     paint.color = red;
-    canvas.drawCircle(
-      Offset.zero,
-      geometry.doubleBullRadius,
-      paint,
-    );
+    canvas.drawCircle(Offset.zero, geometry.doubleBullRadius, paint);
 
     _drawCenteredText(
       canvas: canvas,
       text: 'DB',
       radius: 0,
       color: Colors.white,
-      fontSize: 24,
-      fontWeight: FontWeight.w900,
     );
   }
 
@@ -542,8 +464,6 @@ class _BoardPainter extends CustomPainter {
         radius: textRadius,
         angle: mid,
         color: Colors.black,
-        fontSize: 24,
-        fontWeight: FontWeight.w800,
       );
     }
 
@@ -574,15 +494,9 @@ class _BoardPainter extends CustomPainter {
     for (int i = 0; i < count; i++) {
       final angle = rotation + i * sweep;
 
-      final p1 = Offset(
-        cos(angle) * innerRadius,
-        sin(angle) * innerRadius,
-      );
+      final p1 = Offset(cos(angle) * innerRadius, sin(angle) * innerRadius);
 
-      final p2 = Offset(
-        cos(angle) * outerRadius,
-        sin(angle) * outerRadius,
-      );
+      final p2 = Offset(cos(angle) * outerRadius, sin(angle) * outerRadius);
 
       canvas.drawLine(p1, p2, paint);
     }
@@ -628,22 +542,14 @@ class _BoardPainter extends CustomPainter {
     required double radius,
     double angle = 0,
     required Color color,
-    required double fontSize,
-    required FontWeight fontWeight,
   }) {
-    final offset = Offset(
-      cos(angle) * radius,
-      sin(angle) * radius,
-    );
+    final offset = Offset(cos(angle) * radius, sin(angle) * radius);
+    final labelStyle = AppTokens.scoreSmallStyle.copyWith(color: color);
 
     final painter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: color,
-          fontSize: fontSize,
-          fontWeight: fontWeight,
-        ),
+      text: TextSpan(text: text, style: labelStyle),
+      textScaler: TextScaler.linear(
+        24 / (AppTokens.scoreSmallStyle.fontSize ?? 18),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -676,7 +582,6 @@ class _CornerBtn extends StatelessWidget {
   final AppTokens t;
   final double width;
   final double height;
-  final double fontSize;
 
   const _CornerBtn({
     this.label = '',
@@ -685,12 +590,13 @@ class _CornerBtn extends StatelessWidget {
     required this.t,
     required this.width,
     required this.height,
-    required this.fontSize,
     this.isActive = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -700,26 +606,20 @@ class _CornerBtn extends StatelessWidget {
         decoration: BoxDecoration(
           color: isActive ? t.accent : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isActive ? t.accent : t.border,
-            width: 1,
-          ),
+          border: Border.all(color: isActive ? t.accent : t.border, width: 1),
         ),
         child: icon != null
             ? Icon(
-          icon,
-          color: isActive ? t.accentFg : t.textSecondary,
-          size: fontSize * 1.4,
-        )
+                icon,
+                color: isActive ? t.accentFg : t.textSecondary,
+                size: (tt.titleSmall?.fontSize ?? 13) * 1.4,
+              )
             : Text(
-          label,
-          style: TextStyle(
-            color: isActive ? t.accentFg : t.textSecondary,
-            fontSize: fontSize,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
-          ),
-        ),
+                label,
+                style: tt.titleSmall?.copyWith(
+                  color: isActive ? t.accentFg : t.textSecondary,
+                ),
+              ),
       ),
     );
   }

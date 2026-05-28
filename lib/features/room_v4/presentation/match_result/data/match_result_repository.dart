@@ -14,6 +14,7 @@ class MatchResultRepository {
       Match match,
       List<PlayerInfo> players,
       bool isTeamMode,
+      bool isCricket,
       ) async {
     final stats = <String, PlayerStatistics>{};
 
@@ -32,12 +33,16 @@ class MatchResultRepository {
         for (final round in leg.rounds) {
           for (final turn in round.turns) {
             final current = stats[turn.playerId]!;
-            // Per Cricket, totalScore è la somma dei moltiplicatori (totalMarks)
-            // Per X01, totalScore è la somma dei punteggi (total)
-            final turnValue = turn.totalMarks > 0 ? turn.totalMarks : turn.total;
+
+            final turnValue = isCricket
+                ? turn.totalMarks
+                : turn.isBust
+                ? 0
+                : turn.initialScore - turn.score;
+
             stats[turn.playerId] = current.copyWith(
               totalTurns: current.totalTurns + 1,
-              totalScore: current.totalScore + turnValue,
+              totalScore: current.totalScore + turnValue,  // ← ORA CORRETTO
               totalDarts: current.totalDarts + turn.throws.length,
               checkouts: current.checkouts + (turn.isCheckout ? 1 : 0),
               bestTurn: current.bestTurn > turnValue ? current.bestTurn : turnValue,

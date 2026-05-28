@@ -65,6 +65,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Scaffold(
       backgroundColor: t.bg,
@@ -85,20 +86,20 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               const SizedBox(height: 24),
               Text(
                 'Inserisci la tua email',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: t.textPrimary),
+                style: tt.titleMedium?.copyWith(color: t.textPrimary),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 'Ti invieremo un link per reimpostare la password',
-                style: TextStyle(color: t.textSecondary),
+                style: tt.bodySmall?.copyWith(color: t.textSecondary),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
-                style: TextStyle(color: t.textPrimary),
+                style: tt.bodyMedium?.copyWith(color: t.textPrimary),
                 decoration: InputDecoration(
                   labelText: 'Email',
                   prefixIcon: Icon(Icons.email_outlined, color: t.accent),
@@ -124,12 +125,20 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     color: t.green.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(_successMessage!, style: TextStyle(color: t.green), textAlign: TextAlign.center),
+                  child: Text(
+                    _successMessage!,
+                    style: tt.bodySmall?.copyWith(color: t.green),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               if (_errorMessage != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(_errorMessage!, style: TextStyle(color: t.red), textAlign: TextAlign.center),
+                  child: Text(
+                    _errorMessage!,
+                    style: tt.bodySmall?.copyWith(color: t.red),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               const SizedBox(height: 24),
               ElevatedButton(
@@ -142,11 +151,17 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 ),
                 child: _isLoading
                     ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: t.accentFg))
-                    : const Text('INVIA LINK', style: TextStyle(fontSize: 16)),
+                    : Text(
+                        'INVIA LINK',
+                        style: tt.titleSmall?.copyWith(color: t.accentFg),
+                      ),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text('Torna al login', style: TextStyle(color: t.accent)),
+                child: Text(
+                  'Torna al login',
+                  style: tt.titleSmall?.copyWith(color: t.accent),
+                ),
               ),
             ],
           ),

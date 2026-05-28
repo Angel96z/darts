@@ -2,6 +2,7 @@
 /// Widget di feedback per il salvataggio del match
 
 import 'package:flutter/material.dart';
+import '../../../../app_theme.dart';
 import '../../domain/entities/local_match_record.dart';
 
 class MatchSaveFeedback extends StatelessWidget {
@@ -18,6 +19,7 @@ class MatchSaveFeedback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     String message;
     IconData icon;
     Color color;
@@ -67,7 +69,7 @@ class MatchSaveFeedback extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16),
+              style: tt.bodyMedium,
             ),
             const SizedBox(height: 20),
             Row(

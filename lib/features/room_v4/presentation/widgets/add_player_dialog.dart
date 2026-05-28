@@ -103,6 +103,7 @@ Future<(String, String, bool)?> showAddPlayerDialog(
 
 Future<bool?> _showCurrentUserDialog(BuildContext context, User user) {
   final t = AppTokens.of(context);
+  final tt = Theme.of(context).textTheme;
 
   return showDialog<bool>(
     context: context,
@@ -132,21 +133,13 @@ Future<bool?> _showCurrentUserDialog(BuildContext context, User user) {
           Text(
             'Gioca come',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: t.textPrimary,
-              fontSize: 18,  // aumentato
-              fontWeight: FontWeight.w900,
-            ),
+            style: tt.titleMedium?.copyWith(color: t.textPrimary),
           ),
           const SizedBox(height: 12),
           Text(
             user.email ?? user.displayName ?? 'User',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: t.accent,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
+            style: tt.titleSmall?.copyWith(color: t.accent),
           ),
           const SizedBox(height: 28),
           Row(
@@ -159,7 +152,7 @@ Future<bool?> _showCurrentUserDialog(BuildContext context, User user) {
                     side: BorderSide(color: t.border),
                     foregroundColor: t.textSecondary,  // ← AGGIUNGI
                   ),
-                  child: const Text('No', style: TextStyle(fontSize: 15)),
+                  child: Text('No', style: tt.bodyMedium?.copyWith(color: t.textSecondary)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -171,7 +164,7 @@ Future<bool?> _showCurrentUserDialog(BuildContext context, User user) {
                     backgroundColor: t.accent,  // ← AGGIUNGI
                     foregroundColor: t.accentFg,  // ← AGGIUNGI
                   ),
-                  child: const Text('Sì', style: TextStyle(fontSize: 15)),
+                  child: Text('Sì', style: tt.bodyMedium?.copyWith(color: t.accentFg)),
                 ),
               ),
             ],
@@ -204,6 +197,7 @@ class _AddPlayerPageState extends ConsumerState<_AddPlayerPage> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final state = ref.watch(roomNotifierProvider);
     final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
     final hasKeyboard = keyboardHeight > 0;
@@ -294,6 +288,7 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
@@ -317,11 +312,7 @@ class _Header extends StatelessWidget {
           Expanded(
             child: Text(
               'Aggiungi giocatore',
-              style: TextStyle(
-                color: t.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-              ),
+              style: tt.titleMedium?.copyWith(color: t.textPrimary),
             ),
           ),
         ],
@@ -383,6 +374,7 @@ class _ModeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Expanded(
       child: InkWell(
@@ -410,10 +402,8 @@ class _ModeChip extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 label,
-                style: TextStyle(
+                style: tt.titleSmall?.copyWith(
                   color: selected ? t.accent : t.textSecondary,
-                  fontSize: 13,
-                  fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
                 ),
               ),
             ],
@@ -479,6 +469,7 @@ class _GuestFormState extends State<_GuestForm> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -513,12 +504,9 @@ class _GuestFormState extends State<_GuestForm> {
                 borderRadius: AppTokens.r16,
               ),
             ),
-            child: const Text(
+            child: Text(
               'Aggiungi giocatore',
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 14,
-              ),
+              style: tt.titleSmall?.copyWith(color: t.accentFg),
             ),
           ),
         ),
@@ -572,6 +560,7 @@ class _BotFormState extends State<_BotForm> {
     required String value,
     required AppTokens t,
   }) {
+    final tt = Theme.of(context).textTheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -590,19 +579,11 @@ class _BotFormState extends State<_BotForm> {
           const SizedBox(width: 4),
           Text(
             '$label ',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: t.textMuted,
-            ),
+            style: tt.bodySmall?.copyWith(color: t.textMuted),
           ),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: t.accent,
-            ),
+            style: tt.labelSmall?.copyWith(color: t.accent),
           ),
         ],
       ),
@@ -628,6 +609,7 @@ class _BotFormState extends State<_BotForm> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -638,12 +620,7 @@ class _BotFormState extends State<_BotForm> {
             children: [
               Text(
                 'Livello difficoltà',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: t.textMuted,
-                  letterSpacing: 0.5,
-                ),
+                style: tt.labelSmall?.copyWith(color: t.textMuted),
               ),
               const SizedBox(height: 6),
 
@@ -682,9 +659,7 @@ class _BotFormState extends State<_BotForm> {
                           const SizedBox(width: 6),
                           Text(
                             level.displayName,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
+                            style: tt.bodySmall?.copyWith(
                               color: isSelected ? t.accent : t.textSecondary,
                             ),
                           ),
@@ -707,10 +682,7 @@ class _BotFormState extends State<_BotForm> {
                 : _getBotIcon(_selectedLevel, t.accentFg),
             label: Text(
               _botAdded ? 'Bot aggiunto!' : 'Aggiungi bot ${_selectedLevel.displayName}',
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 14,
-              ),
+              style: tt.titleSmall?.copyWith(color: t.accentFg),
             ),
             style: FilledButton.styleFrom(
               backgroundColor: _botAdded ? Colors.green : t.accent,
@@ -851,6 +823,7 @@ class _LoginFormState extends State<_LoginForm> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -901,11 +874,7 @@ class _LoginFormState extends State<_LoginForm> {
           const SizedBox(height: 12),
           Text(
             _error!,
-            style: TextStyle(
-              color: t.red,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
+            style: tt.bodySmall?.copyWith(color: t.red),
           ),
         ],
         const SizedBox(height: 16),
@@ -929,10 +898,7 @@ class _LoginFormState extends State<_LoginForm> {
             ),
             label: Text(
               _loginAdded ? 'Aggiunto' : 'Aggiungi giocatore',
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 14,
-              ),
+              style: tt.titleSmall?.copyWith(color: t.accentFg),
             ),
             style: FilledButton.styleFrom(
               backgroundColor: _loginAdded ? Colors.green : t.accent,
@@ -1004,6 +970,7 @@ class _AddedPlayersStripState extends State<_AddedPlayersStrip> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final sorted = List<PlayerInfo>.from(widget.players)
       ..sort((a, b) => a.order.compareTo(b.order));
 
@@ -1021,11 +988,7 @@ class _AddedPlayersStripState extends State<_AddedPlayersStrip> {
             ),
             child: Text(
               'Nessun giocatore aggiunto',
-              style: TextStyle(
-                color: t.textMuted,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
+              style: tt.bodySmall?.copyWith(color: t.textMuted),
             ),
           )
         else
@@ -1076,6 +1039,7 @@ class _AddedPlayerMiniCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Container(
       width: 200,
@@ -1106,11 +1070,7 @@ class _AddedPlayerMiniCard extends StatelessWidget {
               player.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: t.textPrimary,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
+              style: tt.titleSmall?.copyWith(color: t.textPrimary),
             ),
           ),
           const SizedBox(width: 4),

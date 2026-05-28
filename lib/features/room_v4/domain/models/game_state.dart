@@ -334,24 +334,37 @@ class GameState {
 
   double getPlayerAverage(String playerId) {
     final turns = getTurnsForPlayer(playerId);
+
     if (turns.isEmpty) return 0.0;
 
     int totalValue = 0;
     int totalDarts = 0;
 
     for (final turn in turns) {
-      if (isCricket) {
-        // Cricket: usa totalMarks (somma dei moltiplicatori)
-        totalValue += turn.totalMarks;
-      } else {
-        // X01: usa total (somma dei punteggi)
-        totalValue += turn.total;
-      }
       totalDarts += turn.throws.length;
+
+      if (isCricket) {
+        totalValue += turn.totalMarks;
+        continue;
+      }
+
+      // X01 REAL AVG
+      // Usa SOLO i punti realmente scalati.
+
+      if (turn.isBust) {
+        // Bust = 0 punti ma le freccette contano
+        continue;
+      }
+
+      final scored = turn.initialScore - turn.score;
+
+      if (scored > 0) {
+        totalValue += scored;
+      }
     }
 
     if (totalDarts == 0) return 0.0;
-    // Media su 3 dardi
+
     return (totalValue / totalDarts) * 3;
   }
 
@@ -381,7 +394,20 @@ class GameState {
   int getPlayerBestTurn(String playerId) {
     final turns = getTurnsForPlayer(playerId);
     if (turns.isEmpty) return 0;
-    return turns.map((t) => t.total).reduce((a, b) => a > b ? a : b);
+
+    int best = 0;
+
+    for (final turn in turns) {
+      final value = isCricket
+          ? turn.totalMarks
+          : turn.isBust
+          ? 0
+          : turn.initialScore - turn.score;
+
+      if (value > best) best = value;
+    }
+
+    return best;
   }
 
   double getPlayerCheckoutPercentage(String playerId) {

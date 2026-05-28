@@ -354,6 +354,8 @@ class _LivePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       child: Column(
@@ -366,23 +368,36 @@ class _LivePanel extends StatelessWidget {
               Text(
                 vm.playerName,
                 overflow: TextOverflow.ellipsis,
-                style: t.bodyBold(t.textPrimary).copyWith(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: tt.titleMedium?.copyWith(color: t.textPrimary),
               ),
-              if (vm.teamLabel != null) Text(vm.teamLabel!, style: t.bodySmall(t.textMuted)),
+              if (vm.teamLabel != null)
+                Text(
+                  vm.teamLabel!,
+                  style: tt.bodySmall?.copyWith(color: t.textMuted),
+                ),
             ])),
             if (vm.badge != null) _Pill(vm: vm.badge!, t: t),
           ]),
           const SizedBox(height: 4),
           // Riga 2: Score + Round
           Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Expanded(child: Text(vm.score, maxLines: 1, style: t.numericLarge(t.textPrimary))),
+            Expanded(
+              child: MediaQuery(
+                data: AppTokens.clampScore(context),
+                child: Text(
+                  vm.score,
+                  maxLines: 1,
+                  style: AppTokens.scoreStyle.copyWith(color: t.textPrimary),
+                ),
+              ),
+            ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               decoration: BoxDecoration(color: t.accent.withOpacity(0.15), borderRadius: AppTokens.r4),
-              child: Text(vm.roundLabel, style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800, color: t.accent, letterSpacing: 0.5)),
+              child: Text(
+                vm.roundLabel,
+                style: tt.titleSmall?.copyWith(color: t.accent),
+              ),
             ),
           ]),
           // 🔥 Riga 3: 3 freccette - SOLO se showStats = true (X01)
@@ -410,8 +425,8 @@ class _LivePanel extends StatelessWidget {
               Expanded(child: _StatItem(label: 'TURN', value: vm.liveTotalLabel, color: live, t: t)),
               const SizedBox(width: 6),
               Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text(vm.setLabel, style: t.bodySmall(t.textMuted)),
-                Text(vm.legLabel, style: t.bodySmall(t.textMuted)),
+                Text(vm.setLabel, style: tt.bodySmall?.copyWith(color: t.textMuted)),
+                Text(vm.legLabel, style: tt.bodySmall?.copyWith(color: t.textMuted)),
               ]),
             ]),
           ],
@@ -438,6 +453,8 @@ class _RightPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
       child: Column(
@@ -465,8 +482,8 @@ class _RightPanel extends StatelessWidget {
             Expanded(child: _StatItem(label: 'TURN', value: vm.liveTotalLabel, color: live, t: t)),
             const SizedBox(width: 12),
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text(vm.setLabel, style: t.bodySmall(t.textMuted)),
-              Text(vm.legLabel, style: t.bodySmall(t.textMuted)),
+              Text(vm.setLabel, style: tt.bodySmall?.copyWith(color: t.textMuted)),
+              Text(vm.legLabel, style: tt.bodySmall?.copyWith(color: t.textMuted)),
             ]),
           ]),
         ],
@@ -490,7 +507,7 @@ class _Pill extends StatelessWidget {
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(vm.icon, size: 10, color: c),
         const SizedBox(width: 3),
-        Text(vm.text, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: c, letterSpacing: 0.4)),
+        Text(vm.text, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: c)),
       ]),
     );
   }
@@ -502,6 +519,7 @@ class _DartChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     final hasValue = label != null;
     final text = hasValue ? label! : suggested ?? (isFrozen ? '?' : '_');
     final bgColor = hasValue ? live.withOpacity(0.12) : t.surfaceHigh;
@@ -511,7 +529,7 @@ class _DartChip extends StatelessWidget {
       padding: EdgeInsets.zero,
       alignment: Alignment.center,
       decoration: BoxDecoration(color: bgColor, borderRadius: AppTokens.r4),
-      child: Text(text, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: txtColor)),
+      child: Text(text, style: tt.titleMedium?.copyWith(color: txtColor)),
     );
   }
 }
@@ -520,13 +538,16 @@ class _StatItem extends StatelessWidget {
   final String label, value; final Color color; final AppTokens t;
   const _StatItem({required this.label, required this.value, required this.color, required this.t});
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: t.textMuted, letterSpacing: 0.6)),
-      Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: color, height: 1.1)),
-    ],
-  );
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: tt.labelSmall?.copyWith(color: t.textMuted)),
+        Text(value, style: tt.titleMedium?.copyWith(color: color)),
+      ],
+    );
+  }
 }
 
 // ──────────────────────────────────────────────
@@ -571,6 +592,7 @@ class HistoryPanelState extends State<HistoryPanel> {
   @override
   Widget build(BuildContext context) {
     final t = widget.t;
+    final tt = Theme.of(context).textTheme;
     final listMaxHeight = (MediaQuery.sizeOf(context).height * 0.20)
         .clamp(96.0, 160.0)
         .toDouble();
@@ -580,19 +602,20 @@ class HistoryPanelState extends State<HistoryPanel> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
-          child: Row(
-            children: [
-              Expanded(child: Text('SCORE', style: t.labelCaps(t.textMuted))),
-              Text(
-                '${widget.startScore}',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: t.textSecondary,
+            child: Row(
+              children: [
+              Expanded(
+                child: Text(
+                  'SCORE',
+                  style: tt.labelSmall?.copyWith(color: t.textMuted),
                 ),
               ),
+              Text(
+                '${widget.startScore}',
+                style: tt.titleMedium?.copyWith(color: t.textSecondary),
+              ),
               const SizedBox(width: 24),
-              Text('R', style: t.labelCaps(t.textMuted)),
+              Text('R', style: tt.labelSmall?.copyWith(color: t.textMuted)),
             ],
           ),
         ),
@@ -605,7 +628,7 @@ class HistoryPanelState extends State<HistoryPanel> {
               padding: const EdgeInsets.all(16),
               child: Text(
                 'Nessun turno ancora',
-                style: t.bodySmall(t.textMuted),
+                style: tt.bodySmall?.copyWith(color: t.textMuted),
               ),
             ),
           )
@@ -629,20 +652,28 @@ class HistoryRow extends StatelessWidget {
   const HistoryRow({required this.vm, required this.t});
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     final scoreColor = vm.isCheckout ? t.green : vm.isBust ? t.red : t.textPrimary;
     return Container(
       height: 32,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(children: [
         Expanded(child: Row(children: [
-          Text(vm.turnTotal, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: scoreColor)),
+          Text(vm.turnTotal, style: tt.titleSmall?.copyWith(color: scoreColor)),
           const SizedBox(width: 6),
-          Flexible(child: Text(vm.dartsLabel, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 9, color: t.textMuted))),
+          Flexible(
+            child: Text(
+              vm.dartsLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: tt.bodySmall?.copyWith(color: t.textMuted),
+            ),
+          ),
         ])),
         SizedBox(width: 44, child: Text(vm.scoreAfterTurn, textAlign: TextAlign.right,
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: vm.isCheckout ? t.green : t.textSecondary))),
+            style: tt.titleSmall?.copyWith(color: vm.isCheckout ? t.green : t.textSecondary))),
         SizedBox(width: 24, child: Text(vm.roundNumber, textAlign: TextAlign.right,
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: t.textMuted))),
+            style: tt.labelSmall?.copyWith(color: t.textMuted))),
       ]),
     );
   }

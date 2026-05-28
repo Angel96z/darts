@@ -53,6 +53,8 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
   SessionSort _sort = SessionSort.dateDesc;
   late Future<List<T>> _future;
   bool _isSelectionMode = false;
+  bool _isSyncing = false;
+  bool _isManualSyncing = false;
   final Set<String> _selectedIds = <String>{};
   final List<StreamSubscription<dynamic>> _subscriptions = [];
 
@@ -74,19 +76,37 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
   void _attachSyncListeners() {
     switch (widget.type) {
       case SessionType.training:
+        _isSyncing = LocalTrainingSyncService.instance.isSyncing;
+
         _subscriptions.add(
           LocalTrainingSyncService.instance.onSyncStatusChanged.listen((_) {
             if (!mounted) return;
             _reload();
           }),
         );
+
+        _subscriptions.add(
+          LocalTrainingSyncService.instance.onSyncRunningChanged.listen((value) {
+            if (!mounted) return;
+            _setSyncing(value);
+          }),
+        );
         break;
 
       case SessionType.match:
+        _isSyncing = LocalMatchSyncService.instance.isSyncing;
+
         _subscriptions.add(
           LocalMatchSyncService.instance.onSyncStatusChanged.listen((_) {
             if (!mounted) return;
             _reload();
+          }),
+        );
+
+        _subscriptions.add(
+          LocalMatchSyncService.instance.onSyncRunningChanged.listen((value) {
+            if (!mounted) return;
+            _setSyncing(value);
           }),
         );
         break;
@@ -114,7 +134,8 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
   }
 
   Future<void> _loadTrainingSessions(List<T> sessions, Set<String> added) async {
-    final localRecords = await LocalTrainingSyncService.instance.getAllRecords();
+    final localRecords = await LocalTrainingSyncService.instance.getAllRecordsForPicker();
+
 
     for (final local in localRecords.where((e) => e.target == widget.filterBy)) {
       final localStats = TrainingStats(local.throwsList);
@@ -195,7 +216,7 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
   }
 
   Future<void> _loadMatchSessions(List<T> sessions, Set<String> added) async {
-    final allMatches = await LocalMatchSyncService.instance.getAllRecords();
+    final allMatches = await LocalMatchSyncService.instance.getAllRecordsForPicker();
 
     final filteredMatches = widget.filterBy != null
         ? allMatches.where((m) => m.mode == widget.filterBy).toList()
@@ -224,7 +245,12 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
 
         totalTurns = x01Turns.length;
         totalDarts = x01Turns.fold<int>(0, (sum, turn) => sum + turn.dartsThrown);
-        totalScore = x01Turns.fold<int>(0, (sum, turn) => sum + turn.total);
+        totalScore = x01Turns.fold<int>(0, (sum, turn) {
+          if (turn.isBust) return sum;
+          final scored = turn.initialScore - turn.scoreAfter;
+          return sum + (scored > 0 ? scored : 0);
+        });
+
         checkouts = x01Turns.where((turn) => turn.isCheckout).length;
         average = totalDarts > 0 ? (totalScore / totalDarts) * 3 : 0.0;
       } else if (match.mode == 'cricket') {
@@ -443,19 +469,28 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Elimina sessioni', style: t.bodyBold(t.textPrimary)),
+        title: Text(
+          'Elimina sessioni',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(color: t.textPrimary),
+        ),
         content: Text(
           'Sei sicuro di voler eliminare ${_selectedIds.length} sessione${_selectedIds.length > 1 ? 'i' : ''}?',
-          style: t.bodySmall(t.textSecondary),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Annulla', style: t.bodyBold(t.textSecondary)),
+            child: Text(
+              'Annulla',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(color: t.textSecondary),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Elimina', style: t.bodyBold(t.red)),
+            child: Text(
+              'Elimina',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(color: t.red),
+            ),
           ),
         ],
       ),
@@ -473,15 +508,11 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
     try {
       switch (widget.type) {
         case SessionType.training:
-          for (final id in idsToDelete) {
-            await LocalTrainingSyncService.instance.deleteRecord(id);
-          }
+          await LocalTrainingSyncService.instance.deleteRecords(idsToDelete.toList());
           break;
 
         case SessionType.match:
-          for (final id in idsToDelete) {
-            await LocalMatchSyncService.instance.deleteRecord(id);
-          }
+          await LocalMatchSyncService.instance.deleteRecords(idsToDelete.toList());
           break;
       }
 
@@ -502,6 +533,76 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
     setState(() {
       _future = _loadSessions();
     });
+  }
+
+  void _setSyncing(bool value) {
+    if (_isSyncing == value) return;
+
+    setState(() {
+      _isSyncing = value;
+      if (!value) {
+        _future = _loadSessions();
+      }
+    });
+  }
+
+  Future<void> _runManualSync() async {
+    if (_isManualSyncing || _isSyncing) return;
+
+    setState(() {
+      _isManualSyncing = true;
+    });
+
+    try {
+      switch (widget.type) {
+        case SessionType.training:
+          await LocalTrainingSyncService.instance.syncAll();
+          break;
+
+        case SessionType.match:
+          await LocalMatchSyncService.instance.syncAll();
+          break;
+      }
+
+      if (!mounted) return;
+      _reload();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Errore sincronizzazione: $e')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isManualSyncing = false;
+      });
+    }
+  }
+
+  Widget _buildSyncLoading(AppTokens t) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: t.accent),
+            const SizedBox(height: 16),
+            Text(
+              'Sincronizzazione dati...',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: t.textPrimary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Aggiorno le sessioni locali e remote.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _toggleSelectionMode() {
@@ -526,6 +627,7 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Scaffold(
       backgroundColor: t.bg,
@@ -533,8 +635,8 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
         title: Text(
           _isSelectionMode
               ? '${_selectedIds.length} selezionate'
-              : 'Sessioni — PICKER UFFICIALE',
-          style: TextStyle(color: t.textPrimary),
+              : 'Sessioni',
+          style: tt.titleMedium?.copyWith(color: t.textPrimary),
         ),
         backgroundColor: t.surface,
         elevation: 0,
@@ -550,6 +652,22 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
               icon: Icon(Icons.delete, color: t.red),
               onPressed: widget.allowDelete ? _deleteSelected : null,
             ),
+          if (!_isSelectionMode)
+            IconButton(
+              tooltip: 'Sincronizza sessioni',
+              onPressed: (_isManualSyncing || _isSyncing) ? null : _runManualSync,
+              icon: (_isManualSyncing || _isSyncing)
+                  ? SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: t.accent,
+                ),
+              )
+                  : Icon(Icons.sync_rounded, color: t.accent),
+            ),
+
           if (!_isSelectionMode)
             PopupMenuButton<SessionSort>(
               onSelected: (value) {
@@ -576,8 +694,12 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
       body: FutureBuilder<List<T>>(
         future: _future,
         builder: (context, snapshot) {
+          if (_isSyncing) {
+            return _buildSyncLoading(t);
+          }
+
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return _buildSyncLoading(t);
           }
 
           if (snapshot.hasError) {
@@ -585,7 +707,7 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text('Errore caricamento sessioni: ${snapshot.error}',
-                    style: t.bodySmall(t.red)),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.red)),
               ),
             );
           }
@@ -594,7 +716,10 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
 
           if (sessions.isEmpty) {
             return Center(
-              child: Text('Nessuna sessione', style: t.bodySmall(t.textSecondary)),
+              child: Text(
+                'Nessuna sessione',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+              ),
             );
           }
 
@@ -606,30 +731,6 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
               final isHighlighted = widget.highlightedId == id;
               final isSelected = _selectedIds.contains(id);
               final syncStatus = _getSyncStatus(session);
-
-              IconData? icon;
-              Color? iconColor;
-
-              switch (syncStatus) {
-                case LocalTrainingSyncStatus.synced:
-                  icon = Icons.cloud_done;
-                  iconColor = t.green;
-                  break;
-                case LocalTrainingSyncStatus.pending:
-                  icon = Icons.cloud_upload;
-                  iconColor = t.orange;
-                  break;
-                case LocalTrainingSyncStatus.syncing:
-                  icon = Icons.cloud_sync;
-                  iconColor = t.accent;
-                  break;
-                case LocalTrainingSyncStatus.failed:
-                  icon = Icons.cloud_off;
-                  iconColor = t.red;
-                  break;
-                default:
-                  break;
-              }
 
               return Container(
                 color: isSelected
@@ -643,7 +744,7 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
                     activeColor: t.accent,
                     checkColor: t.accentFg,
                   )
-                      : (icon != null ? Icon(icon, color: iconColor) : null),
+                      : _SyncStatusBadge(status: syncStatus, t: t),
                   title: _SessionPickerTitle(
                     session: session,
                     dateText: DateFormat('dd/MM/yyyy HH:mm').format(_getStartTime(session)),
@@ -651,9 +752,9 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
                   ),
                   subtitle: Text(
                     _getSubtitle(session),
-                    style: t.bodySmall(t.textSecondary),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.textSecondary),
                   ),
-                  trailing: !_isSelectionMode && syncStatus == LocalTrainingSyncStatus.failed
+                  trailing: !_isSelectionMode && _canRetrySync(syncStatus)
                       ? IconButton(
                     icon: Icon(Icons.refresh, color: t.accent),
                     onPressed: () async {
@@ -692,25 +793,95 @@ class _SessionPickerScreenState<T> extends State<SessionPickerScreen<T>> {
   LocalTrainingSyncStatus? _getSyncStatus(T session) {
     if (session is TrainingSessionStats) return session.syncStatus;
     if (session is MatchSessionStats) {
-      // Mappa LocalMatchSyncStatus a LocalTrainingSyncStatus
       final matchStatus = session.syncStatus;
       if (matchStatus == null) return null;
+
       switch (matchStatus) {
         case LocalMatchSyncStatus.synced:
           return LocalTrainingSyncStatus.synced;
         case LocalMatchSyncStatus.pending:
-        case LocalMatchSyncStatus.pendingDelete:
           return LocalTrainingSyncStatus.pending;
         case LocalMatchSyncStatus.syncing:
           return LocalTrainingSyncStatus.syncing;
         case LocalMatchSyncStatus.failed:
-        case LocalMatchSyncStatus.failedDelete:
           return LocalTrainingSyncStatus.failed;
+        case LocalMatchSyncStatus.pendingDelete:
+          return LocalTrainingSyncStatus.pendingDelete;
+        case LocalMatchSyncStatus.failedDelete:
+          return LocalTrainingSyncStatus.failedDelete;
       }
     }
+
     return null;
   }
+
+  bool _canRetrySync(LocalTrainingSyncStatus? status) {
+    return status == LocalTrainingSyncStatus.failed ||
+        status == LocalTrainingSyncStatus.failedDelete;
+  }
 }
+
+class _SyncStatusBadge extends StatelessWidget {
+  final LocalTrainingSyncStatus? status;
+  final AppTokens t;
+
+  const _SyncStatusBadge({
+    required this.status,
+    required this.t,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    final data = _data();
+
+    return Container(
+      constraints: const BoxConstraints(minWidth: 78),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: data.color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: data.color.withOpacity(0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(data.icon, size: 13, color: data.color),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              data.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: tt.labelSmall?.copyWith(color: data.color),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  ({String label, IconData icon, Color color}) _data() {
+    switch (status) {
+      case LocalTrainingSyncStatus.synced:
+        return (label: 'SYNC', icon: Icons.cloud_done_rounded, color: t.green);
+      case LocalTrainingSyncStatus.pending:
+        return (label: 'DA SALVARE', icon: Icons.cloud_upload_rounded, color: t.orange);
+      case LocalTrainingSyncStatus.syncing:
+        return (label: 'SYNC...', icon: Icons.sync_rounded, color: t.accent);
+      case LocalTrainingSyncStatus.failed:
+        return (label: 'ERRORE', icon: Icons.cloud_off_rounded, color: t.red);
+      case LocalTrainingSyncStatus.pendingDelete:
+        return (label: 'DA ELIM.', icon: Icons.delete_sweep_rounded, color: t.orange);
+      case LocalTrainingSyncStatus.failedDelete:
+        return (label: 'ERR. ELIM.', icon: Icons.error_outline_rounded, color: t.red);
+      case null:
+        return (label: 'LOCALE', icon: Icons.storage_rounded, color: t.textSecondary);
+    }
+  }
+}
+
+
 class _SessionPickerTitle extends StatelessWidget {
   final dynamic session;
   final String dateText;
@@ -727,7 +898,7 @@ class _SessionPickerTitle extends StatelessWidget {
     if (session is! MatchSessionStats) {
       return Text(
         dateText,
-        style: t.bodyBold(t.textPrimary),
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(color: t.textPrimary),
       );
     }
 
@@ -742,7 +913,7 @@ class _SessionPickerTitle extends StatelessWidget {
       children: [
         Text(
           dateText,
-          style: t.bodyBold(t.textPrimary),
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(color: t.textPrimary),
         ),
         _SmallSessionBadge(label: rulesLabel, t: t),
         if (isWinner)
@@ -823,6 +994,7 @@ class _SmallSessionBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
@@ -834,11 +1006,7 @@ class _SmallSessionBadge extends StatelessWidget {
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: t.accent,
-          fontSize: 9,
-          fontWeight: FontWeight.w900,
-        ),
+        style: tt.labelSmall?.copyWith(color: t.accent),
       ),
     );
   }

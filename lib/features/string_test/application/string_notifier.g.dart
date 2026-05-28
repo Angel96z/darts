@@ -6,7 +6,7 @@ part of 'string_notifier.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$stringControllerHash() => r'a814606eabf542aca282d3a622d2c484b5c63ba1';
+String _$stringControllerHash() => r'e13606a9e845ab0ced8e890d9cd40c7c65d40609';
 
 /// See also [StringController].
 @ProviderFor(StringController)

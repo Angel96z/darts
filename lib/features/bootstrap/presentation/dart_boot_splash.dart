@@ -8,6 +8,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
+import '../../../app_theme.dart';
+
 // ----- DOMAIN LAYER (modello puro) -----
 
 @immutable
@@ -47,20 +49,74 @@ class BootState {
 
 class _DartboardStepLogic {
   static const List<int> boardNumbers = [
-    20, 1, 18, 4, 13, 6, 10, 15, 2, 17,
-    3, 19, 7, 16, 8, 11, 14, 9, 12, 5,
+    20,
+    1,
+    18,
+    4,
+    13,
+    6,
+    10,
+    15,
+    2,
+    17,
+    3,
+    19,
+    7,
+    16,
+    8,
+    11,
+    14,
+    9,
+    12,
+    5,
   ];
 
   static const List<int> doublesOrder = [
-    1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
-    11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
   ];
 
   static const List<int> triplesOrder = doublesOrder;
 
   static const List<int> singlesOrder = [
-    1, 18, 4, 13, 6, 10, 15, 2, 17, 3,
-    19, 7, 16, 8, 11, 14, 9, 12, 5, 20,
+    1,
+    18,
+    4,
+    13,
+    6,
+    10,
+    15,
+    2,
+    17,
+    3,
+    19,
+    7,
+    16,
+    8,
+    11,
+    14,
+    9,
+    12,
+    5,
+    20,
   ];
 
   static const int totalSteps = 62;
@@ -104,11 +160,7 @@ class DartBootSplash extends StatefulWidget {
   final String appName;
   final BootState state;
 
-  const DartBootSplash({
-    super.key,
-    required this.appName,
-    required this.state,
-  });
+  const DartBootSplash({super.key, required this.appName, required this.state});
 
   @override
   State<DartBootSplash> createState() => _DartBootSplashState();
@@ -127,12 +179,13 @@ class _DartBootSplashState extends State<DartBootSplash>
   void initState() {
     super.initState();
     _lastStep = _step;
-    _glowCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 350),
-    )..addListener(() {
-      if (mounted) setState(() => _glowValue = 1.0 - _glowCtrl.value);
-    });
+    _glowCtrl =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 350),
+        )..addListener(() {
+          if (mounted) setState(() => _glowValue = 1.0 - _glowCtrl.value);
+        });
   }
 
   @override
@@ -152,6 +205,7 @@ class _DartBootSplashState extends State<DartBootSplash>
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     final pct = (widget.state.clampedProgress * 100).round();
     final hasError = widget.state.hasError;
     final step = _step;
@@ -173,6 +227,9 @@ class _DartBootSplashState extends State<DartBootSplash>
                 painter: _DartboardPainter(
                   step: step,
                   glowValue: _glowValue,
+                  boardNumberStyle: AppTokens.scoreSmallStyle.copyWith(
+                    color: Colors.white.withOpacity(0.90),
+                  ),
                   boardNumbers: _DartboardStepLogic.boardNumbers,
                   doublesOrder: _DartboardStepLogic.doublesOrder,
                   triplesOrder: _DartboardStepLogic.triplesOrder,
@@ -190,42 +247,42 @@ class _DartBootSplashState extends State<DartBootSplash>
                   if (step > 0 && step <= 60 && !hasError)
                     Text(
                       prefix,
-                      style: TextStyle(
+                      style: tt.labelSmall?.copyWith(
                         color: Colors.white.withOpacity(0.38),
-                        fontSize: 11,
-                        letterSpacing: 4,
-                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   const SizedBox(height: 2),
-                  Text(
-                    value,
-                    style: TextStyle(
-                      color: isBullPhase
-                          ? const Color(0xFFFFD700)
-                          : Colors.white,
-                      fontSize: isBullPhase ? 28 : 24,
-                      letterSpacing: 5,
-                      fontWeight: FontWeight.w900,
-                      shadows: isBullPhase
-                          ? const [
-                        Shadow(
-                          color: Color(0xFFFFD700),
-                          blurRadius: 20,
+                  MediaQuery(
+                    data: AppTokens.clampScore(context),
+                    child: SizedBox(
+                      height: isBullPhase ? 28 : 24,
+                      child: FittedBox(
+                        fit: BoxFit.fitHeight,
+                        child: Text(
+                          value,
+                          style: AppTokens.scoreStyle.copyWith(
+                            color: isBullPhase
+                                ? const Color(0xFFFFD700)
+                                : Colors.white,
+                            shadows: isBullPhase
+                                ? const [
+                                    Shadow(
+                                      color: Color(0xFFFFD700),
+                                      blurRadius: 20,
+                                    ),
+                                  ]
+                                : null,
+                          ),
                         ),
-                      ]
-                          : null,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
                   Text(
                     widget.state.label,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: tt.bodySmall?.copyWith(
                       color: Colors.white.withOpacity(0.42),
-                      fontSize: 11,
-                      letterSpacing: 2.4,
-                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
@@ -251,11 +308,8 @@ class _DartBootSplashState extends State<DartBootSplash>
                   const SizedBox(height: 10),
                   Text(
                     '$pct%',
-                    style: TextStyle(
+                    style: tt.labelSmall?.copyWith(
                       color: Colors.white.withOpacity(0.40),
-                      fontSize: 12,
-                      letterSpacing: 2,
-                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
@@ -265,26 +319,25 @@ class _DartBootSplashState extends State<DartBootSplash>
               const SizedBox(height: 20),
               TextButton(
                 onPressed: widget.state.onRetry,
-                child: const Text(
+                child: Text(
                   'RIPROVA',
-                  style: TextStyle(
-                    color: Color(0xFFFFD700),
-                    letterSpacing: 2,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: tt.titleSmall?.copyWith(color: Color(0xFFFFD700)),
                 ),
               ),
             ],
             const Spacer(),
             Padding(
               padding: const EdgeInsets.only(bottom: 42),
-              child: Text(
-                widget.appName.toUpperCase(),
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.16),
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 8,
+              child: SizedBox(
+                height: 20,
+                child: FittedBox(
+                  fit: BoxFit.fitHeight,
+                  child: Text(
+                    widget.appName.toUpperCase(),
+                    style: tt.titleMedium?.copyWith(
+                      color: Colors.white.withOpacity(0.16),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -300,6 +353,7 @@ class _DartBootSplashState extends State<DartBootSplash>
 class _DartboardPainter extends CustomPainter {
   final int step;
   final double glowValue;
+  final TextStyle boardNumberStyle;
   final List<int> boardNumbers;
   final List<int> doublesOrder;
   final List<int> triplesOrder;
@@ -316,6 +370,7 @@ class _DartboardPainter extends CustomPainter {
   const _DartboardPainter({
     required this.step,
     required this.glowValue,
+    required this.boardNumberStyle,
     required this.boardNumbers,
     required this.doublesOrder,
     required this.triplesOrder,
@@ -323,8 +378,7 @@ class _DartboardPainter extends CustomPainter {
   });
 
   int _bi(int number) => boardNumbers.indexOf(number);
-  double _sa(int boardIndex) =>
-      (boardIndex * 18 - 9 - 90) * math.pi / 180;
+  double _sa(int boardIndex) => (boardIndex * 18 - 9 - 90) * math.pi / 180;
 
   Color _colorDT(int bi) =>
       bi.isOdd ? const Color(0xFF009A44) : const Color(0xFFD62B2B);
@@ -364,16 +418,32 @@ class _DartboardPainter extends CustomPainter {
     for (int d = 0; d < dDone; d++) {
       final bi = _bi(doublesOrder[d]);
       final gv = d == dDone - 1 && step <= 20 ? glowValue : 0.0;
-      _seg(canvas, c, R * _kDoubleInner, R * _kDoubleOuter, _sa(bi), _kSweep,
-          _colorDT(bi), gv);
+      _seg(
+        canvas,
+        c,
+        R * _kDoubleInner,
+        R * _kDoubleOuter,
+        _sa(bi),
+        _kSweep,
+        _colorDT(bi),
+        gv,
+      );
     }
 
     final tDone = (step - 20).clamp(0, 20);
     for (int t = 0; t < tDone; t++) {
       final bi = _bi(triplesOrder[t]);
       final gv = t == tDone - 1 && step > 20 && step <= 40 ? glowValue : 0.0;
-      _seg(canvas, c, R * _kTripleInner, R * _kTripleOuter, _sa(bi), _kSweep,
-          _colorDT(bi), gv);
+      _seg(
+        canvas,
+        c,
+        R * _kTripleInner,
+        R * _kTripleOuter,
+        _sa(bi),
+        _kSweep,
+        _colorDT(bi),
+        gv,
+      );
     }
 
     final sDone = (step - 40).clamp(0, 20);
@@ -381,19 +451,45 @@ class _DartboardPainter extends CustomPainter {
       final bi = _bi(singlesOrder[s]);
       final gv = s == sDone - 1 && step > 40 && step <= 60 ? glowValue : 0.0;
       final col = _colorSingle(bi);
-      _seg(canvas, c, R * _kBullOuter, R * _kTripleInner, _sa(bi), _kSweep, col,
-          gv);
-      _seg(canvas, c, R * _kTripleOuter, R * _kDoubleInner, _sa(bi), _kSweep,
-          col, gv);
+      _seg(
+        canvas,
+        c,
+        R * _kBullOuter,
+        R * _kTripleInner,
+        _sa(bi),
+        _kSweep,
+        col,
+        gv,
+      );
+      _seg(
+        canvas,
+        c,
+        R * _kTripleOuter,
+        R * _kDoubleInner,
+        _sa(bi),
+        _kSweep,
+        col,
+        gv,
+      );
     }
 
     if (step >= 61) {
-      _circle(canvas, c, R * _kBullOuter, const Color(0xFF009A44),
-          step == 61 ? glowValue : 0.0);
+      _circle(
+        canvas,
+        c,
+        R * _kBullOuter,
+        const Color(0xFF009A44),
+        step == 61 ? glowValue : 0.0,
+      );
     }
     if (step >= 62) {
-      _circle(canvas, c, R * _kBullseye, const Color(0xFFD62B2B),
-          step == 62 ? glowValue : 0.0);
+      _circle(
+        canvas,
+        c,
+        R * _kBullseye,
+        const Color(0xFFD62B2B),
+        step == 62 ? glowValue : 0.0,
+      );
     }
 
     _drawWire(canvas, c, R);
@@ -437,12 +533,10 @@ class _DartboardPainter extends CustomPainter {
 
       tp.text = TextSpan(
         text: boardNumbers[i].toString(),
-        style: TextStyle(
-          color: Colors.white.withOpacity(0.90),
-          fontSize: R * 0.112,
-          fontWeight: FontWeight.bold,
-          height: 1,
-        ),
+        style: boardNumberStyle,
+      );
+      tp.textScaler = TextScaler.linear(
+        (R * 0.112) / (boardNumberStyle.fontSize ?? 18),
       );
 
       tp.layout();
@@ -450,10 +544,23 @@ class _DartboardPainter extends CustomPainter {
     }
   }
 
-  void _seg(Canvas canvas, Offset c, double r1, double r2, double sa, double sw,
-      Color col, double gv) {
+  void _seg(
+    Canvas canvas,
+    Offset c,
+    double r1,
+    double r2,
+    double sa,
+    double sw,
+    Color col,
+    double gv,
+  ) {
     final path = _buildPath(c, r1, r2, sa, sw);
-    canvas.drawPath(path, Paint()..style = PaintingStyle.fill..color = col);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.fill
+        ..color = col,
+    );
     if (gv > 0) {
       canvas.drawPath(
         path,
@@ -478,8 +585,15 @@ class _DartboardPainter extends CustomPainter {
     }
   }
 
-  void _arc(Canvas canvas, Offset c, double r1, double r2, double sa, double sw,
-      Paint p) {
+  void _arc(
+    Canvas canvas,
+    Offset c,
+    double r1,
+    double r2,
+    double sa,
+    double sw,
+    Paint p,
+  ) {
     canvas.drawPath(_buildPath(c, r1, r2, sa, sw), p);
   }
 
@@ -488,10 +602,7 @@ class _DartboardPainter extends CustomPainter {
       ..moveTo(c.dx + r1 * math.cos(sa), c.dy + r1 * math.sin(sa))
       ..lineTo(c.dx + r2 * math.cos(sa), c.dy + r2 * math.sin(sa))
       ..arcTo(Rect.fromCircle(center: c, radius: r2), sa, sw, false)
-      ..lineTo(
-        c.dx + r1 * math.cos(sa + sw),
-        c.dy + r1 * math.sin(sa + sw),
-      )
+      ..lineTo(c.dx + r1 * math.cos(sa + sw), c.dy + r1 * math.sin(sa + sw))
       ..arcTo(Rect.fromCircle(center: c, radius: r1), sa + sw, -sw, false)
       ..close();
   }

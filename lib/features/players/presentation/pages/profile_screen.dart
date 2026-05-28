@@ -225,6 +225,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
+            final tt = Theme.of(ctx).textTheme;
             final canConfirm = selected.isNotEmpty;
 
             return AlertDialog(
@@ -251,7 +252,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   Expanded(
                     child: Text(
                       'Reset dati giochi',
-                      style: TextStyle(color: t.textPrimary, fontSize: 18, fontWeight: FontWeight.w800),
+                      style: tt.titleMedium?.copyWith(color: t.textPrimary),
                     ),
                   ),
                 ],
@@ -265,7 +266,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
                       child: Text(
                         'Seleziona quali dati eliminare dal tuo profilo. L’azione è definitiva.',
-                        style: TextStyle(color: t.textSecondary, fontSize: 13, height: 1.35),
+                        style: tt.bodySmall?.copyWith(color: t.textSecondary),
                       ),
                     ),
                     _buildResetTargetTile(
@@ -310,7 +311,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: Text('Annulla', style: TextStyle(color: t.textSecondary)),
+                  child: Text(
+                    'Annulla',
+                    style: tt.bodySmall?.copyWith(color: t.textSecondary),
+                  ),
                 ),
                 ElevatedButton.icon(
                   onPressed: canConfirm
@@ -382,7 +386,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Annulla")),
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text("ELIMINA DEFINITIVAMENTE", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+              child: Text(
+                "ELIMINA DEFINITIVAMENTE",
+                style: Theme.of(ctx).textTheme.titleSmall?.copyWith(color: t.red),
+              ),
             ),
           ],
         );
@@ -453,6 +460,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     required bool selected,
     required ValueChanged<bool?> onChanged,
   }) {
+    final tt = Theme.of(context).textTheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -470,11 +478,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         secondary: Icon(_resetTargetIcon(target), color: selected ? t.red : t.textMuted),
         title: Text(
           _resetTargetLabel(target),
-          style: TextStyle(color: selected ? t.red : t.textPrimary, fontSize: 14, fontWeight: FontWeight.w800),
+          style: tt.titleSmall?.copyWith(color: selected ? t.red : t.textPrimary),
         ),
         subtitle: Text(
           _resetTargetSubtitle(target),
-          style: TextStyle(color: t.textSecondary, fontSize: 12, height: 1.25),
+          style: tt.bodySmall?.copyWith(color: t.textSecondary),
         ),
       ),
     );
@@ -517,6 +525,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final userState = ref.watch(userProvider);
     final user = FirebaseAuth.instance.currentUser;
     final email = user?.email ?? "Nessuna email";
@@ -541,13 +550,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
           if (!isDesktop) {
             // Layout mobile originale
-            return _buildMobileLayout(t, profile, userState, email, firstName, lastName, nickname);
+            return _buildMobileLayout(
+              t,
+              tt,
+              profile,
+              userState,
+              email,
+              firstName,
+              lastName,
+              nickname,
+            );
           }
 
-          // Layout desktop: due colonne
+// Layout desktop: due colonne
           return Center(
             child: SizedBox(
-              width: 1100, // Larghezza massima contenitore desktop
+              width: 800,
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Row(
@@ -555,15 +573,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   children: [
                     // COLONNA SINISTRA - Azioni (40%)
                     Expanded(
-                      flex: 4,
-                      child: _buildActionsColumn(t, profile, email, firstName, lastName, nickname, userState),
+                      flex: 6,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: MediaQuery.of(context).size.height - 100, // Altezza massima disponibile
+                        ),
+                        child: SingleChildScrollView(
+                          child: _buildActionsColumn(t, profile, email, firstName, lastName, nickname, userState),
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 24),
                     // COLONNA DESTRA - Statistiche carriera (60%)
                     if (profile?.stats != null)
                       Expanded(
-                        flex: 6,
-                        child: _buildStatsColumn(t, profile!),
+                        flex: 4,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight: MediaQuery.of(context).size.height - 100,
+                          ),
+                          child: SingleChildScrollView(
+                            child: _buildStatsColumn(t, profile!),
+                          ),
+                        ),
                       ),
                   ],
                 ),
@@ -587,22 +619,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     required Future<void> Function() onSave,
     required String placeholder,
   }) {
+    final tt = Theme.of(context).textTheme;
     return ListTile(
       leading: Icon(icon, color: t.accent),
-      title: Text(label, style: TextStyle(color: t.textSecondary, fontSize: 12)),
+      title: Text(label, style: tt.bodySmall?.copyWith(color: t.textSecondary)),
       subtitle: isEditing
           ? TextField(
         controller: controller,
         autofocus: true,
-        style: TextStyle(color: t.textPrimary),
+        style: tt.bodyMedium?.copyWith(color: t.textPrimary),
         decoration: InputDecoration(
           hintText: placeholder,
-          hintStyle: TextStyle(color: t.textMuted),
+          hintStyle: tt.bodySmall?.copyWith(color: t.textMuted),
           border: InputBorder.none,
           contentPadding: EdgeInsets.zero,
         ),
       )
-          : Text(value.isNotEmpty ? value : '—', style: TextStyle(color: value.isNotEmpty ? t.textPrimary : t.textMuted)),
+          : Text(
+              value.isNotEmpty ? value : '—',
+              style: tt.bodyMedium?.copyWith(
+                color: value.isNotEmpty ? t.textPrimary : t.textMuted,
+              ),
+            ),
       trailing: isEditing
           ? Row(
         mainAxisSize: MainAxisSize.min,
@@ -617,18 +655,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildStatTile(AppTokens t, String label, String value) {
+    final tt = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: t.textSecondary, fontSize: 14)),
-          Text(value, style: TextStyle(color: t.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+          Text(label, style: tt.bodySmall?.copyWith(color: t.textSecondary)),
+          Text(value, style: tt.titleSmall?.copyWith(color: t.textPrimary)),
         ],
       ),
     );
   }
-  Widget _buildMobileLayout(AppTokens t, UserProfile? profile, UserState userState, String email, String firstName, String lastName, String nickname) {
+  Widget _buildMobileLayout(
+    AppTokens t,
+    TextTheme tt,
+    UserProfile? profile,
+    UserState userState,
+    String email,
+    String firstName,
+    String lastName,
+    String nickname,
+  ) {
     return Stack(
       children: [
         ListView(
@@ -641,18 +689,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 backgroundColor: t.accent.withOpacity(0.1),
                 child: Text(
                   profile?.initials ?? '?',
-                  style: TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: t.accent,
-                  ),
+                  style: AppTokens.scoreSmallStyle.copyWith(color: t.accent),
                 ),
               ),
             ),
             const SizedBox(height: 12),
-            Center(child: Text(profile?.displayName ?? email.split('@').first, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: t.textPrimary))),
+            Center(
+              child: Text(
+                profile?.displayName ?? email.split('@').first,
+                style: tt.titleMedium?.copyWith(color: t.textPrimary),
+              ),
+            ),
             const SizedBox(height: 8),
-            Center(child: Text(email, style: TextStyle(fontSize: 14, color: t.textSecondary))),
+            Center(child: Text(email, style: tt.bodySmall?.copyWith(color: t.textSecondary))),
             const SizedBox(height: 24),
 
             Card(
@@ -716,7 +765,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       child: Row(
                         children: [
                           Expanded(
-                            child: Text('Statistiche carriera', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: t.textPrimary)),
+                            child: Text(
+                              'Statistiche carriera',
+                              style: tt.titleMedium?.copyWith(color: t.textPrimary),
+                            ),
                           ),
                           if (!_isRefreshingStats)
                             IconButton(
@@ -753,7 +805,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
               child: ListTile(
                 leading: Icon(Icons.lock_outline, color: t.accent),
-                title: Text('Cambia password', style: TextStyle(color: t.textPrimary)),
+                title: Text('Cambia password', style: tt.bodyMedium?.copyWith(color: t.textPrimary)),
                 trailing: Icon(Icons.chevron_right, color: t.textMuted),
                 onTap: () {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
@@ -771,8 +823,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               child: ListTile(
                 leading: Icon(Icons.restart_alt_rounded, color: t.orange),
-                title: Text('Reset dati giochi', style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.w700)),
-                subtitle: Text('Elimina dati Training, X01 e Cricket dal profilo', style: TextStyle(color: t.textSecondary)),
+                title: Text('Reset dati giochi', style: tt.titleSmall?.copyWith(color: t.textPrimary)),
+                subtitle: Text(
+                  'Elimina dati Training, X01 e Cricket dal profilo',
+                  style: tt.bodySmall?.copyWith(color: t.textSecondary),
+                ),
                 trailing: Icon(Icons.chevron_right, color: t.orange),
                 onTap: _isResettingGameData ? null : _showResetGameDataOverlay,
               ),
@@ -785,8 +840,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
               child: ListTile(
                 leading: Icon(Icons.email, color: t.accent),
-                title: Text('Reset password via email', style: TextStyle(color: t.textPrimary)),
-                subtitle: Text('Riceverai un link per reimpostare la password', style: TextStyle(color: t.textSecondary, fontSize: 12)),
+                title: Text(
+                  'Reset password via email',
+                  style: tt.bodyMedium?.copyWith(color: t.textPrimary),
+                ),
+                subtitle: Text(
+                  'Riceverai un link per reimpostare la password',
+                  style: tt.bodySmall?.copyWith(color: t.textSecondary),
+                ),
                 trailing: Icon(Icons.chevron_right, color: t.textMuted),
                 onTap: () async {
                   try {
@@ -812,8 +873,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.red.withOpacity(0.3))),
               child: ListTile(
                 leading: Icon(Icons.delete_forever, color: t.red),
-                title: Text('Elimina account', style: TextStyle(color: t.red, fontWeight: FontWeight.w600)),
-                subtitle: Text('Elimina definitivamente profilo e dati', style: TextStyle(color: t.textSecondary, fontSize: 12)),
+                title: Text('Elimina account', style: tt.titleSmall?.copyWith(color: t.red)),
+                subtitle: Text(
+                  'Elimina definitivamente profilo e dati',
+                  style: tt.bodySmall?.copyWith(color: t.textSecondary),
+                ),
                 trailing: Icon(Icons.chevron_right, color: t.red),
                 onTap: _isDeletingAccount ? null : _deleteAccount,
               ),
@@ -831,171 +895,193 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildActionsColumn(AppTokens t, UserProfile? profile, String email, String firstName, String lastName, String nickname, UserState userState) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Center(
-          child: CircleAvatar(
-            radius: 56,
-            backgroundColor: t.accent.withOpacity(0.1),
-            child: Text(
-              profile?.initials ?? '?',
-              style: TextStyle(
-                fontSize: 42,
-                fontWeight: FontWeight.bold,
-                color: t.accent,
+    final tt = Theme.of(context).textTheme;
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: CircleAvatar(
+              radius: 56,
+              backgroundColor: t.accent.withOpacity(0.1),
+              child: Text(
+                profile?.initials ?? '?',
+                style: AppTokens.scoreSmallStyle.copyWith(color: t.accent),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-        Center(
-          child: Column(
-            children: [
-              Text(profile?.displayName ?? email.split('@').first, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: t.textPrimary)),
-              const SizedBox(height: 4),
-              Text(email, style: TextStyle(fontSize: 13, color: t.textSecondary)),
-            ],
+          const SizedBox(height: 16),
+          Center(
+            child: Column(
+              children: [
+                Text(
+                  profile?.displayName ?? email.split('@').first,
+                  style: tt.titleMedium?.copyWith(color: t.textPrimary),
+                ),
+                const SizedBox(height: 4),
+                Text(email, style: tt.bodySmall?.copyWith(color: t.textSecondary)),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 24),
+          const SizedBox(height: 24),
 
-        Card(
-          color: t.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
-          child: Column(
-            children: [
-              _buildEditableTile(
-                t: t,
-                icon: Icons.person_outline,
-                label: 'Nome',
-                value: firstName,
-                isEditing: _isEditingFirstName,
-                controller: _firstNameController,
-                onEdit: () => _startEditFirstName(firstName),
-                onCancel: _cancelEditFirstName,
-                onSave: _saveFirstName,
-                placeholder: 'Inserisci il tuo nome',
+          Card(
+            color: t.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
+            child: Column(
+              children: [
+                _buildEditableTile(
+                  t: t,
+                  icon: Icons.person_outline,
+                  label: 'Nome',
+                  value: firstName,
+                  isEditing: _isEditingFirstName,
+                  controller: _firstNameController,
+                  onEdit: () => _startEditFirstName(firstName),
+                  onCancel: _cancelEditFirstName,
+                  onSave: _saveFirstName,
+                  placeholder: 'Inserisci il tuo nome',
+                ),
+                Divider(color: t.divider, height: 1, indent: 56),
+                _buildEditableTile(
+                  t: t,
+                  icon: Icons.person_outline,
+                  label: 'Cognome',
+                  value: lastName,
+                  isEditing: _isEditingLastName,
+                  controller: _lastNameController,
+                  onEdit: () => _startEditLastName(lastName),
+                  onCancel: _cancelEditLastName,
+                  onSave: _saveLastName,
+                  placeholder: 'Inserisci il tuo cognome',
+                ),
+                Divider(color: t.divider, height: 1, indent: 56),
+                _buildEditableTile(
+                  t: t,
+                  icon: Icons.tag,
+                  label: 'Nickname',
+                  value: nickname,
+                  isEditing: _isEditingNickname,
+                  controller: _nicknameController,
+                  onEdit: () => _startEditNickname(nickname),
+                  onCancel: _cancelEditNickname,
+                  onSave: _saveNickname,
+                  placeholder: 'Inserisci il tuo nickname',
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          Card(
+            color: t.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
+            child: ListTile(
+              leading: Icon(Icons.lock_outline, color: t.accent),
+              title: Text('Cambia password', style: tt.bodyMedium?.copyWith(color: t.textPrimary)),
+              trailing: Icon(Icons.chevron_right, color: t.textMuted),
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
+              },
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          Card(
+            color: t.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: t.orange.withOpacity(0.35)),
+            ),
+            child: ListTile(
+              leading: Icon(Icons.restart_alt_rounded, color: t.orange),
+              title: Text('Reset dati giochi', style: tt.titleSmall?.copyWith(color: t.textPrimary)),
+              subtitle: Text(
+                'Elimina dati Training, X01 e Cricket',
+                style: tt.bodySmall?.copyWith(color: t.textSecondary),
               ),
-              Divider(color: t.divider, height: 1, indent: 56),
-              _buildEditableTile(
-                t: t,
-                icon: Icons.person_outline,
-                label: 'Cognome',
-                value: lastName,
-                isEditing: _isEditingLastName,
-                controller: _lastNameController,
-                onEdit: () => _startEditLastName(lastName),
-                onCancel: _cancelEditLastName,
-                onSave: _saveLastName,
-                placeholder: 'Inserisci il tuo cognome',
+              trailing: Icon(Icons.chevron_right, color: t.orange),
+              onTap: _isResettingGameData ? null : _showResetGameDataOverlay,
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          Card(
+            color: t.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
+            child: ListTile(
+              leading: Icon(Icons.email, color: t.accent),
+              title: Text(
+                'Reset password via email',
+                style: tt.bodyMedium?.copyWith(color: t.textPrimary),
               ),
-              Divider(color: t.divider, height: 1, indent: 56),
-              _buildEditableTile(
-                t: t,
-                icon: Icons.tag,
-                label: 'Nickname',
-                value: nickname,
-                isEditing: _isEditingNickname,
-                controller: _nicknameController,
-                onEdit: () => _startEditNickname(nickname),
-                onCancel: _cancelEditNickname,
-                onSave: _saveNickname,
-                placeholder: 'Inserisci il tuo nickname',
+              subtitle: Text(
+                'Riceverai un link per reimpostare',
+                style: tt.bodySmall?.copyWith(color: t.textSecondary),
               ),
-            ],
+              trailing: Icon(Icons.chevron_right, color: t.textMuted),
+              onTap: () async {
+                try {
+                  await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Email per reset password inviata"), backgroundColor: Colors.green),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Errore: $e"), backgroundColor: Colors.red),
+                  );
+                }
+              },
+            ),
           ),
-        ),
 
-        const SizedBox(height: 16),
+          const SizedBox(height: 16),
 
-        Card(
-          color: t.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
-          child: ListTile(
-            leading: Icon(Icons.lock_outline, color: t.accent),
-            title: Text('Cambia password', style: TextStyle(color: t.textPrimary)),
-            trailing: Icon(Icons.chevron_right, color: t.textMuted),
-            onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
-            },
+          Card(
+            color: t.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.red.withOpacity(0.3))),
+            child: ListTile(
+              leading: Icon(Icons.delete_forever, color: t.red),
+              title: Text('Elimina account', style: tt.titleSmall?.copyWith(color: t.red)),
+              subtitle: Text(
+                'Elimina definitivamente profilo e dati',
+                style: tt.bodySmall?.copyWith(color: t.textSecondary),
+              ),
+              trailing: Icon(Icons.chevron_right, color: t.red),
+              onTap: _isDeletingAccount ? null : _deleteAccount,
+            ),
           ),
-        ),
-
-        const SizedBox(height: 8),
-
-        Card(
-          color: t.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: t.orange.withOpacity(0.35)),
-          ),
-          child: ListTile(
-            leading: Icon(Icons.restart_alt_rounded, color: t.orange),
-            title: Text('Reset dati giochi', style: TextStyle(color: t.textPrimary, fontWeight: FontWeight.w700)),
-            subtitle: Text('Elimina dati Training, X01 e Cricket', style: TextStyle(color: t.textSecondary, fontSize: 12)),
-            trailing: Icon(Icons.chevron_right, color: t.orange),
-            onTap: _isResettingGameData ? null : _showResetGameDataOverlay,
-          ),
-        ),
-
-        const SizedBox(height: 8),
-
-        Card(
-          color: t.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
-          child: ListTile(
-            leading: Icon(Icons.email, color: t.accent),
-            title: Text('Reset password via email', style: TextStyle(color: t.textPrimary)),
-            subtitle: Text('Riceverai un link per reimpostare', style: TextStyle(color: t.textSecondary, fontSize: 12)),
-            trailing: Icon(Icons.chevron_right, color: t.textMuted),
-            onTap: () async {
-              try {
-                await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Email per reset password inviata"), backgroundColor: Colors.green),
-                );
-              } catch (e) {
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("Errore: $e"), backgroundColor: Colors.red),
-                );
-              }
-            },
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        Card(
-          color: t.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.red.withOpacity(0.3))),
-          child: ListTile(
-            leading: Icon(Icons.delete_forever, color: t.red),
-            title: Text('Elimina account', style: TextStyle(color: t.red, fontWeight: FontWeight.w600)),
-            subtitle: Text('Elimina definitivamente profilo e dati', style: TextStyle(color: t.textSecondary, fontSize: 12)),
-            trailing: Icon(Icons.chevron_right, color: t.red),
-            onTap: _isDeletingAccount ? null : _deleteAccount,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildStatsColumn(AppTokens t, UserProfile profile) {
+    final tt = Theme.of(context).textTheme;
     return Card(
       color: t.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: t.border)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: t.border)
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
                 Expanded(
-                  child: Text('Statistiche carriera', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: t.textPrimary)),
+                  child: Text(
+                    'Statistiche carriera',
+                    style: tt.titleMedium?.copyWith(color: t.textPrimary),
+                  ),
                 ),
                 if (!_isRefreshingStats)
                   IconButton(
@@ -1021,6 +1107,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           _buildStatTile(t, '100+', '${profile.stats.total100s}'),
           _buildStatTile(t, 'Checkout totali', '${profile.stats.totalCheckouts}'),
           _buildStatTile(t, 'Miglior checkout', '${profile.stats.bestCheckout}'),
+          const SizedBox(height: 8),
         ],
       ),
     );

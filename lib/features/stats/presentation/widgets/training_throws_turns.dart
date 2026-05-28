@@ -1,6 +1,7 @@
 /// File: training_throws_turns.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
 
 import 'package:flutter/material.dart';
+import '../../../../app_theme.dart';
 
 class TrainingThrowsTurns extends StatelessWidget {
   final int throwsCount;
@@ -15,16 +16,16 @@ class TrainingThrowsTurns extends StatelessWidget {
 
   /// Funzione: descrive in modo semplice questo blocco di logica.
   Widget _chip(BuildContext context, IconData icon, String value) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        color: scheme.surfaceVariant.withOpacity(0.65),
+        color: t.surfaceHigh.withOpacity(0.65),
         border: Border.all(
-          color: scheme.outlineVariant.withOpacity(0.50),
+          color: t.border.withOpacity(0.50),
         ),
       ),
       child: Row(
@@ -34,17 +35,14 @@ class TrainingThrowsTurns extends StatelessWidget {
           Icon(
             icon,
             size: 18,
-            color: scheme.onSurfaceVariant,
+            color: t.textSecondary,
           ),
 
           const SizedBox(width: 6),
 
           Text(
             value,
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              color: scheme.onSurface,
-            ),
+            style: tt.titleSmall?.copyWith(color: t.textPrimary),
           ),
 
         ],

@@ -246,9 +246,21 @@ class ConsigliNotifier extends StateNotifier<ConsigliState> {
     final consigli = state.consigli;
     if (consigli.isEmpty) return;
 
-    // Versione casuale (invece di sequenziale)
-    final randomIndex = _random.nextInt(consigli.length);
-    state = state.copyWith(current: consigli[randomIndex]);
+    if (consigli.length == 1) {
+      state = state.copyWith(current: consigli.first);
+      return;
+    }
+
+    final currentId = state.current?.id;
+    var next = consigli[_random.nextInt(consigli.length)];
+
+    var guard = 0;
+    while (next.id == currentId && guard < 8) {
+      next = consigli[_random.nextInt(consigli.length)];
+      guard++;
+    }
+
+    state = state.copyWith(current: next);
   }
 
   void skipToNext() {
@@ -281,16 +293,22 @@ class ConsigliCarouselWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final state = ref.watch(consigliProvider);
     final notifier = ref.read(consigliProvider.notifier);
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
-      child: _buildContent(t, state, notifier),
+      child: _buildContent(tt, t, state, notifier),
     );
   }
 
-  Widget _buildContent(AppTokens t, ConsigliState state, ConsigliNotifier notifier) {
+  Widget _buildContent(
+    TextTheme tt,
+    AppTokens t,
+    ConsigliState state,
+    ConsigliNotifier notifier,
+  ) {
     // Loading (come StringTestPage)
     if (state.status == ConsigliStatus.loading || state.status == ConsigliStatus.initial) {
       return Card(
@@ -315,7 +333,7 @@ class ConsigliCarouselWidget extends ConsumerWidget {
               const SizedBox(width: 12),
               Text(
                 'Caricamento consigli...',
-                style: TextStyle(color: t.textSecondary, fontSize: 13),
+                style: tt.bodySmall?.copyWith(color: t.textSecondary),
               ),
             ],
           ),
@@ -341,7 +359,7 @@ class ConsigliCarouselWidget extends ConsumerWidget {
               Expanded(
                 child: Text(
                   state.errorMessage ?? 'Impossibile caricare i consigli',
-                  style: TextStyle(color: t.textSecondary, fontSize: 12),
+                  style: tt.bodySmall?.copyWith(color: t.textSecondary),
                 ),
               ),
             ],
@@ -367,7 +385,7 @@ class ConsigliCarouselWidget extends ConsumerWidget {
               const SizedBox(width: 12),
               Text(
                 '💡 Aggiungi il primo consiglio sul database!',
-                style: TextStyle(color: t.textSecondary, fontSize: 13),
+                style: tt.bodySmall?.copyWith(color: t.textSecondary),
               ),
             ],
           ),
@@ -379,7 +397,16 @@ class ConsigliCarouselWidget extends ConsumerWidget {
     final consiglio = state.current!;
 
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 180),
+      layoutBuilder: (currentChild, previousChildren) {
+        return Stack(
+          alignment: Alignment.topCenter,
+          children: <Widget>[
+            ...previousChildren,
+            if (currentChild != null) currentChild,
+          ],
+        );
+      },
       transitionBuilder: (child, animation) {
         return FadeTransition(opacity: animation, child: child);
       },
@@ -411,26 +438,34 @@ class ConsigliCarouselWidget extends ConsumerWidget {
                       ),
                       child: Text(
                         _categoriaLabel(consiglio.categoria),
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: t.accent,
-                          letterSpacing: 0.8,
-                        ),
+                        style: tt.labelSmall?.copyWith(color: t.accent),
                       ),
                     ),
                     const Spacer(),
                     // Hint "tocca per saltare"
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.touch_app, size: 12, color: t.textMuted),
-                        const SizedBox(width: 4),
-                        Text(
-                          'skip',
-                          style: TextStyle(fontSize: 9, color: t.textMuted),
+                    // Azione rapida: prossimo consiglio
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(999),
+                        onTap: () => notifier.skipToNext(),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 7,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 18,
+                                color: t.accent,
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
@@ -442,10 +477,7 @@ class ConsigliCarouselWidget extends ConsumerWidget {
                   children: [
                     Text(
                       '„',
-                      style: TextStyle(
-                        fontSize: 32,
-                        height: 1,
-                        fontWeight: FontWeight.w400,
+                      style: AppTokens.scoreSmallStyle.copyWith(
                         color: t.accent.withOpacity(0.5),
                       ),
                     ),
@@ -453,20 +485,12 @@ class ConsigliCarouselWidget extends ConsumerWidget {
                     Expanded(
                       child: Text(
                         consiglio.text,
-                        style: TextStyle(
-                          fontSize: 15,
-                          height: 1.4,
-                          fontWeight: FontWeight.w500,
-                          color: t.textPrimary,
-                        ),
+                        style: tt.bodyMedium?.copyWith(color: t.textPrimary),
                       ),
                     ),
                     Text(
                       '“',
-                      style: TextStyle(
-                        fontSize: 32,
-                        height: 1,
-                        fontWeight: FontWeight.w400,
+                      style: AppTokens.scoreSmallStyle.copyWith(
                         color: t.accent.withOpacity(0.5),
                       ),
                     ),
@@ -479,11 +503,7 @@ class ConsigliCarouselWidget extends ConsumerWidget {
                     padding: const EdgeInsets.only(top: 12, left: 28),
                     child: Text(
                       '— ${consiglio.autore}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontStyle: FontStyle.italic,
-                        color: t.textSecondary,
-                      ),
+                      style: tt.bodySmall?.copyWith(color: t.textSecondary),
                     ),
                   ),
               ],

@@ -118,6 +118,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Scaffold(
       backgroundColor: t.bg,
@@ -138,14 +139,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 const SizedBox(height: 16),
                 Text(
                   'Crea il tuo account',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: t.textPrimary),
+                  style: tt.titleMedium?.copyWith(color: t.textPrimary),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
                 // Nome
                 TextFormField(
                   controller: _firstNameController,
-                  style: TextStyle(color: t.textPrimary),
+                  style: tt.bodyMedium?.copyWith(color: t.textPrimary),
                   decoration: InputDecoration(
                     labelText: 'Nome *',
                     hintText: 'Il tuo nome',
@@ -163,7 +164,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 // Cognome
                 TextFormField(
                   controller: _lastNameController,
-                  style: TextStyle(color: t.textPrimary),
+                  style: tt.bodyMedium?.copyWith(color: t.textPrimary),
                   decoration: InputDecoration(
                     labelText: 'Cognome *',
                     hintText: 'Il tuo cognome',
@@ -181,7 +182,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 // Nickname
                 TextFormField(
                   controller: _nicknameController,
-                  style: TextStyle(color: t.textPrimary),
+                  style: tt.bodyMedium?.copyWith(color: t.textPrimary),
                   decoration: InputDecoration(
                     labelText: 'Nickname *',
                     hintText: 'Come vuoi essere chiamato nel gioco',
@@ -200,7 +201,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  style: TextStyle(color: t.textPrimary),
+                  style: tt.bodyMedium?.copyWith(color: t.textPrimary),
                   decoration: InputDecoration(
                     labelText: 'Email *',
                     prefixIcon: Icon(Icons.email_outlined, color: t.accent),
@@ -219,7 +220,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
-                  style: TextStyle(color: t.textPrimary),
+                  style: tt.bodyMedium?.copyWith(color: t.textPrimary),
                   decoration: InputDecoration(
                     labelText: 'Password *',
                     prefixIcon: Icon(Icons.lock_outline, color: t.accent),
@@ -242,7 +243,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 TextFormField(
                   controller: _confirmPasswordController,
                   obscureText: _obscureConfirmPassword,
-                  style: TextStyle(color: t.textPrimary),
+                  style: tt.bodyMedium?.copyWith(color: t.textPrimary),
                   decoration: InputDecoration(
                     labelText: 'Conferma password *',
                     prefixIcon: Icon(Icons.lock_outline, color: t.accent),
@@ -263,7 +264,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 if (_errorMessage != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),
-                    child: Text(_errorMessage!, style: TextStyle(color: t.red, fontSize: 14), textAlign: TextAlign.center),
+                    child: Text(
+                      _errorMessage!,
+                      style: tt.bodySmall?.copyWith(color: t.red),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 ElevatedButton(
                   onPressed: _isLoading ? null : _register,
@@ -275,12 +280,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   child: _isLoading
                       ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: t.accentFg))
-                      : const Text('REGISTRATI', style: TextStyle(fontSize: 16)),
+                      : Text(
+                          'REGISTRATI',
+                          style: tt.titleSmall?.copyWith(color: t.accentFg),
+                        ),
                 ),
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text('Hai già un account? Accedi', style: TextStyle(color: t.accent)),
+                  child: Text(
+                    'Hai già un account? Accedi',
+                    style: tt.titleSmall?.copyWith(color: t.accent),
+                  ),
                 ),
               ],
             ),

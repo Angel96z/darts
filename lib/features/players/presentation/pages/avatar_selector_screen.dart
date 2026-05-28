@@ -42,6 +42,7 @@ class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
 
     return Scaffold(
       backgroundColor: t.bg,
@@ -58,7 +59,7 @@ class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
           else
             TextButton(
               onPressed: _saveAvatar,
-              child: Text('Salva', style: TextStyle(color: t.accent, fontWeight: FontWeight.bold)),
+              child: Text('Salva', style: tt.titleSmall?.copyWith(color: t.accent)),
             ),
         ],
       ),

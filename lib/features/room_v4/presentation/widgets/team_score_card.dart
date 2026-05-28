@@ -18,6 +18,7 @@ class TeamScoreCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final tt = Theme.of(context).textTheme;
     final isCricket = gameState.isCricket;
 
     final isCurrentTeam = playerIds.contains(gameState.currentPlayerId);
@@ -48,16 +49,16 @@ class TeamScoreCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(teamId, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg)),
+              Text(teamId, style: tt.labelSmall?.copyWith(color: fg)),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   'Set $sets  Leg $legs',
-                  style: TextStyle(fontSize: 10, color: t.textMuted),
+                  style: tt.bodySmall?.copyWith(color: t.textMuted),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Text('$score', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: fg)),
+              Text('$score', style: tt.titleMedium?.copyWith(color: fg)),
             ],
           ),
           const SizedBox(height: 2),

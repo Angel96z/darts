@@ -1,6 +1,7 @@
 /// File: training_hit_stats.dart. Contiene logica di presentazione (UI, widget o controller) per questa parte dell'app.
 
 import 'package:flutter/material.dart';
+import '../../../../app_theme.dart';
 
 class TrainingHitStats extends StatelessWidget {
   final int hit;
@@ -24,6 +25,7 @@ class TrainingHitStats extends StatelessWidget {
       int value,
       Color color,
       ) {
+    final tt = Theme.of(context).textTheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -34,10 +36,7 @@ class TrainingHitStats extends StatelessWidget {
 
         Text(
           "$value",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
+          style: tt.titleSmall?.copyWith(color: color),
         ),
 
       ],

@@ -1048,7 +1048,13 @@ class RoomNotifier extends StateNotifier<RoomState> {
         .where((turn) => turn.playerId == player.id)
         .toList();
 
-    final totalScore = playerTurns.fold(0, (sum, t) => sum + t.total);
+    final totalScore = playerTurns.fold(0, (sum, t) {
+      final turnValue = t.totalMarks > 0
+          ? t.totalMarks
+          : (t.initialScore - t.score);
+      return sum + turnValue;
+    });
+
     final totalDarts = playerTurns.fold(0, (sum, t) => sum + t.throws.length);
     final avg = totalDarts > 0 ? (totalScore / totalDarts) * 3 : 0.0;
     final checkouts = playerTurns.where((t) => t.isCheckout).length;
